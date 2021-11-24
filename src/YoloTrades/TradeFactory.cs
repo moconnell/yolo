@@ -117,10 +117,11 @@ namespace YoloTrades
                 var rawSize = (constrainedTargetWeight - currentWeight.Value) *
                     nominal / price.Value;
 
-                var size = Math.Floor(rawSize / market.LotSizeStep) * market.LotSizeStep;
+                var size = Math.Floor(rawSize / market.QuantityStep) * market.QuantityStep;
                 var factor = isBuy ? 0.618m : 0.382m;
-                var spread = market.Ask - market.Bid;
-                var limitPrice = market.Bid + spread * factor;
+                var spread = market.Ask!.Value - market.Bid!.Value;
+                var rawLimitPrice = market.Bid!.Value + spread * factor;
+                var limitPrice = Math.Floor(rawLimitPrice / market.PriceStep) * market.PriceStep;
                 var trade = new Trade(market.Name, market.AssetType, size, limitPrice);
 
                 _logger.GeneratedTrade(

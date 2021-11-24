@@ -148,8 +148,8 @@ namespace YoloBroker.Binance
             foreach (var x in spotExchangeInfo.Symbols)
             {
                 var ticker = spotTickersDict[x.Name];
-
-                var lotSizeStep = (x.LotSizeFilter?.StepSize ?? x.MarketLotSizeFilter?.StepSize) ??
+                var priceStep = x.PriceFilter?.TickSize ?? 1;
+                var quantityStep = (x.LotSizeFilter?.StepSize ?? x.MarketLotSizeFilter?.StepSize) ??
                                   1;
 
                 markets.Add(x.Name,
@@ -160,7 +160,8 @@ namespace YoloBroker.Binance
                             x.BaseAsset,
                             x.QuoteAsset,
                             AssetType.Spot,
-                            lotSizeStep,
+                            priceStep,
+                            quantityStep,
                             ticker.AskPrice,
                             ticker.BidPrice,
                             ticker.LastPrice,
@@ -192,6 +193,7 @@ namespace YoloBroker.Binance
                             x.BaseAsset,
                             x.QuoteAsset,
                             AssetType.Future,
+                            x.PriceFilter.TickSize,
                             x.LotSizeFilter.StepSize,
                             price.BestAskPrice,
                             price.BestBidPrice,

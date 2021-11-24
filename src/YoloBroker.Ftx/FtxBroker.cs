@@ -138,6 +138,7 @@ namespace YoloBroker.Ftx
                             g.Key,
                             s.QuoteCurrency,
                             s.Type.ToAssetType(),
+                            s.PriceStep,
                             s.QuantityStep,
                             s.BestAsk,
                             s.BestBid,
