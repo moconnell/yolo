@@ -50,8 +50,7 @@ internal class Program
             //setup our DI
             var serviceProvider = new ServiceCollection()
                 .AddLogging(loggingBuilder => loggingBuilder
-                    .AddConsole()
-                    .AddDebug())
+                    .AddConsole())
                 .AddBroker(config)
                 .AddSingleton<ITradeFactory, TradeFactory>()
                 .AddSingleton<IConfiguration>(config)
