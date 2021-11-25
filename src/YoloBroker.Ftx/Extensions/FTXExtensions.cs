@@ -28,22 +28,9 @@ namespace YoloBroker.Ftx.Extensions
 
         private static DateTime GetQuarterlyExpiry(string name)
         {
-            int Month(int q)
-            {
-                return q switch
-                {
-                    1 => 3,
-                    2 => 6,
-                    3 => 9,
-                    4 => 12,
-                    _ => throw new ArgumentOutOfRangeException(nameof(q), q, "Invalid quarter")
-                };
-            }
-
             DateTime LastFridayOf(int year, int month)
             {
-                var firstOfMonth = new DateTime(year, month, 1);
-                var firstOfNextMonth = firstOfMonth.AddMonths(1);
+                var firstOfNextMonth = new DateTime(year, month + 1, 1);
                 var deltaDays = -7 + (DayOfWeek.Friday - firstOfNextMonth.DayOfWeek);
                 
                 return firstOfNextMonth.AddDays(deltaDays);
@@ -57,7 +44,7 @@ namespace YoloBroker.Ftx.Extensions
             var q = Convert.ToInt32(match.Groups["quarter"]
                 .Value);
 
-            var month = Month(q);
+            var month = q*3;
             
             return LastFridayOf(year, month);
         }
