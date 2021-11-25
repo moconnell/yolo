@@ -129,6 +129,9 @@ namespace YoloBroker.Binance
         }
 
         public async Task<IDictionary<string, IEnumerable<MarketInfo>>> GetMarketsAsync(
+            ISet<string>? baseAssetFilter = null,
+            string? quoteCurrency = null,
+            AssetPermissions assetPermissions = AssetPermissions.All,
             CancellationToken ct = default)
         {
             var markets = new Dictionary<string, IEnumerable<MarketInfo>>();
@@ -165,6 +168,7 @@ namespace YoloBroker.Binance
                             ticker.AskPrice,
                             ticker.BidPrice,
                             ticker.LastPrice,
+                            null,
                             DateTime.UtcNow)
                     });
             }
@@ -197,6 +201,7 @@ namespace YoloBroker.Binance
                             x.LotSizeFilter.StepSize,
                             price.BestAskPrice,
                             price.BestBidPrice,
+                            null,
                             null,
                             price.Timestamp ?? DateTime.UtcNow)
                     });

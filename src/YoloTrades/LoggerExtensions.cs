@@ -5,7 +5,6 @@ using static YoloTrades.WellKnown;
 
 namespace YoloTrades
 {
-
     public static partial class LoggerExtensions
     {
         [LoggerMessage(

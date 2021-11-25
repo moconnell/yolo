@@ -12,6 +12,7 @@ namespace YoloAbstractions
         decimal? Ask,
         decimal? Bid,
         decimal? Last,
+        DateTime? Expiry,
         DateTime TimeStamp)
     {
         public string Key => $"{Name}-{AssetType}";

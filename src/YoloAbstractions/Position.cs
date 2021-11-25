@@ -2,7 +2,7 @@ namespace YoloAbstractions
 {
     public record Position(
         string AssetName,
-        string AssetUnderlying,
+        string BaseAsset,
         AssetType AssetType,
         decimal Amount)
     {

@@ -23,7 +23,7 @@ namespace YoloTrades
             TradeBuffer = yoloConfig.TradeBuffer;
             MaxLeverage = yoloConfig.MaxLeverage;
             NominalCash = yoloConfig.NominalCash;
-            BaseCurrencyToken = yoloConfig.BaseCurrencyToken;
+            BaseCurrencyToken = yoloConfig.BaseAsset;
             TradePreference = yoloConfig.TradePreference;
         }
 
@@ -95,7 +95,8 @@ namespace YoloTrades
                         ? tokenMarkets.Last()
                         : tokenMarkets.First();
 
-                var delta =constrainedTargetWeight - currentWeight!.Value;
+                var delta = constrainedTargetWeight - currentWeight!.Value;
+
                 if (Math.Abs(delta) <= TradeBuffer)
                 {
                     _logger.WithinTradeBuffer(

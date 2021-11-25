@@ -21,8 +21,9 @@ namespace YoloBroker.Ftx
         private readonly FTXClient _ftxClient;
         private readonly FTXSocketClient _ftxSocketClient;
         private bool _disposed;
-        
-        public FtxBroker(IConfiguration configuration) : this(configuration.GetFtxConfig())
+
+        public FtxBroker(IConfiguration configuration)
+            : this(configuration.GetFtxConfig())
         {
         }
 
@@ -62,12 +63,14 @@ namespace YoloBroker.Ftx
                 {
                     var orderSide = trade.Amount < 0 ? OrderSide.Sell : OrderSide.Buy;
                     var quantity = Math.Abs(trade.Amount);
+                    var orderType = trade.LimitPrice.HasValue ? OrderType.Limit : OrderType.Market;
 
                     var result = await _ftxClient.PlaceOrderAsync(
                         trade.AssetName,
                         orderSide,
-                        OrderType.Market,
+                        orderType,
                         quantity,
+                        trade.LimitPrice,
                         ct: ct);
 
                     return (trade, result);
@@ -121,6 +124,9 @@ namespace YoloBroker.Ftx
         }
 
         public async Task<IDictionary<string, IEnumerable<MarketInfo>>> GetMarketsAsync(
+            ISet<string>? baseAssetFilter = null,
+            string? quoteCurrency = null,
+            AssetPermissions assetPermissions = AssetPermissions.All,
             CancellationToken ct = default)
         {
             var symbols = await GetDataAsync(
@@ -128,7 +134,42 @@ namespace YoloBroker.Ftx
                 "Unable to get symbols"
             );
 
+            bool Filter(FTXSymbol s)
+            {
+                if (quoteCurrency is { } &&
+                    s.QuoteCurrency is { } &&
+                    quoteCurrency != s.QuoteCurrency)
+                    return false;
+                
+                if (baseAssetFilter is { } &&
+                    s.BaseCurrency is { } &&
+                    !baseAssetFilter.Contains(s.BaseCurrency))
+                {
+                    return false;
+                }
+
+                var expiry = s.GetExpiry();
+
+                return assetPermissions switch
+                {
+                    AssetPermissions.None => false,
+                    AssetPermissions.All => true,
+                    AssetPermissions.SpotAndPerp => s.Type == SymbolType.Spot ||
+                                                    expiry is null,
+                    AssetPermissions.Spot => s.Type == SymbolType.Spot,
+                    AssetPermissions.PerpetualFutures => s.Type == SymbolType.Future &&
+                                                         expiry is null,
+                    AssetPermissions.ExpiringFutures => s.Type == SymbolType.Future &&
+                                                        expiry is { },
+                    _ => throw new ArgumentOutOfRangeException(nameof(assetPermissions),
+                        assetPermissions,
+                        "Unsupported asset permissions value")
+                };
+            }
+
+
             return symbols
+                .Where(Filter)
                 .GroupBy(s => s.BaseCurrency ?? s.Underlying)
                 .ToDictionary(
                     g => g.Key,
@@ -143,6 +184,7 @@ namespace YoloBroker.Ftx
                             s.BestAsk,
                             s.BestBid,
                             s.LastPrice,
+                            s.GetExpiry(),
                             DateTime.UtcNow)));
         }
 

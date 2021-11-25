@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using YoloAbstractions.Config;
 using YoloBroker;
 using YoloTrades;
@@ -49,8 +50,8 @@ internal class Program
             //setup our DI
             var serviceProvider = new ServiceCollection()
                 .AddLogging(loggingBuilder => loggingBuilder
-                    .AddConsole(configure =>
-                        configure.LogToStandardErrorThreshold = LogLevel.Debug))
+                    .AddConsole()
+                    .AddDebug())
                 .AddBroker(config)
                 .AddSingleton<ITradeFactory, TradeFactory>()
                 .AddSingleton<IConfiguration>(config)
@@ -62,12 +63,28 @@ internal class Program
 
             var yoloConfig = config.GetYoloConfig();
 
-            var weights = await yoloConfig
-                .GetWeights();
+            var weights = (await yoloConfig
+                .GetWeights())
+                .ToArray();
 
             using IYoloBroker broker = serviceProvider.GetService<IYoloBroker>()!;
+            
             var positions = await broker.GetPositionsAsync(cancellationToken);
-            var markets = await broker.GetMarketsAsync(cancellationToken);
+            // _logger.LogDebug("{Positions}", JsonConvert.SerializeObject(positions));
+
+            var baseAssetFilter = positions
+                .Values
+                .Select(p => p.BaseAsset)
+                .Union(weights.Select(w => w.Ticker.Split("/")
+                    .First()))
+                .ToHashSet();
+            
+            var markets = await broker.GetMarketsAsync(
+                baseAssetFilter, 
+                yoloConfig.BaseAsset,
+                yoloConfig.AssetPermissions, 
+                cancellationToken);
+            // _logger.LogDebug("{Markets}", JsonConvert.SerializeObject(markets));
 
             var tradeFactory = serviceProvider.GetService<ITradeFactory>()!;
 

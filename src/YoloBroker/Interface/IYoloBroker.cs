@@ -14,6 +14,10 @@ namespace YoloBroker
 
         Task ConnectAsync(CancellationToken ct);
 
-        Task<IDictionary<string, IEnumerable<MarketInfo>>> GetMarketsAsync(CancellationToken ct = default);
+        Task<IDictionary<string, IEnumerable<MarketInfo>>> GetMarketsAsync(
+            ISet<string>? baseAssetFilter = null,
+            string quoteCurrency = null,
+            AssetPermissions assetPermissions = AssetPermissions.All,
+            CancellationToken ct = default);
     }
 }

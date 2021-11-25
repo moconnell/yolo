@@ -5,4 +5,5 @@ namespace YoloAbstractions
         BestPrice,
         MatchExistingPosition
     }
+
 }

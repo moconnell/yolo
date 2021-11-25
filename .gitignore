@@ -265,3 +265,7 @@ __pycache__/
 
 # local appsettings
 appsettings.*.json
+
+# macOS folder settings
+.DS_Store
+
