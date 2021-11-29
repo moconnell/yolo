@@ -37,7 +37,7 @@ namespace YoloTrades
             };
 
             return markets
-                .GetMarkets(assetUnderlying, assetType)
+                .GetMarkets(assetUnderlying)
                 .Select(market => amount * market.Bid.GetValueOrDefault())
                 .FirstOrDefault();
         }

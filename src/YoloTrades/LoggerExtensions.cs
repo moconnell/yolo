@@ -32,11 +32,10 @@ namespace YoloTrades
         [LoggerMessage(
             EventId = TradeEventIds.NoMarkets,
             Level = LogLevel.Error, 
-            Message = "({Token}): no {AssetType} markets")]
+            Message = "({Token}): no markets")]
         public static partial void NoMarkets(
             this ILogger logger,
-            string token, 
-            AssetType? assetType);
+            string token);
 
         [LoggerMessage(
             EventId = TradeEventIds.NoBid,

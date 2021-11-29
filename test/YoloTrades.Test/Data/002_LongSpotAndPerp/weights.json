@@ -1,0 +1,82 @@
+[
+  {
+    "Price": 1.03265,
+    "ComboWeight": -0.035358456804061786,
+    "Date": "2021-11-24",
+    "MomentumFactor": -0.015873015873015876,
+    "Ticker": "XRP/USD",
+    "TrendFactor": -0.0548438977351077
+  },
+  {
+    "Price": 50.12,
+    "ComboWeight": -0.08912472066164345,
+    "Date": "2021-11-24",
+    "MomentumFactor": -0.11111111111111113,
+    "Ticker": "FTT/USD",
+    "TrendFactor": -0.06713833021217579
+  },
+  {
+    "Price": 4271.3,
+    "ComboWeight": 0.04170355272333968,
+    "Date": "2021-11-24",
+    "MomentumFactor": 0.09523809523809522,
+    "Ticker": "ETH/USD",
+    "TrendFactor": -0.011830989791415862
+  },
+  {
+    "Price": 212.27,
+    "ComboWeight": 0.04570070821619997,
+    "Date": "2021-11-24",
+    "MomentumFactor": 0.09788359788359786,
+    "Ticker": "LTC/USD",
+    "TrendFactor": -0.006482181451197927
+  },
+  {
+    "Price": 0.217363,
+    "ComboWeight": -0.10490068056050514,
+    "Date": "2021-11-24",
+    "MomentumFactor": -0.14550264550264552,
+    "Ticker": "DOGE/USD",
+    "TrendFactor": -0.06429871561836474
+  },
+  {
+    "Price": 0.884975,
+    "ComboWeight": 0.15019061798883973,
+    "Date": "2021-11-24",
+    "MomentumFactor": 0.1904761904761905,
+    "Ticker": "CRO/USD",
+    "TrendFactor": 0.10990504550148897
+  },
+  {
+    "Price": 618.925,
+    "ComboWeight": 0.05219880166661978,
+    "Date": "2021-11-24",
+    "MomentumFactor": 0.10846560846560849,
+    "Ticker": "BCH/USD",
+    "TrendFactor": -0.0040680051323689174
+  },
+  {
+    "Price": 20.81,
+    "ComboWeight": -0.09653111272074875,
+    "Date": "2021-11-24",
+    "MomentumFactor": -0.11375661375661378,
+    "Ticker": "UNI/USD",
+    "TrendFactor": -0.07930561168488373
+  },
+  {
+    "Price": 25.59,
+    "ComboWeight": -0.08830803740479116,
+    "Date": "2021-11-24",
+    "MomentumFactor": -0.11375661375661378,
+    "Ticker": "LINK/USD",
+    "TrendFactor": -0.06285946105296855
+  },
+  {
+    "Price": 57152.0,
+    "ComboWeight": -0.015294757656324872,
+    "Date": "2021-11-24",
+    "MomentumFactor": 0.007936507936507938,
+    "Ticker": "BTC/USD",
+    "TrendFactor": -0.03852602324915768
+  }
+]

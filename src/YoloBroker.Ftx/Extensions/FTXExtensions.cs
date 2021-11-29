@@ -30,7 +30,7 @@ namespace YoloBroker.Ftx.Extensions
         {
             DateTime LastFridayOf(int year, int month)
             {
-                var firstOfNextMonth = new DateTime(year, month + 1, 1);
+                var firstOfNextMonth = new DateTime(year, month, 1).AddMonths(1);
                 var deltaDays = -7 + (DayOfWeek.Friday - firstOfNextMonth.DayOfWeek);
                 
                 return firstOfNextMonth.AddDays(deltaDays);

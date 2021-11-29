@@ -24,10 +24,10 @@ namespace YoloTrades
             MaxLeverage = yoloConfig.MaxLeverage;
             NominalCash = yoloConfig.NominalCash;
             BaseCurrencyToken = yoloConfig.BaseAsset;
-            TradePreference = yoloConfig.TradePreference;
+            AssetPermissions = yoloConfig.AssetPermissions;
         }
 
-        private AssetTypePreference TradePreference { get; }
+        private AssetPermissions AssetPermissions { get; }
         private string BaseCurrencyToken { get; }
         private decimal? NominalCash { get; }
         private decimal MaxLeverage { get; }
@@ -54,7 +54,7 @@ namespace YoloTrades
 
             var trades = new List<Trade>();
 
-            void AddTrade(Weight w)
+            void Process(Weight w)
             {
                 var (token, baseCurrency) = w.Ticker.SplitConstituents();
 
@@ -70,22 +70,15 @@ namespace YoloTrades
 
                 _logger.LogDebug("Processing weight: {Weight}", w);
 
-                var assetTypeFilter =
-                    TradePreference == AssetTypePreference.MatchExistingPosition &&
-                    position.Amount != 0
-                        ? position.AssetType
-                        : (AssetType?)null;
-
                 var tokenMarkets = markets.GetMarkets(
-                        token,
-                        assetTypeFilter)
+                        token)
                     .OrderBy(p => p.Last)
                     .Select(p => (price: p, currentWeight: position.Amount * p.Bid / nominal))
                     .ToArray();
 
                 if (!tokenMarkets.Any())
                 {
-                    _logger.NoMarkets(token, assetTypeFilter);
+                    _logger.NoMarkets(token);
                     return;
                 }
 
@@ -108,37 +101,71 @@ namespace YoloTrades
                 }
 
                 var isBuy = constrainedTargetWeight > currentWeight!.Value;
-                var price = GetPrice(isBuy, market);
 
-                if (price is null)
+                if (constrainedTargetWeight < 0 && !isBuy && market.AssetType == AssetType.Spot &&
+                    !AssetPermissions.HasFlag(AssetPermissions.ShortSpot))
                 {
-                    return;
+                    if (currentWeight > 0)
+                    {
+                        // close spot
+                        var trade = CreateTrade(
+                            market,
+                            currentWeight.Value,
+                            0,
+                            nominal);
+
+                        trades.Add(trade);
+                    }
+                    
+                    // short the rest with futures
+                }
+                else
+                {
+                    // trade normally
+                    var trade = CreateTrade(
+                        market,
+                        currentWeight.Value,
+                        constrainedTargetWeight,
+                        nominal);
+
+                    trades.Add(trade);
                 }
 
-                var rawSize = (constrainedTargetWeight - currentWeight.Value) *
-                    nominal / price.Value;
-
-                var size = Math.Floor(rawSize / market.QuantityStep) * market.QuantityStep;
-                var factor = isBuy ? 0.618m : 0.382m;
-                var spread = market.Ask!.Value - market.Bid!.Value;
-                var rawLimitPrice = market.Bid!.Value + spread * factor;
-                var limitPrice = Math.Floor(rawLimitPrice / market.PriceStep) * market.PriceStep;
-                var trade = new Trade(market.Name, market.AssetType, size, limitPrice);
-
-                _logger.GeneratedTrade(
-                    token,
-                    currentWeight,
-                    constrainedTargetWeight,
-                    delta,
-                    trade);
-
-                trades.Add(trade);
             }
 
             weightsList
-                .ForEach(AddTrade);
+                .ForEach(Process);
 
             return trades;
+        }
+
+        private Trade CreateTrade(MarketInfo market, decimal currentWeight, decimal targetWeight, decimal nominal)
+        {
+            var isBuy = targetWeight > currentWeight;
+            var price = GetPrice(isBuy, market);
+            if (price is null)
+            {
+                throw new TradeException("Missing price");
+            }
+
+            var delta = targetWeight - currentWeight;
+            var rawSize = delta * nominal / price.Value;
+
+            var size = Math.Floor(rawSize / market.QuantityStep) * market.QuantityStep;
+            var factor = isBuy ? 0.618m : 0.382m;
+            var spread = market.Ask!.Value - market.Bid!.Value;
+            var rawLimitPrice = market.Bid!.Value + spread * factor;
+            var limitPrice = Math.Floor(rawLimitPrice / market.PriceStep) * market.PriceStep;
+            var trade = new Trade(market.Name, market.AssetType, size, limitPrice);
+
+            _logger.GeneratedTrade(
+                market.BaseAsset,
+                currentWeight,
+                targetWeight,
+                delta,
+                trade);
+
+            return trade;
         }
 
         private decimal? GetPrice(bool isBuy, MarketInfo market)

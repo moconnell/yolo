@@ -139,31 +139,29 @@ namespace YoloBroker.Ftx
                 if (quoteCurrency is { } &&
                     s.QuoteCurrency is { } &&
                     quoteCurrency != s.QuoteCurrency)
+                {
                     return false;
-                
+                }
+
                 if (baseAssetFilter is { } &&
-                    s.BaseCurrency is { } &&
-                    !baseAssetFilter.Contains(s.BaseCurrency))
+                    !baseAssetFilter.Contains(s.BaseCurrency ?? s.Underlying))
                 {
                     return false;
                 }
 
                 var expiry = s.GetExpiry();
 
-                return assetPermissions switch
+                return s.Type switch
                 {
-                    AssetPermissions.None => false,
-                    AssetPermissions.All => true,
-                    AssetPermissions.SpotAndPerp => s.Type == SymbolType.Spot ||
-                                                    expiry is null,
-                    AssetPermissions.Spot => s.Type == SymbolType.Spot,
-                    AssetPermissions.PerpetualFutures => s.Type == SymbolType.Future &&
-                                                         expiry is null,
-                    AssetPermissions.ExpiringFutures => s.Type == SymbolType.Future &&
-                                                        expiry is { },
-                    _ => throw new ArgumentOutOfRangeException(nameof(assetPermissions),
-                        assetPermissions,
-                        "Unsupported asset permissions value")
+                    SymbolType.Future when expiry.HasValue => assetPermissions.HasFlag(
+                        AssetPermissions.ExpiringFutures),
+                    SymbolType.Future when !expiry.HasValue => assetPermissions.HasFlag(
+                        AssetPermissions.PerpetualFutures),
+                    SymbolType.Spot => assetPermissions.HasFlag(AssetPermissions.LongSpot) ||
+                                       assetPermissions.HasFlag(AssetPermissions.ShortSpot),
+                    _ => throw new ArgumentOutOfRangeException(nameof(s.Type),
+                        s.Type,
+                        "unknown asset type")
                 };
             }
 

@@ -83,7 +83,7 @@ internal class Program
                 yoloConfig.BaseAsset,
                 yoloConfig.AssetPermissions, 
                 cancellationToken);
-            // _logger.LogDebug("{Markets}", JsonConvert.SerializeObject(markets));
+            _logger.LogInformation("{Markets}", JsonConvert.SerializeObject(markets));
 
             var tradeFactory = serviceProvider.GetService<ITradeFactory>()!;
 

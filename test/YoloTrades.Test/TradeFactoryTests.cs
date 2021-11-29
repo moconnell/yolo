@@ -19,6 +19,7 @@ public class TradeFactoryTests
     [InlineData("./Data/001")]
     public async Task ShouldCalculateTrades(
         string path,
+        AssetPermissions assetPermissions = AssetPermissions.All,
         string baseAsset = "USD",
         decimal nominalCash = 10000,
         decimal tradeBuffer = 0.04m)
@@ -26,6 +27,7 @@ public class TradeFactoryTests
         var mockLogger = new Mock<ILogger<TradeFactory>>();
         var config = new YoloConfig
         {
+            AssetPermissions = assetPermissions,
             BaseAsset = baseAsset,
             NominalCash = nominalCash,
             TradeBuffer = tradeBuffer
