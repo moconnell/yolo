@@ -1,0 +1,58 @@
+﻿[
+  {
+    "AssetName": "FTT/USD",
+    "AssetType": "Spot",
+    "Amount": -17.2,
+    "LimitPrice": 52.056,
+    "Expiry": null
+  },
+  {
+    "AssetName": "ETH/BTC",
+    "AssetType": "Spot",
+    "Amount": 5493.634,
+    "LimitPrice": 0.0759025,
+    "Expiry": null
+  },
+  {
+    "AssetName": "LTC/BTC",
+    "AssetType": "Spot",
+    "Amount": 117414.62,
+    "LimitPrice": 0.00388975,
+    "Expiry": null
+  },
+  {
+    "AssetName": "DOGE-1231",
+    "AssetType": "Future",
+    "Amount": -4695.0,
+    "LimitPrice": 0.2236220,
+    "Expiry": null
+  },
+  {
+    "AssetName": "CRO/USD",
+    "AssetType": "Spot",
+    "Amount": 1860.0,
+    "LimitPrice": 0.804750,
+    "Expiry": null
+  },
+  {
+    "AssetName": "BCH/BTC",
+    "AssetType": "Spot",
+    "Amount": 48715.633,
+    "LimitPrice": 0.010700,
+    "Expiry": null
+  },
+  {
+    "AssetName": "UNI-1231",
+    "AssetType": "Future",
+    "Amount": -44.9,
+    "LimitPrice": 21.546,
+    "Expiry": null
+  },
+  {
+    "AssetName": "LINK-1231",
+    "AssetType": "Future",
+    "Amount": -31.9,
+    "LimitPrice": 27.7055,
+    "Expiry": null
+  }
+]

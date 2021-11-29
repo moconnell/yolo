@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace YoloAbstractions.Config
 {
     public class YoloConfig
@@ -11,6 +9,7 @@ namespace YoloAbstractions.Config
         public decimal? NominalCash { get; init; }
         public AssetTypePreference TradePreference { get; init; } =
             AssetTypePreference.MatchExistingPosition;
-        public string BaseCurrencyToken { get; init; }
+        public AssetPermissions AssetPermissions { get; init; } = AssetPermissions.SpotAndPerp;
+        public string BaseAsset { get; init; }
     }
 }

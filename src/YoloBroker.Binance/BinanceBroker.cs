@@ -7,20 +7,24 @@ using Binance.Net;
 using Binance.Net.Enums;
 using Binance.Net.Objects;
 using Binance.Net.Objects.Futures.FuturesData;
-using Binance.Net.Objects.Spot.MarketData;
 using Binance.Net.Objects.Spot.SpotData;
 using CryptoExchange.Net.Authentication;
 using CryptoExchange.Net.Objects;
+using Microsoft.Extensions.Configuration;
 using YoloAbstractions;
 
 namespace YoloBroker.Binance
 {
-    public class BinanceBroker : IYoloBroker, IDisposable
+    public class BinanceBroker : IYoloBroker
     {
         private readonly BinanceClient _binanceClient;
         private readonly BinanceSocketClient _binanceSocketClient;
         private bool _disposed;
-
+        
+        public BinanceBroker(IConfiguration configuration) : this(configuration.GetBinanceConfig())
+        {
+        }
+        
         public BinanceBroker(BinanceConfig config)
         {
             var credentials = new ApiCredentials(config.ApiKey, config.Secret);
@@ -112,40 +116,6 @@ namespace YoloBroker.Binance
             }
         }
 
-        public async Task<Dictionary<string, IEnumerable<Price>>> GetPricesAsync(
-            CancellationToken ct = default)
-        {
-            async Task<IDictionary<string, Price>> GetPricesImplAsync(
-                AssetType assetType,
-                Func<CancellationToken, Task<WebCallResult<IEnumerable<BinancePrice>>>>
-                    fetchPricesFunc)
-            {
-                var result = await fetchPricesFunc(ct);
-
-                if (!result.Success)
-                {
-                    throw new BinanceException("Could not fetch prices", result);
-                }
-
-                return result.Data.ToDictionary(
-                    p => p.Symbol,
-                    p => new Price(p.Symbol, assetType, p.Price, p.Timestamp));
-            }
-
-            var spotPrices = await GetPricesImplAsync(
-                AssetType.Spot,
-                _binanceClient.Spot.Market.GetPricesAsync);
-
-            var futuresUsdtPrices = await GetPricesImplAsync(
-                AssetType.Future,
-                _binanceClient.FuturesUsdt.Market.GetPricesAsync);
-
-            return spotPrices
-                .Union(futuresUsdtPrices)
-                .GroupBy(kvp => kvp.Key)
-                .ToDictionary(g => g.Key, g => g.Select(kvp => kvp.Value));
-        }
-
         public async Task<IDictionary<string, Position>> GetPositionsAsync(
             CancellationToken ct = default)
         {
@@ -155,40 +125,89 @@ namespace YoloBroker.Binance
 
             return accountData.Balances.ToDictionary(
                 x => x.Asset,
-                x => new Position(x.Asset, AssetType.Spot, x.Total));
+                x => new Position(x.Asset, x.Asset, AssetType.Spot, x.Total));
         }
 
-        public async Task<IDictionary<string, SymbolInfo>> GetSymbolsAsync(
-            IEnumerable<string>? symbols = null,
+        public async Task<IDictionary<string, IEnumerable<MarketInfo>>> GetMarketsAsync(
+            ISet<string>? baseAssetFilter = null,
+            string? quoteCurrency = null,
+            AssetPermissions assetPermissions = AssetPermissions.All,
             CancellationToken ct = default)
         {
-            var spotExchangeInfo = await GetDataAsync<BinanceExchangeInfo>(
-                symbols is null
-                    ? () => _binanceClient.Spot.System.GetExchangeInfoAsync(ct)
-                    : () => _binanceClient.Spot.System.GetExchangeInfoAsync(symbols, ct),
+            var markets = new Dictionary<string, IEnumerable<MarketInfo>>();
+
+            var spotTickers = await GetDataAsync(
+                () => _binanceClient.Spot.Market.GetTickersAsync(ct),
+                "Could not get spot prices");
+
+            var spotTickersDict = spotTickers.ToDictionary(
+                t => t.Symbol,
+                t => t);
+
+            var spotExchangeInfo = await GetDataAsync(
+                () => _binanceClient.Spot.System.GetExchangeInfoAsync(ct),
                 "Could not get spot exchange info");
 
-            var spotSymbols = spotExchangeInfo.Symbols.Select(
-                x => new SymbolInfo(
-                    x.BaseAsset,
-                    x.QuoteAsset,
-                    AssetType.Spot,
-                    (x.LotSizeFilter?.StepSize ?? x.MarketLotSizeFilter?.StepSize) ??
-                    1));
+            foreach (var x in spotExchangeInfo.Symbols)
+            {
+                var ticker = spotTickersDict[x.Name];
+                var priceStep = x.PriceFilter?.TickSize ?? 1;
+                var quantityStep = (x.LotSizeFilter?.StepSize ?? x.MarketLotSizeFilter?.StepSize) ??
+                                  1;
+
+                markets.Add(x.Name,
+                    new[]
+                    {
+                        new MarketInfo(
+                            x.Name,
+                            x.BaseAsset,
+                            x.QuoteAsset,
+                            AssetType.Spot,
+                            priceStep,
+                            quantityStep,
+                            ticker.AskPrice,
+                            ticker.BidPrice,
+                            ticker.LastPrice,
+                            null,
+                            DateTime.UtcNow)
+                    });
+            }
+
+            var futuresUsdtPrices = await GetDataAsync(
+                () => _binanceClient.FuturesUsdt.Market.GetBookPricesAsync(ct: ct),
+                "Could not get futures prices");
+
+            var futuresUsdtPricesDict = futuresUsdtPrices.ToDictionary(
+                t => t.Symbol,
+                t => t);
 
             var futuresExchangeInfo = await GetDataAsync(
                 () => _binanceClient.FuturesUsdt.System.GetExchangeInfoAsync(ct),
                 "Could not get futures exchange info");
 
-            var futuresSymbols = futuresExchangeInfo.Symbols.Select(
-                x => new SymbolInfo(
-                    x.BaseAsset,
-                    x.QuoteAsset,
-                    AssetType.Future,
-                    x.LotSizeFilter.StepSize));
+            foreach (var x in futuresExchangeInfo.Symbols)
+            {
+                var price = futuresUsdtPricesDict[x.Name];
 
-            return spotSymbols.Union(futuresSymbols)
-                .ToDictionary(x => x.Key, x => x);
+                markets.Add(x.Name,
+                    new[]
+                    {
+                        new MarketInfo(
+                            x.Name,
+                            x.BaseAsset,
+                            x.QuoteAsset,
+                            AssetType.Future,
+                            x.PriceFilter.TickSize,
+                            x.LotSizeFilter.StepSize,
+                            price.BestAskPrice,
+                            price.BestBidPrice,
+                            null,
+                            null,
+                            price.Timestamp ?? DateTime.UtcNow)
+                    });
+            }
+
+            return markets;
         }
 
         protected virtual void Dispose(bool disposing)

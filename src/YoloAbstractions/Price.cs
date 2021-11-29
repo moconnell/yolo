@@ -5,6 +5,8 @@ namespace YoloAbstractions
     public record Price(
         string AssetName,
         AssetType AssetType,
-        decimal Last,
+        decimal? Ask,
+        decimal? Bid,
+        decimal? Last,
         DateTime? At);
 }

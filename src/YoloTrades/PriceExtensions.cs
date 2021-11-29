@@ -7,11 +7,11 @@ public static class PriceExtensions
 {
     public static IEnumerable<Price> GetPrices(
         this IDictionary<string, IEnumerable<Price>> prices,
-        string token,
+        string symbol,
         string baseCurrencyToken,
         AssetType? assetType = null)
     {
-        var cross = $"{token}{baseCurrencyToken}";
+        var cross = $"{symbol}{baseCurrencyToken}";
         return prices.GetPrices(cross, assetType);
     }
 
@@ -25,5 +25,17 @@ public static class PriceExtensions
                         crossPrices.Where(p => p.AssetType == assetType) :
                         crossPrices
                     : Array.Empty<Price>();
+    }
+
+    public static IEnumerable<MarketInfo> GetMarkets(
+        this IDictionary<string, IEnumerable<MarketInfo>> markets,
+        string cross,
+        AssetType? assetType = null)
+    {
+        return markets.TryGetValue(cross, out var market)
+                    ? assetType.HasValue ? 
+                        market.Where(p => p.AssetType == assetType) :
+                        market
+                    : Array.Empty<MarketInfo>();
     }
 }
