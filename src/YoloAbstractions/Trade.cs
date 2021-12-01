@@ -8,4 +8,5 @@ namespace YoloAbstractions
         decimal Amount,
         decimal? LimitPrice = null,
         DateTime? Expiry = null);
+
 }

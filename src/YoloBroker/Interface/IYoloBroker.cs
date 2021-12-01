@@ -10,7 +10,7 @@ namespace YoloBroker
     {
         Task<IDictionary<string, Position>> GetPositionsAsync(CancellationToken ct);
 
-        Task PlaceTradesAsync(IEnumerable<Trade> trades, CancellationToken ct);
+        IAsyncEnumerable<TradeResult> PlaceTradesAsync(IEnumerable<Trade> trades, CancellationToken ct);
 
         Task ConnectAsync(CancellationToken ct);
 

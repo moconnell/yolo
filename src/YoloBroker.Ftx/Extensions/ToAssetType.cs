@@ -4,7 +4,7 @@ using YoloAbstractions;
 
 namespace YoloBroker.Ftx.Extensions
 {
-    public static class SymbolTypeExtensions
+    public static partial class FtxExtensions
     {
         public static AssetType ToAssetType(this SymbolType type) => type switch
         {
