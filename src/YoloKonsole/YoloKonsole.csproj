@@ -26,7 +26,11 @@
       <ProjectReference Include="..\YoloWeights\YoloWeights.csproj" />
     </ItemGroup>
 
-    <ItemGroup>
+    <ItemGroup> 
+      <None Update="appsettings.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      </None>
       <None Update="appsettings.development.json">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         <CopyToPublishDirectory>Never</CopyToPublishDirectory>
