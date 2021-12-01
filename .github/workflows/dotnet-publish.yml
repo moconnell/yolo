@@ -22,4 +22,4 @@ jobs:
     - name: Test
       run: dotnet test --no-build --verbosity normal  
     - name: Publish
-      run: dotnet publish src/YoloKonsole/YoloKonsole.csproj -c Release -o releases/win-x64 --os win-x64
+      run: dotnet publish src/YoloKonsole/YoloKonsole.csproj -c Release -o releases/win-x64 --os win
