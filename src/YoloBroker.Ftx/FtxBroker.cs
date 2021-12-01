@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using CryptoExchange.Net.Authentication;
@@ -54,35 +55,32 @@ namespace YoloBroker.Ftx
             GC.SuppressFinalize(this);
         }
 
-        public async Task PlaceTradesAsync(
+        public async IAsyncEnumerable<TradeResult> PlaceTradesAsync(
             IEnumerable<Trade> trades,
-            CancellationToken ct = default)
+            [EnumeratorCancellation] CancellationToken ct = default)
         {
-            var tradeResults = await Task.WhenAll(
-                trades.Select(async trade =>
-                {
-                    var orderSide = trade.Amount < 0 ? OrderSide.Sell : OrderSide.Buy;
-                    var quantity = Math.Abs(trade.Amount);
-                    var orderType = trade.LimitPrice.HasValue ? OrderType.Limit : OrderType.Market;
-
-                    var result = await _ftxClient.PlaceOrderAsync(
-                        trade.AssetName,
-                        orderSide,
-                        orderType,
-                        quantity,
-                        trade.LimitPrice,
-                        ct: ct);
-
-                    return (trade, result);
-                }));
-
-            var failedResults = tradeResults
-                .Where(tradeResult => !tradeResult.result.Success)
-                .ToArray();
-
-            if (failedResults.Any())
+            foreach (var trade in trades)
             {
-                throw new FtxException("Errors placing trades", failedResults);
+                await Task.Delay(123, ct); // throttle as FTX errors if > 2 orders in 200ms
+
+                var orderSide = trade.Amount < 0 ? OrderSide.Sell : OrderSide.Buy;
+                var quantity = Math.Abs(trade.Amount);
+                var orderType = trade.LimitPrice.HasValue ? OrderType.Limit : OrderType.Market;
+
+                var result = await _ftxClient.PlaceOrderAsync(
+                    trade.AssetName,
+                    orderSide,
+                    orderType,
+                    quantity,
+                    trade.LimitPrice,
+                    ct: ct);
+
+                yield return new TradeResult(
+                    trade,
+                    result.Success,
+                    result.Data.ToOrder(),
+                    result.Error?.Message,
+                    result.Error?.Code);
             }
         }
 
@@ -139,8 +137,10 @@ namespace YoloBroker.Ftx
                 if (quoteCurrency is { } &&
                     s.QuoteCurrency is { } &&
                     quoteCurrency != s.QuoteCurrency)
+                {
                     return false;
-                
+                }
+
                 if (baseAssetFilter is { } &&
                     s.BaseCurrency is { } &&
                     !baseAssetFilter.Contains(s.BaseCurrency))

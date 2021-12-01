@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 using YoloAbstractions.Config;
 using YoloBroker;
 using YoloTrades;
@@ -99,9 +98,21 @@ internal class Program
             Console.WriteLine();
             Console.Write("Proceed? (y/n): ");
 
-            if (Console.Read() == 'y')
+            if (Console.Read() != 'y')
             {
-                await broker.PlaceTradesAsync(trades, cancellationToken);
+                return Success;
+            }
+
+            await foreach (var result in broker.PlaceTradesAsync(trades, cancellationToken))
+            {
+                if (result.Success)
+                {
+                    _logger.PlacedOrder(result.Order!.AssetName, result.Order);
+                }
+                else
+                {
+                    _logger.OrderError(result.Trade.AssetName, result.Error, result.ErrorCode);
+                }
             }
 
             return Success;
