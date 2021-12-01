@@ -1,11 +1,13 @@
-name: '.NET Publish'
+name: '.NET Release'
 
-on: 
+# https://help.github.com/en/articles/workflow-syntax-for-github-actions#on
+on:
   push:
-    branches: [ master ]
+    tags:
+      - "*"
 
 jobs:
-  publish-win-x64:
+  release-win-x64:
 
     runs-on: ubuntu-latest
 
@@ -23,3 +25,23 @@ jobs:
       run: dotnet test --no-build --verbosity normal  
     - name: Publish
       run: dotnet publish src/YoloKonsole/YoloKonsole.csproj -c Release -o releases/win-x64 --os win
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        body: |
+          Test upload-to-github-release works with ```actions/create-release```
+        draft: true
+        prerelease: false
+    - uses: xresloader/upload-to-github-release@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        file: "releases/**/*"
+        release_id: ${{ steps.create_release.outputs.id }}
+        overwrite: true
+        verbose: true
