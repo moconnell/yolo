@@ -1,7 +1,7 @@
-name: .NET Publish
+name: '.NET Publish'
 
 on: 
-  - push 
+  push:
     branches: [ master ]
 
 jobs:
