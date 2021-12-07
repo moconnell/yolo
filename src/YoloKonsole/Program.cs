@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using Serilog;
 using YoloAbstractions.Config;
 using YoloBroker;
 using YoloTrades;
@@ -49,7 +51,9 @@ internal class Program
             //setup our DI
             var serviceProvider = new ServiceCollection()
                 .AddLogging(loggingBuilder => loggingBuilder
-                    .AddConsole())
+                    .AddConsole()
+                    .AddFile(config.GetSection("Logging")))
+                    // .AddFile("/Users/moc/logs/yolo-{Date}.txt", LogLevel.Debug))
                 .AddBroker(config)
                 .AddSingleton<ITradeFactory, TradeFactory>()
                 .AddSingleton<IConfiguration>(config)
@@ -62,13 +66,17 @@ internal class Program
             var yoloConfig = config.GetYoloConfig();
 
             var weights = (await yoloConfig
-                .GetWeights())
+                    .GetWeights())
                 .ToArray();
 
             using IYoloBroker broker = serviceProvider.GetService<IYoloBroker>()!;
-            
+
             var positions = await broker.GetPositionsAsync(cancellationToken);
-            // _logger.LogDebug("{Positions}", JsonConvert.SerializeObject(positions));
+
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug("{Positions}", JsonConvert.SerializeObject(positions));
+            }
 
             var baseAssetFilter = positions
                 .Values
@@ -76,13 +84,17 @@ internal class Program
                 .Union(weights.Select(w => w.Ticker.Split("/")
                     .First()))
                 .ToHashSet();
-            
+
             var markets = await broker.GetMarketsAsync(
-                baseAssetFilter, 
+                baseAssetFilter,
                 yoloConfig.BaseAsset,
-                yoloConfig.AssetPermissions, 
+                yoloConfig.AssetPermissions,
                 cancellationToken);
-            // _logger.LogDebug("{Markets}", JsonConvert.SerializeObject(markets));
+
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug("{Markets}", JsonConvert.SerializeObject(markets));
+            }
 
             var tradeFactory = serviceProvider.GetService<ITradeFactory>()!;
 
