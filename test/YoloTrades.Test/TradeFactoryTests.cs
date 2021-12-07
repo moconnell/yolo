@@ -21,13 +21,15 @@ public class TradeFactoryTests
         string path,
         string baseAsset = "USD",
         decimal nominalCash = 10000,
-        decimal tradeBuffer = 0.04m)
+        decimal tradeBuffer = 0.04m,
+        RebalanceMode rebalanceMode = RebalanceMode.Slow)
     {
         var mockLogger = new Mock<ILogger<TradeFactory>>();
         var config = new YoloConfig
         {
             BaseAsset = baseAsset,
             NominalCash = nominalCash,
+            RebalanceMode = rebalanceMode,
             TradeBuffer = tradeBuffer
         };
         var tradeFactory = new TradeFactory(mockLogger.Object, config);

@@ -11,5 +11,7 @@ namespace YoloAbstractions.Config
             AssetTypePreference.MatchExistingPosition;
         public AssetPermissions AssetPermissions { get; init; } = AssetPermissions.SpotAndPerp;
         public string BaseAsset { get; init; }
+        public RebalanceMode RebalanceMode { get; init; } =
+            RebalanceMode.Slow;
     }
 }

@@ -25,6 +25,7 @@ namespace YoloTrades
             NominalCash = yoloConfig.NominalCash;
             BaseCurrencyToken = yoloConfig.BaseAsset;
             TradePreference = yoloConfig.TradePreference;
+            RebalanceMode = yoloConfig.RebalanceMode;
         }
 
         private AssetTypePreference TradePreference { get; }
@@ -32,6 +33,7 @@ namespace YoloTrades
         private decimal? NominalCash { get; }
         private decimal MaxLeverage { get; }
         private decimal TradeBuffer { get; }
+        private RebalanceMode RebalanceMode { get; }
 
         public IEnumerable<Trade> CalculateTrades(
             IEnumerable<Weight> weights,
@@ -95,8 +97,16 @@ namespace YoloTrades
                         ? tokenMarkets.Last()
                         : tokenMarkets.First();
 
-                var delta = constrainedTargetWeight - currentWeight!.Value;
+                var tradeBufferAdjustment = TradeBuffer * RebalanceMode switch
+                {
+                    RebalanceMode.Slow => constrainedTargetWeight < currentWeight!.Value ? 1 : -1,
+                    _ => 0
+                };
 
+                constrainedTargetWeight += tradeBufferAdjustment;
+
+                var delta = constrainedTargetWeight - currentWeight!.Value;
+                
                 if (Math.Abs(delta) <= TradeBuffer)
                 {
                     _logger.WithinTradeBuffer(
@@ -107,7 +117,7 @@ namespace YoloTrades
                     return;
                 }
 
-                var isBuy = constrainedTargetWeight > currentWeight!.Value;
+                var isBuy = constrainedTargetWeight > currentWeight.Value;
                 var price = GetPrice(isBuy, market);
 
                 if (price is null)
