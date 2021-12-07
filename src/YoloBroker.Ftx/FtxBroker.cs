@@ -142,8 +142,7 @@ namespace YoloBroker.Ftx
                 }
 
                 if (baseAssetFilter is { } &&
-                    s.BaseCurrency is { } &&
-                    !baseAssetFilter.Contains(s.BaseCurrency))
+                    !baseAssetFilter.Contains(s.BaseCurrency ?? s.Underlying))
                 {
                     return false;
                 }
