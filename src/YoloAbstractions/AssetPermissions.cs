@@ -12,4 +12,5 @@ namespace YoloAbstractions
         ExpiringFutures = 4,
         All = 7
     }
+
 }
