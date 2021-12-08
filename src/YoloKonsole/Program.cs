@@ -87,7 +87,7 @@ internal class Program
 
             var markets = await broker.GetMarketsAsync(
                 baseAssetFilter,
-                yoloConfig.BaseAsset,
+                yoloConfig.BaseCurrency,
                 yoloConfig.AssetPermissions,
                 cancellationToken);
 

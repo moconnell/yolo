@@ -1,0 +1,65 @@
+﻿[
+  {
+    "AssetName": "BCH/USD",
+    "AssetType": "Spot",
+    "Amount": -0.4215,
+    "LimitPrice": 474.6000,
+    "Expiry": null
+  },
+  {
+    "AssetName": "CRO/USD",
+    "AssetType": "Spot",
+    "Amount": 1606.5573,
+    "LimitPrice": 0.6100,
+    "Expiry": null
+  },
+  {
+    "AssetName": "DOGE/USD",
+    "AssetType": "Spot",
+    "Amount": -4611.1112,
+    "LimitPrice": 0.1800,
+    "Expiry": null
+  },
+  {
+    "AssetName": "ETH/USD",
+    "AssetType": "Spot",
+    "Amount": 0.1496,
+    "LimitPrice": 4310.2000,
+    "Expiry": null
+  },
+  {
+    "AssetName": "FTT/USD",
+    "AssetType": "Spot",
+    "Amount": -11.1836,
+    "LimitPrice": 42.9200,
+    "Expiry": null
+  },
+  {
+    "AssetName": "LINK/USD",
+    "AssetType": "Spot",
+    "Amount": -26.3034,
+    "LimitPrice": 21.1000,
+    "Expiry": null
+  },
+  {
+    "AssetName": "LTC/USD",
+    "AssetType": "Spot",
+    "Amount": -3.1152,
+    "LimitPrice": 162.1100,
+    "Expiry": null
+  },
+  {
+    "AssetName": "UNI/USD",
+    "AssetType": "Spot",
+    "Amount": -29.7377,
+    "LimitPrice": 17.1500,
+    "Expiry": null
+  },
+  {
+    "AssetName": "XRP/USD",
+    "AssetType": "Spot",
+    "Amount": -1146.3415,
+    "LimitPrice": 0.8200,
+    "Expiry": null
+  }
+]

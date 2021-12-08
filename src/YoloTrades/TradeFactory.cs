@@ -23,9 +23,10 @@ namespace YoloTrades
             TradeBuffer = yoloConfig.TradeBuffer;
             MaxLeverage = yoloConfig.MaxLeverage;
             NominalCash = yoloConfig.NominalCash;
-            BaseCurrencyToken = yoloConfig.BaseAsset;
+            BaseCurrencyToken = yoloConfig.BaseCurrency;
             TradePreference = yoloConfig.TradePreference;
             RebalanceMode = yoloConfig.RebalanceMode;
+            SpreadSplit = Math.Max(0, Math.Min(1, yoloConfig.SpreadSplit));
         }
 
         private AssetTypePreference TradePreference { get; }
@@ -34,6 +35,7 @@ namespace YoloTrades
         private decimal MaxLeverage { get; }
         private decimal TradeBuffer { get; }
         private RebalanceMode RebalanceMode { get; }
+        private decimal SpreadSplit { get; }
 
         public IEnumerable<Trade> CalculateTrades(
             IEnumerable<Weight> weights,
@@ -103,11 +105,11 @@ namespace YoloTrades
                     _ => 0
                 };
 
-                constrainedTargetWeight += tradeBufferAdjustment;
-
-                var delta = constrainedTargetWeight - currentWeight!.Value;
+                var delta = constrainedTargetWeight - currentWeight!.Value + tradeBufferAdjustment;
                 
-                if (Math.Abs(delta) <= TradeBuffer)
+                if (RebalanceMode == RebalanceMode.Slow && 
+                    currentWeight.Value >= constrainedTargetWeight - TradeBuffer && 
+                    currentWeight.Value <= constrainedTargetWeight + TradeBuffer)
                 {
                     _logger.WithinTradeBuffer(
                         token,
@@ -117,7 +119,7 @@ namespace YoloTrades
                     return;
                 }
 
-                var isBuy = constrainedTargetWeight > currentWeight.Value;
+                var isBuy = delta > 0;
                 var price = GetPrice(isBuy, market);
 
                 if (price is null)
@@ -125,11 +127,9 @@ namespace YoloTrades
                     return;
                 }
 
-                var rawSize = (constrainedTargetWeight - currentWeight.Value) *
-                    nominal / price.Value;
-
+                var rawSize = delta * nominal / price.Value;
                 var size = Math.Floor(rawSize / market.QuantityStep) * market.QuantityStep;
-                var factor = isBuy ? 0.618m : 0.382m;
+                var factor = isBuy ? SpreadSplit : 1 - SpreadSplit;
                 var spread = market.Ask!.Value - market.Bid!.Value;
                 var rawLimitPrice = market.Bid!.Value + spread * factor;
                 var limitPrice = Math.Floor(rawLimitPrice / market.PriceStep) * market.PriceStep;

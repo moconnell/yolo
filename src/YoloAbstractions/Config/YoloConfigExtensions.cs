@@ -10,7 +10,7 @@ namespace YoloAbstractions.Config
             return configuration
                 .GetSection(Yolo)
                 .Get<YoloConfig>()
-                .Ensure(c => c.BaseAsset)
+                .Ensure(c => c.BaseCurrency)
                 .Ensure(c => c.WeightsUrl)
                 .Ensure(c => c.TradeBuffer);
         }
