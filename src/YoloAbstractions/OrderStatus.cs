@@ -1,4 +1,3 @@
-namespace YoloAbstractions
-{
-    public enum OrderStatus { New, Open, Closed }
-}
+namespace YoloAbstractions;
+
+public enum OrderStatus { New, Open, Closed }

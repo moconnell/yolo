@@ -1,8 +1,7 @@
-namespace YoloAbstractions
+namespace YoloAbstractions;
+
+public enum RebalanceMode
 {
-    public enum RebalanceMode
-    {
-        Slow,
-        Fast
-    }
+    Slow,
+    Fast
 }

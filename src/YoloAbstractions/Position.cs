@@ -1,11 +1,10 @@
-namespace YoloAbstractions
+namespace YoloAbstractions;
+
+public record Position(
+    string AssetName,
+    string BaseAsset,
+    AssetType AssetType,
+    decimal Amount)
 {
-    public record Position(
-        string AssetName,
-        string BaseAsset,
-        AssetType AssetType,
-        decimal Amount)
-    {
-        public static readonly Position Null = new(string.Empty, string.Empty, AssetType.Spot, 0);
-    }
+    public static readonly Position Null = new(string.Empty, string.Empty, AssetType.Spot, 0);
 }

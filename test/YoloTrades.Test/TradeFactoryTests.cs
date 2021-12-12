@@ -13,7 +13,6 @@ using Snapshooter.Xunit;
 using Xunit;
 using YoloAbstractions;
 using YoloAbstractions.Config;
-using YoloTrades;
 using YoloTrades.Test.Data.Types;
 
 namespace YoloTrades.Test;
@@ -21,15 +20,14 @@ namespace YoloTrades.Test;
 public class TradeFactoryTests
 {
     [Theory]
-    [InlineData("./Data/csv/20211207/YOLO Trade Helper v4 20211207.csv")]
-    [InlineData("./Data/csv/20211208/YOLO Trade Helper v4 20211208.csv")]
+    [InlineData("./Data/csv/20211212/YOLO Trade Helper v4 20211212.csv")]
     public void ShouldCalculateTradesFromCsv(
         string path,
         string baseCurrency = "USD",
         decimal nominalCash = 10000,
         decimal tradeBuffer = 0.02m,
         RebalanceMode rebalanceMode = RebalanceMode.Slow,
-        decimal maxDeviation = 0.001m)
+        decimal stepSize = 0.0001m)
     {
         var mockLogger = new Mock<ILogger<TradeFactory>>();
 
@@ -42,7 +40,8 @@ public class TradeFactoryTests
         };
         var tradeFactory = new TradeFactory(mockLogger.Object, config);
 
-        var (weights, positions, markets, expectedTrades) = DeserializeCsv(path, baseCurrency);
+        var (weights, positions, markets, expectedTrades) =
+            DeserializeCsv(path, baseCurrency, stepSize);
 
         var trades = tradeFactory
             .CalculateTrades(weights, positions, markets)
@@ -63,9 +62,9 @@ public class TradeFactoryTests
                 var expectedTradeQuantity = expectedTrades[baseAsset];
 
                 return (baseAsset, expectedTradeQuantity, t.Amount,
-                    deviation: t.Amount / expectedTradeQuantity - 1);
+                    deviation: t.Amount - expectedTradeQuantity);
             })
-            .Where(tuple => Math.Abs(tuple.deviation) > maxDeviation)
+            .Where(tuple => Math.Abs(tuple.deviation) > stepSize)
             .ToArray();
 
         Assert.Empty(tradesWithDeviatingQuantity);
@@ -103,7 +102,7 @@ public class TradeFactoryTests
         (Weight[] weights, Dictionary<string, Position> positions,
         Dictionary<string, IEnumerable<MarketInfo>> markets, Dictionary<string, decimal>
         expectedTrades)
-        DeserializeCsv(string path, string baseCurrency)
+        DeserializeCsv(string path, string baseCurrency, decimal stepSize)
     {
         var config = new CsvConfiguration(CultureInfo.InvariantCulture)
         {
@@ -146,8 +145,8 @@ public class TradeFactoryTests
                         x.Ticker,
                         baseCurrency,
                         AssetType.Spot,
-                        0.0001m,
-                        0.0001m,
+                        stepSize,
+                        stepSize,
                         x.Price,
                         x.Price,
                         x.Price,

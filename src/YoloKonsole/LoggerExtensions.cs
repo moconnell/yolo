@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Logging;
 using YoloAbstractions;
 
+namespace YoloKonsole;
+
 public static partial class LoggerExtensions
 {
     [LoggerMessage(
@@ -12,7 +14,7 @@ public static partial class LoggerExtensions
         this ILogger logger,
         string token,
         Order order);
-    
+
     [LoggerMessage(
         EventId = WellKnown.TradeEventIds.OrderError,
         Level = LogLevel.Error,
