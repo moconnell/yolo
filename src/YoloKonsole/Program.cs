@@ -1,18 +1,17 @@
-﻿// See https://aka.ms/new-console-template for more information
-// [Argument(short name (char), long name (string), help text)]
-
-using System;
+﻿using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
+using Utility.CommandLine;
 using YoloAbstractions.Config;
 using YoloBroker;
 using YoloTrades;
 using YoloWeights;
+
+namespace YoloKonsole;
 
 internal class Program
 {
@@ -20,11 +19,8 @@ internal class Program
     private const int Success = 0;
     private static ILogger<Program>? _logger;
 
-    // [Argument('u', "url", "RobotWealth YOLO weights URL")]
-    // private static string? Url { get; set; }
-    //
-    // [Argument('d', "dateFormat", "DateFormat string for dates in response")]
-    // private static string? DateFormat { get; set; }
+    [Argument('s', "silent", "Silent running: no challenge will be issued before placing trades")]
+    internal static bool Silent { get; set; }
 
     private static async Task<int> Main(string[] args)
     {
@@ -34,7 +30,6 @@ internal class Program
         var env = "prod";
 #endif
 
-        // Define the cancellation token.
         CancellationTokenSource source = new();
         var cancellationToken = source.Token;
 
@@ -47,10 +42,10 @@ internal class Program
 
             var config = builder.Build();
 
-            //setup our DI
             var serviceProvider = new ServiceCollection()
                 .AddLogging(loggingBuilder => loggingBuilder
-                    .AddConsole())
+                    .AddConsole()
+                    .AddFile(config.GetSection("Logging")))
                 .AddBroker(config)
                 .AddSingleton<ITradeFactory, TradeFactory>()
                 .AddSingleton<IConfiguration>(config)
@@ -63,13 +58,12 @@ internal class Program
             var yoloConfig = config.GetYoloConfig();
 
             var weights = (await yoloConfig
-                .GetWeights())
+                    .GetWeights())
                 .ToArray();
 
-            using IYoloBroker broker = serviceProvider.GetService<IYoloBroker>()!;
-            
+            using var broker = serviceProvider.GetService<IYoloBroker>()!;
+
             var positions = await broker.GetPositionsAsync(cancellationToken);
-            // _logger.LogDebug("{Positions}", JsonConvert.SerializeObject(positions));
 
             var baseAssetFilter = positions
                 .Values
@@ -77,13 +71,12 @@ internal class Program
                 .Union(weights.Select(w => w.Ticker.Split("/")
                     .First()))
                 .ToHashSet();
-            
+
             var markets = await broker.GetMarketsAsync(
-                baseAssetFilter, 
-                yoloConfig.BaseAsset,
-                yoloConfig.AssetPermissions, 
+                baseAssetFilter,
+                yoloConfig.BaseCurrency,
+                yoloConfig.AssetPermissions,
                 cancellationToken);
-            _logger.LogInformation("{Markets}", JsonConvert.SerializeObject(markets));
 
             var tradeFactory = serviceProvider.GetService<ITradeFactory>()!;
 
@@ -96,15 +89,32 @@ internal class Program
                 return Success;
             }
 
-            Console.WriteLine();
-            Console.Write("Proceed? (y/n): ");
-
-            if (Console.Read() == 'y')
+            if (!Silent)
             {
-                await broker.PlaceTradesAsync(trades, cancellationToken);
+                _logger.LogInformation("Proceed? (y/n): ");
+
+                if (Console.Read() != 'y')
+                {
+                    return Success;
+                }
             }
 
-            return Success;
+            var returnCode = Success;
+
+            await foreach (var result in broker.PlaceTradesAsync(trades, cancellationToken))
+            {
+                if (result.Success)
+                {
+                    _logger.PlacedOrder(result.Order!.AssetName, result.Order);
+                }
+                else
+                {
+                    _logger.OrderError(result.Trade.AssetName, result.Error, result.ErrorCode);
+                    returnCode = result.ErrorCode ?? Error;
+                }
+            }
+
+            return returnCode;
         }
         catch (Exception e)
         {

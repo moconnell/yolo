@@ -1,12 +1,13 @@
-using System;
 using FTX.Net.Enums;
 using YoloAbstractions;
 
-namespace YoloBroker.Ftx.Extensions
+namespace YoloBroker.Ftx.Extensions;
+
+public static partial class FtxExtensions
 {
-    public static class SymbolTypeExtensions
+    public static AssetType ToAssetType(this SymbolType type)
     {
-        public static AssetType ToAssetType(this SymbolType type) => type switch
+        return type switch
         {
             SymbolType.Future => AssetType.Future,
             SymbolType.Spot => AssetType.Spot,

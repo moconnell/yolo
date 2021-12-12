@@ -1,7 +1,11 @@
+using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using CsvHelper;
+using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Newtonsoft.Json;
@@ -9,32 +13,84 @@ using Snapshooter.Xunit;
 using Xunit;
 using YoloAbstractions;
 using YoloAbstractions.Config;
-using YoloTrades;
+using YoloTrades.Test.Data.Types;
 
 namespace YoloTrades.Test;
 
 public class TradeFactoryTests
 {
     [Theory]
-    [InlineData("./Data/001")]
-    public async Task ShouldCalculateTrades(
+    [InlineData("./Data/csv/20211212/YOLO Trade Helper v4 20211212.csv")]
+    public void ShouldCalculateTradesFromCsv(
         string path,
-        AssetPermissions assetPermissions = AssetPermissions.All,
-        string baseAsset = "USD",
+        string baseCurrency = "USD",
         decimal nominalCash = 10000,
-        decimal tradeBuffer = 0.04m)
+        decimal tradeBuffer = 0.02m,
+        RebalanceMode rebalanceMode = RebalanceMode.Slow,
+        decimal stepSize = 0.0001m)
     {
         var mockLogger = new Mock<ILogger<TradeFactory>>();
+
         var config = new YoloConfig
         {
-            AssetPermissions = assetPermissions,
-            BaseAsset = baseAsset,
+            BaseCurrency = baseCurrency,
             NominalCash = nominalCash,
+            RebalanceMode = rebalanceMode,
             TradeBuffer = tradeBuffer
         };
         var tradeFactory = new TradeFactory(mockLogger.Object, config);
 
-        var (weights, positions, markets) = await DeserializeInputs(path);
+        var (weights, positions, markets, expectedTrades) =
+            DeserializeCsv(path, baseCurrency, stepSize);
+
+        var trades = tradeFactory
+            .CalculateTrades(weights, positions, markets)
+            .ToArray();
+
+        Assert.NotNull(trades);
+
+        var filename = path[(path.LastIndexOf("/", StringComparison.Ordinal) + 1)..]
+            .Replace(" ", string.Empty);
+        trades.MatchSnapshot($"ShouldCalculateTradesFromCsv_{filename}");
+
+        Assert.Equal(expectedTrades.Count, trades.Length);
+
+        var tradesWithDeviatingQuantity = trades
+            .Select(t =>
+            {
+                var baseAsset = t.AssetName.Split('-', '/')[0];
+                var expectedTradeQuantity = expectedTrades[baseAsset];
+
+                return (baseAsset, expectedTradeQuantity, t.Amount,
+                    deviation: t.Amount - expectedTradeQuantity);
+            })
+            .Where(tuple => Math.Abs(tuple.deviation) > stepSize)
+            .ToArray();
+
+        Assert.Empty(tradesWithDeviatingQuantity);
+    }
+
+    [Theory]
+    [InlineData("./Data/json/001")]
+    public async Task ShouldCalculateTrades(
+        string path,
+        string baseCurrency = "USD",
+        decimal nominalCash = 10000,
+        decimal tradeBuffer = 0.04m,
+        RebalanceMode rebalanceMode = RebalanceMode.Slow)
+    {
+        var mockLogger = new Mock<ILogger<TradeFactory>>();
+
+        var config = new YoloConfig
+        {
+            BaseCurrency = baseCurrency,
+            NominalCash = nominalCash,
+            RebalanceMode = rebalanceMode,
+            TradeBuffer = tradeBuffer
+        };
+        var tradeFactory = new TradeFactory(mockLogger.Object, config);
+
+        var (weights, positions, markets) = await DeserializeInputsAsync(path);
 
         var trades = tradeFactory.CalculateTrades(weights, positions, markets);
 
@@ -42,9 +98,74 @@ public class TradeFactoryTests
         trades.MatchSnapshot();
     }
 
+    private static
+        (Weight[] weights, Dictionary<string, Position> positions,
+        Dictionary<string, IEnumerable<MarketInfo>> markets, Dictionary<string, decimal>
+        expectedTrades)
+        DeserializeCsv(string path, string baseCurrency, decimal stepSize)
+    {
+        var config = new CsvConfiguration(CultureInfo.InvariantCulture)
+        {
+            HasHeaderRecord = true
+        };
+
+        using var reader = new StreamReader(path);
+        using var csv = new CsvReader(reader, config);
+
+        var records = csv
+            .GetRecords<YoloCsvRow>()
+            .ToArray();
+
+        var weights = records.Select(x =>
+                new Weight(
+                    x.Price,
+                    (x.Momentum + x.Trend) / 2,
+                    DateTime.Today,
+                    x.Momentum,
+                    $"{x.Ticker}/{baseCurrency}",
+                    x.Trend))
+            .ToArray();
+
+        var positions = records.ToDictionary(
+            x => x.Ticker,
+            x =>
+                new Position(
+                    $"{x.Ticker}/{baseCurrency}",
+                    x.Ticker,
+                    AssetType.Spot,
+                    x.CurrentPosition));
+
+        var markets = records.ToDictionary(
+            x => x.Ticker,
+            x =>
+                new[]
+                {
+                    new MarketInfo(
+                        $"{x.Ticker}/{baseCurrency}",
+                        x.Ticker,
+                        baseCurrency,
+                        AssetType.Spot,
+                        stepSize,
+                        stepSize,
+                        x.Price,
+                        x.Price,
+                        x.Price,
+                        null,
+                        DateTime.UtcNow)
+                } as IEnumerable<MarketInfo>);
+
+        var expectedTrades = records
+            .Where(x => x.TradeQuantity != 0)
+            .ToDictionary(
+                x => x.Ticker,
+                x => x.TradeQuantity);
+
+        return (weights, positions, markets, expectedTrades);
+    }
+
     private static async
         Task<(Weight[], Dictionary<string, Position>, Dictionary<string, IEnumerable<MarketInfo>>)>
-        DeserializeInputs(
+        DeserializeInputsAsync(
             string path)
     {
         var weights = await DeserializeAsync<Weight[]>($"{path}/weights.json");

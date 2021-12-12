@@ -2,6 +2,7 @@
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
+        <PublishSingleFile>true</PublishSingleFile>
         <TargetFramework>net6.0</TargetFramework>
         <Nullable>enable</Nullable>
         <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
@@ -15,17 +16,22 @@
         <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="6.0.0" />
         <PackageReference Include="Microsoft.Extensions.Logging" Version="6.0.0" />
         <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="6.0.0" />
+        <PackageReference Include="Serilog.Extensions.Logging" Version="3.1.0" />
+        <PackageReference Include="Serilog.Extensions.Logging.File" Version="2.0.0" />
         <PackageReference Include="Utility.CommandLine.Arguments" Version="6.0.0" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\YoloBroker.Binance\YoloBroker.Binance.csproj" />
       <ProjectReference Include="..\YoloBroker.Ftx\YoloBroker.Ftx.csproj" />
       <ProjectReference Include="..\YoloTrades\YoloTrades.csproj" />
       <ProjectReference Include="..\YoloWeights\YoloWeights.csproj" />
     </ItemGroup>
 
-    <ItemGroup>
+    <ItemGroup> 
+      <None Update="appsettings.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      </None>
       <None Update="appsettings.development.json">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         <CopyToPublishDirectory>Never</CopyToPublishDirectory>
