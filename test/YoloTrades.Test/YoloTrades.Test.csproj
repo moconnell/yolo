@@ -12,6 +12,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="CsvHelper" Version="27.2.1" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.0.0" />
         <PackageReference Include="Moq" Version="4.16.1" />
         <PackageReference Include="Snapshooter.Xunit" Version="0.7.1" />
@@ -31,15 +32,22 @@
     </ItemGroup>
 
     <ItemGroup>
-      <None Update="Data\001\markets.json">
+      <None Update="Data\json\001\markets.json">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
-      <None Update="Data\001\positions.json">
+      <None Update="Data\json\001\positions.json">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
-      <None Update="Data\001\weights.json">
+      <None Update="Data\json\001\weights.json">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
+      <None Update="Data\csv\20211212\YOLO Trade Helper v4 20211212.csv">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Data\json" />
     </ItemGroup>
 
 </Project>

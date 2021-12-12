@@ -1,8 +1,7 @@
-namespace YoloAbstractions
+namespace YoloAbstractions;
+
+public enum AssetType
 {
-    public enum AssetType
-    {
-        Spot,
-        Future
-    }
+    Spot,
+    Future
 }

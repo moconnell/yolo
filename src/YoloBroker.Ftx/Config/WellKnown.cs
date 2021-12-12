@@ -1,10 +1,9 @@
-namespace YoloBroker.Ftx.Config
+namespace YoloBroker.Ftx.Config;
+
+internal static class WellKnown
 {
-    internal static class WellKnown
+    internal static class ConfigSections
     {
-        internal static class ConfigSections
-        {
-            internal const string Ftx = nameof(Ftx);
-        }
+        internal const string Ftx = nameof(Ftx);
     }
 }

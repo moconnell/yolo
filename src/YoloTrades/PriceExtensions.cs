@@ -21,10 +21,9 @@ public static class PriceExtensions
         AssetType? assetType = null)
     {
         return prices.TryGetValue(cross, out var crossPrices)
-                    ? assetType.HasValue ? 
-                        crossPrices.Where(p => p.AssetType == assetType) :
-                        crossPrices
-                    : Array.Empty<Price>();
+            ? assetType.HasValue ? crossPrices.Where(p => p.AssetType == assetType) :
+            crossPrices
+            : Array.Empty<Price>();
     }
 
     public static IEnumerable<MarketInfo> GetMarkets(
@@ -33,9 +32,8 @@ public static class PriceExtensions
         AssetType? assetType = null)
     {
         return markets.TryGetValue(cross, out var market)
-                    ? assetType.HasValue ? 
-                        market.Where(p => p.AssetType == assetType) :
-                        market
-                    : Array.Empty<MarketInfo>();
+            ? assetType.HasValue ? market.Where(p => p.AssetType == assetType) :
+            market
+            : Array.Empty<MarketInfo>();
     }
 }
