@@ -33,7 +33,7 @@ public class TradeFactoryTests
 
         var config = new YoloConfig
         {
-            BaseCurrency = baseCurrency,
+            BaseAsset = baseCurrency,
             NominalCash = nominalCash,
             RebalanceMode = rebalanceMode,
             TradeBuffer = tradeBuffer
@@ -83,7 +83,7 @@ public class TradeFactoryTests
 
         var config = new YoloConfig
         {
-            BaseCurrency = baseCurrency,
+            BaseAsset = baseCurrency,
             NominalCash = nominalCash,
             RebalanceMode = rebalanceMode,
             TradeBuffer = tradeBuffer
@@ -99,7 +99,7 @@ public class TradeFactoryTests
     }
 
     private static
-        (Weight[] weights, Dictionary<string, Position> positions,
+        (Weight[] weights, Dictionary<string, IEnumerable<Position>> positions,
         Dictionary<string, IEnumerable<MarketInfo>> markets, Dictionary<string, decimal>
         expectedTrades)
         DeserializeCsv(string path, string baseCurrency, decimal stepSize)
@@ -129,11 +129,14 @@ public class TradeFactoryTests
         var positions = records.ToDictionary(
             x => x.Ticker,
             x =>
-                new Position(
-                    $"{x.Ticker}/{baseCurrency}",
-                    x.Ticker,
-                    AssetType.Spot,
-                    x.CurrentPosition));
+                new[]
+                {
+                    new Position(
+                        $"{x.Ticker}/{baseCurrency}",
+                        x.Ticker,
+                        AssetType.Spot,
+                        x.CurrentPosition)
+                }.Cast<Position>());
 
         var markets = records.ToDictionary(
             x => x.Ticker,
@@ -164,23 +167,27 @@ public class TradeFactoryTests
     }
 
     private static async
-        Task<(Weight[], Dictionary<string, Position>, Dictionary<string, IEnumerable<MarketInfo>>)>
+        Task<(Weight[], Dictionary<string, IEnumerable<Position>>, Dictionary<string, IEnumerable<MarketInfo>>)>
         DeserializeInputsAsync(
             string path)
     {
         var weights = await DeserializeAsync<Weight[]>($"{path}/weights.json");
 
         var positions =
-            await DeserializeAsync<Dictionary<string, Position>>($"{path}/positions.json");
+            ToEnumerableDictionary(await DeserializeAsync<Dictionary<string, Position[]>>($"{path}/positions.json"));
 
         var markets =
-            await DeserializeAsync<Dictionary<string, MarketInfo[]>>($"{path}/markets.json");
+            ToEnumerableDictionary(await DeserializeAsync<Dictionary<string, MarketInfo[]>>($"{path}/markets.json"));
 
-        var markets2 = markets.ToDictionary(
+        return (weights, positions, markets);
+    }
+
+    private static Dictionary<TKey, IEnumerable<TValue>> ToEnumerableDictionary<TKey, TValue>(
+        IDictionary<TKey, TValue[]> dictionary) where TKey : notnull
+    {
+        return dictionary.ToDictionary(
             kvp => kvp.Key,
-            kvp => kvp.Value.Cast<MarketInfo>());
-
-        return (weights, positions, markets2);
+            kvp => kvp.Value.Cast<TValue>());
     }
 
     private static async Task<T> DeserializeAsync<T>(string path)
