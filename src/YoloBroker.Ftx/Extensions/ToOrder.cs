@@ -12,6 +12,7 @@ public static partial class FtxExtensions
                 order.Id,
                 order.Symbol,
                 order.CreatedAt,
+                order.Side.ToOrderSide(),
                 order.Status.ToOrderStatus(),
                 order.Quantity,
                 order.RemainingQuantity,

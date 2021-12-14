@@ -9,6 +9,7 @@ using YoloAbstractions;
 using YoloBroker.Ftx.Config;
 using YoloBroker.Ftx.Exceptions;
 using YoloBroker.Ftx.Extensions;
+using OrderSide = FTX.Net.Enums.OrderSide;
 
 namespace YoloBroker.Ftx;
 
@@ -59,8 +60,8 @@ public class FtxBroker : IYoloBroker
             await Task.Delay(123, ct); // throttle as FTX errors if > 2 orders in 200ms
 
             var orderSide = trade.Amount < 0 ? OrderSide.Sell : OrderSide.Buy;
-            var quantity = Math.Abs(trade.Amount);
             var orderType = trade.LimitPrice.HasValue ? OrderType.Limit : OrderType.Market;
+            var quantity = Math.Abs(trade.Amount);
 
             var result = await _ftxClient.PlaceOrderAsync(
                 trade.AssetName,
@@ -79,21 +80,36 @@ public class FtxBroker : IYoloBroker
         }
     }
 
-    public async Task<IDictionary<string, Position>> GetPositionsAsync(
+    public async Task<IDictionary<string, Order>> GetOrdersAsync(CancellationToken ct)
+    {
+        var orders =
+            await GetDataAsync(() => _ftxClient.GetOpenOrdersAsync(ct: ct),
+                "Could not get open orders");
+
+        return orders.ToDictionary(x => x.Future, x => x.ToOrder()!);
+    }
+
+    public async Task<IDictionary<string, IEnumerable<Position>>> GetPositionsAsync(
         CancellationToken ct = default)
     {
         var positions =
             await GetDataAsync(() => _ftxClient.GetPositionsAsync(ct: ct),
                 "Could not get account info");
 
-        var result = positions.ToDictionary(
-            x => x.Future,
-            x => new Position(
-                x.Future,
-                x.Future.Split("-")
-                    .First(),
-                AssetType.Future,
-                x.Quantity));
+        var result = new Dictionary<string, IEnumerable<Position>>();
+
+        foreach (var position in positions)
+        {
+            result[position.Future] = new List<Position>
+            {
+                new(
+                    position.Future,
+                    position.Future.Split("-")
+                        .First(),
+                    AssetType.Future,
+                    position.Quantity * (position.Side == OrderSide.Buy ? 1 : -1))
+            };
+        }
 
         var holdings = await GetDataAsync(
             () => _ftxClient.GetBalancesAsync(ct: ct),
@@ -101,11 +117,24 @@ public class FtxBroker : IYoloBroker
 
         foreach (var holding in holdings)
         {
-            result[holding.Asset] = new Position(
+            var position = new Position(
                 holding.Asset,
                 holding.Asset,
                 AssetType.Spot,
                 holding.Total);
+
+            if (result.TryGetValue(holding.Asset, out var positionsList))
+            {
+                (positionsList as List<Position>)?.Add(position);
+                //result[holding.Asset] = positionsList;
+            }
+            else
+            {
+                result[holding.Asset] = new List<Position>
+                {
+                    position
+                };
+            }
         }
 
         return result;
@@ -127,15 +156,11 @@ public class FtxBroker : IYoloBroker
             if (quoteCurrency is { } &&
                 s.QuoteCurrency is { } &&
                 quoteCurrency != s.QuoteCurrency)
-            {
                 return false;
-            }
 
             if (baseAssetFilter is { } &&
                 !baseAssetFilter.Contains(s.BaseCurrency ?? s.Underlying))
-            {
                 return false;
-            }
 
             var expiry = s.GetExpiry();
 
@@ -177,9 +202,7 @@ public class FtxBroker : IYoloBroker
     protected virtual void Dispose(bool disposing)
     {
         if (_disposed)
-        {
             return;
-        }
 
         if (disposing)
         {
@@ -197,9 +220,7 @@ public class FtxBroker : IYoloBroker
         var result = await webCallFunc();
 
         if (!result.Success)
-        {
             throw new FtxException(exceptionMessage, result);
-        }
 
         return result.Data;
     }

@@ -14,7 +14,7 @@ public static partial class LoggerExtensions
     public static partial void CalculateTrades(
         this ILogger logger,
         IEnumerable<Weight> weights,
-        IDictionary<string, Position> positions,
+        IDictionary<string, IEnumerable<Position>> positions,
         IDictionary<string, IEnumerable<MarketInfo>> markets);
 
     [LoggerMessage(

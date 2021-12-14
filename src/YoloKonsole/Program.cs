@@ -63,18 +63,24 @@ internal class Program
 
             using var broker = serviceProvider.GetService<IYoloBroker>()!;
 
+            var orders = await broker.GetOrdersAsync(cancellationToken);
+
+            if (orders.Any())
+            {
+                _logger.OpenOrders(orders.Values);
+                
+                return Error;
+            }
+
             var positions = await broker.GetPositionsAsync(cancellationToken);
 
             var baseAssetFilter = positions
-                .Values
-                .Select(p => p.BaseAsset)
-                .Union(weights.Select(w => w.Ticker.Split("/")
-                    .First()))
+                .Keys
                 .ToHashSet();
 
             var markets = await broker.GetMarketsAsync(
                 baseAssetFilter,
-                yoloConfig.BaseCurrency,
+                yoloConfig.BaseAsset,
                 yoloConfig.AssetPermissions,
                 cancellationToken);
 
