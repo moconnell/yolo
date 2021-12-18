@@ -46,7 +46,7 @@ Sample configuration below.
 
 #### Logging/PathFormat
 
-This determines where the application will write logs to. Windows paths using \ must be escaped as \\ as below. The substitution token `{Date}` included in the path means that a new file will be written each day. You can omit this if you would prefer to have a single file.
+This determines where the application will write logs to. Windows paths using `\` must be escaped as `\\` as below. The substitution token `{Date}` included in the path means that a new file will be written each day. You can omit this if you would prefer to have a single file.
 
 ```
 {
