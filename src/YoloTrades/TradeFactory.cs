@@ -56,9 +56,7 @@ public class TradeFactory : ITradeFactory
             ? 1
             : MaxLeverage / unconstrainedTargetLeverage;
 
-        var trades = new List<Trade>();
-
-        void AddTrade(Weight w)
+        IEnumerable<Trade> RebalancePositions(Weight w)
         {
             var (token, _) = w.Ticker.SplitConstituents();
 
@@ -69,35 +67,45 @@ public class TradeFactory : ITradeFactory
 
             _logger.LogDebug("Processing weight: {Weight}", w);
 
-            var marketPositions = markets.GetMarkets(token)
-                .Select(marketInfo =>
+            var projectedPositions = markets.GetMarkets(token)
+                .ToDictionary(
+                    market => market.Name, 
+                    market =>
                 {
-                    var currentPosition = tokenPositions
-                        .FirstOrDefault(p => p.AssetName == marketInfo.Name) ?? Position.Null;
+                    if (market.Bid is null)
+                        _logger.NoBid(token, market.Key);
+                    if (market.Ask is null)
+                        _logger.NoAsk(token, market.Key);
 
-                    return (marketInfo, currentPosition);
-                })
-                .ToArray();
+                    var position = tokenPositions
+                                       .FirstOrDefault(p =>
+                                           p.AssetType == market.AssetType &&
+                                           (p.AssetName == market.Name &&
+                                            market.AssetType == AssetType.Future ||
+                                            p.BaseAsset == market.BaseAsset &&
+                                            market.AssetType == AssetType.Spot)) ??
+                                   Position.Null;
 
-            if (!marketPositions.Any())
+                    return new ProjectedPosition(market, position.Amount, nominal);
+                });
+
+            if (!projectedPositions.Any())
             {
                 _logger.NoMarkets(token);
-                return;
+                yield break;
             }
 
-            var currentWeight = marketPositions.Sum(tuple =>
+            bool HasPosition(KeyValuePair<string, ProjectedPosition> keyValuePair) => keyValuePair.Value.HasPosition;
+            
+            if (projectedPositions.Count(HasPosition) > 1)
             {
-                var (marketInfo, currentPosition) = tuple;
-                if (marketInfo.Bid is null)
-                    _logger.NoBid(token, marketInfo.Key);
-                
-                return currentPosition.Amount * marketInfo.Bid / nominal;
-            });
-
-            if (currentWeight is null)
-            {
-                return;
+                _logger.MultiplePositions(token);
+                yield break;
             }
+
+            var currentWeight = projectedPositions.Values.Sum(projectedPosition => projectedPosition.ProjectedWeight);
+            if (currentWeight is null)  
+                yield break;
 
             if (RebalanceMode == RebalanceMode.Slow &&
                 currentWeight >= constrainedTargetWeight - TradeBuffer &&
@@ -108,7 +116,7 @@ public class TradeFactory : ITradeFactory
                     currentWeight.Value,
                     constrainedTargetWeight,
                     constrainedTargetWeight - currentWeight.Value);
-                return;
+                yield break;
             }
 
             var tradeBufferAdjustment = TradeBuffer * RebalanceMode switch
@@ -116,59 +124,101 @@ public class TradeFactory : ITradeFactory
                 RebalanceMode.Slow => constrainedTargetWeight < currentWeight ? 1 : -1,
                 _ => 0
             };
-            var remainingDelta = constrainedTargetWeight - currentWeight.Value + tradeBufferAdjustment;
-            var isBuy = remainingDelta > 0;
-            var orderedMarkets = isBuy
-                ? marketPositions.OrderBy(tuple => tuple.marketInfo.Last).ToArray()
-                : marketPositions.OrderByDescending(tuple => tuple.marketInfo.Last).ToArray();
-            var i = 0;
-            
-            while (remainingDelta != 0 && i < orderedMarkets.Length)
+
+            var bufferedTargetWeight = constrainedTargetWeight + tradeBufferAdjustment;
+            var remainingDelta = bufferedTargetWeight - currentWeight.Value;
+
+            while (remainingDelta != 0)
             {
-                var (market, currentPosition) = orderedMarkets[i++];
-                var currentMarketWeight = currentPosition.Amount * market.Bid / nominal;
-                var price = GetPrice(isBuy, market);
-
-                if (price is null)
-                    return;
-
-                var delta = market.AssetType switch
+                var trades = CalcTrades(token, projectedPositions.Values.ToArray(), bufferedTargetWeight, remainingDelta);
+                
+                foreach (var (trade, remainingDeltaPostTrade) in trades)
                 {
-                    AssetType.Future when market.Expiry is {} && !AssetPermissions.HasFlag(AssetPermissions.ExpiringFutures) => 0,
-                    AssetType.Future when market.Expiry is null && !AssetPermissions.HasFlag(AssetPermissions.PerpetualFutures) => 0,
-                    AssetType.Spot when currentMarketWeight + remainingDelta > 0 && !AssetPermissions.HasFlag(AssetPermissions.LongSpot) => -currentMarketWeight!.Value,
-                    AssetType.Spot when currentMarketWeight + remainingDelta < 0 && !AssetPermissions.HasFlag(AssetPermissions.ShortSpot) => -currentMarketWeight!.Value,
-                    _ => remainingDelta
-                };
-
-                if (delta == 0)
-                    continue;
-
-                var rawSize = delta * nominal / price.Value;
-                var size = Math.Floor(rawSize / market.QuantityStep) * market.QuantityStep;
-                var factor = isBuy ? SpreadSplit : 1 - SpreadSplit;
-                var spread = market.Ask!.Value - market.Bid!.Value;
-                var rawLimitPrice = market.Bid!.Value + spread * factor;
-                var limitPrice = Math.Floor(rawLimitPrice / market.PriceStep) * market.PriceStep;
-                var trade = new Trade(market.Name, market.AssetType, size, limitPrice);
-
-                _logger.GeneratedTrade(
-                    token,
-                    currentWeight,
-                    constrainedTargetWeight,
-                    delta,
-                    trade);
-
-                trades.Add(trade);
-
-                remainingDelta -= delta;
+                    var currentProjectedPosition = projectedPositions[trade.AssetName];
+                    var newProjectedPosition = currentProjectedPosition + trade;
+                    projectedPositions[trade.AssetName] = newProjectedPosition;
+                    yield return trade;
+                    remainingDelta = remainingDeltaPostTrade;
+                }
             }
         }
 
-        weightsList
-            .ForEach(AddTrade);
+        return weightsList
+            .SelectMany(RebalancePositions);
+    }
 
-        return trades;
+    private IEnumerable<(Trade trade, decimal remainingDelta)> CalcTrades(string token,
+        IReadOnlyList<ProjectedPosition> projectedPositions,
+        decimal bufferedTargetWeight,
+        decimal remainingDelta)
+    {
+        bool HasPosition(ProjectedPosition p) => p.HasPosition;
+
+        var startingWeight = bufferedTargetWeight - remainingDelta;
+        var crossingZeroWeightBoundary = startingWeight != 0 && bufferedTargetWeight / startingWeight < 0;
+
+        var marketPositions = projectedPositions.Count(HasPosition) switch
+        {
+            1 when !crossingZeroWeightBoundary => projectedPositions.Where(HasPosition).ToArray(),
+            _ => projectedPositions.ToArray()
+        };
+
+        var isBuy = remainingDelta >= 0;
+        var priceMultiplier = isBuy ? 1 : -1;
+            
+        var orderedMarkets = marketPositions
+            .OrderByDescending(HasPosition)
+            .ThenBy(projectedPosition => priceMultiplier * projectedPosition.Market.Last)
+            .ToArray();
+                
+        _logger.MarketPositions(token, orderedMarkets);
+        
+        foreach (var projectedPosition in orderedMarkets)
+        {
+            var market = projectedPosition.Market;
+            var weight = projectedPosition.ProjectedWeight!.Value;
+            var nominal = projectedPosition.Nominal;
+            var price = GetPrice(isBuy, market);
+
+            if (price is null)
+                continue;
+
+            var (delta, restart) = market.AssetType switch
+            {
+                AssetType.Future when market.Expiry is { } &&
+                                      !AssetPermissions.HasFlag(AssetPermissions.ExpiringFutures) => (0, false),
+                AssetType.Future when market.Expiry is null &&
+                                      !AssetPermissions.HasFlag(AssetPermissions.PerpetualFutures) => (0, false),
+                AssetType.Spot when weight + remainingDelta > 0 &&
+                                    !AssetPermissions.HasFlag(AssetPermissions.LongSpot) => (-weight, false),
+                AssetType.Spot when weight + remainingDelta < 0 &&
+                                    !AssetPermissions.HasFlag(AssetPermissions.ShortSpot) => (-weight, false),
+                _ when crossingZeroWeightBoundary => (-weight, true),
+                _ => (remainingDelta, false)
+            };
+
+            if (delta == 0)
+                continue;
+
+            var rawSize = delta * nominal / price.Value;
+            var size = Math.Floor(rawSize / market.QuantityStep) * market.QuantityStep;
+            var factor = isBuy ? SpreadSplit : 1 - SpreadSplit;
+            var spread = market.Ask!.Value - market.Bid!.Value;
+            var rawLimitPrice = market.Bid!.Value + spread * factor;
+            var limitPrice = Math.Floor(rawLimitPrice / market.PriceStep) * market.PriceStep;
+            var trade = new Trade(market.Name, market.AssetType, size, limitPrice);
+
+            _logger.GeneratedTrade(token, delta, trade);
+
+            remainingDelta -= delta;
+            
+            yield return (trade, remainingDelta);
+            
+            if (restart)
+            {
+                break;
+            }
+        }
     }
 
     private decimal? GetPrice(bool isBuy, MarketInfo market)

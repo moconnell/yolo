@@ -18,15 +18,22 @@ public static partial class LoggerExtensions
         IDictionary<string, IEnumerable<MarketInfo>> markets);
 
     [LoggerMessage(
+        EventId = TradeEventIds.MarketPositions,
+        Level = LogLevel.Debug,
+        Message = "({Token}): market positions... {MarketPositions}")]
+    public static partial void MarketPositions(
+        this ILogger logger, 
+        string token, 
+        IEnumerable<ProjectedPosition> marketPositions);
+    
+    [LoggerMessage(
         EventId = TradeEventIds.GeneratedTrade,
         Level = LogLevel.Information,
         Message =
-            "({Token}): new {Trade} (current weight: {CurrentWeight:0.000}, target weight: {ConstrainedTargetWeight:0.000}, delta: {Delta:0.000})")]
+            "({Token}): new {Trade} (delta: {Delta:0.000})")]
     public static partial void GeneratedTrade(
         this ILogger logger,
         string token,
-        decimal? currentWeight,
-        decimal constrainedTargetWeight,
         decimal delta,
         Trade trade);
 
@@ -35,6 +42,14 @@ public static partial class LoggerExtensions
         Level = LogLevel.Error, 
         Message = "({Token}): no markets")]
     public static partial void NoMarkets(
+        this ILogger logger,
+        string token);
+
+    [LoggerMessage(
+        EventId = TradeEventIds.MultiplePositions,
+        Level = LogLevel.Error, 
+        Message = "({Token}): multiple positions!")]
+    public static partial void MultiplePositions(
         this ILogger logger,
         string token);
 

@@ -80,13 +80,13 @@ public class FtxBroker : IYoloBroker
         }
     }
 
-    public async Task<IDictionary<string, Order>> GetOrdersAsync(CancellationToken ct)
+    public async Task<Dictionary<long, Order>> GetOrdersAsync(CancellationToken ct)
     {
         var orders =
             await GetDataAsync(() => _ftxClient.GetOpenOrdersAsync(ct: ct),
                 "Could not get open orders");
 
-        return orders.ToDictionary(x => x.Future, x => x.ToOrder()!);
+        return orders.ToDictionary(x => x.Id, x => x.ToOrder()!);
     }
 
     public async Task<IDictionary<string, IEnumerable<Position>>> GetPositionsAsync(
@@ -100,12 +100,15 @@ public class FtxBroker : IYoloBroker
 
         foreach (var position in positions)
         {
-            result[position.Future] = new List<Position>
+            var baseAsset = position.Future
+                .Split("-")
+                .First();
+            
+            result[baseAsset] = new List<Position>
             {
                 new(
                     position.Future,
-                    position.Future.Split("-")
-                        .First(),
+                    baseAsset,
                     AssetType.Future,
                     position.Quantity * (position.Side == OrderSide.Buy ? 1 : -1))
             };

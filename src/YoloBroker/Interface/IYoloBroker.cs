@@ -8,7 +8,7 @@ namespace YoloBroker;
 
 public interface IYoloBroker : IDisposable
 {
-    Task<IDictionary<string, Order>> GetOrdersAsync(CancellationToken ct);
+    Task<Dictionary<long, Order>> GetOrdersAsync(CancellationToken ct);
     
     Task<IDictionary<string, IEnumerable<Position>>> GetPositionsAsync(CancellationToken ct);
 
