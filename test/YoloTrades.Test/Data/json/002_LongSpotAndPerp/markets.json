@@ -1,0 +1,302 @@
+{
+  "BCH": [
+    {
+      "Name": "BCH-PERP",
+      "BaseAsset": "BCH",
+      "QuoteAsset": null,
+      "AssetType": 1,
+      "PriceStep": 0.05,
+      "QuantityStep": 0.001,
+      "Ask": 558.85,
+      "Bid": 558.8,
+      "Last": 558.75,
+      "Expiry": null,
+      "TimeStamp": "2021-11-27T21:02:03.373667Z",
+      "Key": "BCH-PERP-Future"
+    },
+    {
+      "Name": "BCH/USD",
+      "BaseAsset": "BCH",
+      "QuoteAsset": "USD",
+      "AssetType": 0,
+      "PriceStep": 0.025,
+      "QuantityStep": 0.001,
+      "Ask": 558.725,
+      "Bid": 558.675,
+      "Last": 558.6,
+      "Expiry": null,
+      "TimeStamp": "2021-11-27T21:02:03.38399Z",
+      "Key": "BCH/USD-Spot"
+    }
+  ],
+  "BTC": [
+    {
+      "Name": "BTC-PERP",
+      "BaseAsset": "BTC",
+      "QuoteAsset": null,
+      "AssetType": 1,
+      "PriceStep": 1.0,
+      "QuantityStep": 0.0001,
+      "Ask": 54286.0,
+      "Bid": 54285.0,
+      "Last": 54285.0,
+      "Expiry": null,
+      "TimeStamp": "2021-11-27T21:02:03.384127Z",
+      "Key": "BTC-PERP-Future"
+    },
+    {
+      "Name": "BTC/USD",
+      "BaseAsset": "BTC",
+      "QuoteAsset": "USD",
+      "AssetType": 0,
+      "PriceStep": 1.0,
+      "QuantityStep": 0.0001,
+      "Ask": 54292.0,
+      "Bid": 54291.0,
+      "Last": 54290.0,
+      "Expiry": null,
+      "TimeStamp": "2021-11-27T21:02:03.384144Z",
+      "Key": "BTC/USD-Spot"
+    }
+  ],
+  "CRO": [
+    {
+      "Name": "CRO-PERP",
+      "BaseAsset": "CRO",
+      "QuoteAsset": null,
+      "AssetType": 1,
+      "PriceStep": 0.000025,
+      "QuantityStep": 10.0,
+      "Ask": 0.78865,
+      "Bid": 0.78835,
+      "Last": 0.78865,
+      "Expiry": null,
+      "TimeStamp": "2021-11-27T21:02:03.384163Z",
+      "Key": "CRO-PERP-Future"
+    },
+    {
+      "Name": "CRO/USD",
+      "BaseAsset": "CRO",
+      "QuoteAsset": "USD",
+      "AssetType": 0,
+      "PriceStep": 0.000025,
+      "QuantityStep": 10.0,
+      "Ask": 0.7874,
+      "Bid": 0.786825,
+      "Last": 0.7874,
+      "Expiry": null,
+      "TimeStamp": "2021-11-27T21:02:03.384183Z",
+      "Key": "CRO/USD-Spot"
+    }
+  ],
+  "DOGE": [
+    {
+      "Name": "DOGE-PERP",
+      "BaseAsset": "DOGE",
+      "QuoteAsset": null,
+      "AssetType": 1,
+      "PriceStep": 0.0000005,
+      "QuantityStep": 1.0,
+      "Ask": 0.203216,
+      "Bid": 0.203185,
+      "Last": 0.203153,
+      "Expiry": null,
+      "TimeStamp": "2021-11-27T21:02:03.384195Z",
+      "Key": "DOGE-PERP-Future"
+    },
+    {
+      "Name": "DOGE/USD",
+      "BaseAsset": "DOGE",
+      "QuoteAsset": "USD",
+      "AssetType": 0,
+      "PriceStep": 0.0000005,
+      "QuantityStep": 1.0,
+      "Ask": 0.2032295,
+      "Bid": 0.2031715,
+      "Last": 0.2031635,
+      "Expiry": null,
+      "TimeStamp": "2021-11-27T21:02:03.384204Z",
+      "Key": "DOGE/USD-Spot"
+    }
+  ],
+  "ETH": [
+    {
+      "Name": "ETH-PERP",
+      "BaseAsset": "ETH",
+      "QuoteAsset": null,
+      "AssetType": 1,
+      "PriceStep": 0.1,
+      "QuantityStep": 0.001,
+      "Ask": 4054.1,
+      "Bid": 4054.0,
+      "Last": 4054.0,
+      "Expiry": null,
+      "TimeStamp": "2021-11-27T21:02:03.384214Z",
+      "Key": "ETH-PERP-Future"
+    },
+    {
+      "Name": "ETH/USD",
+      "BaseAsset": "ETH",
+      "QuoteAsset": "USD",
+      "AssetType": 0,
+      "PriceStep": 0.1,
+      "QuantityStep": 0.001,
+      "Ask": 4055.1,
+      "Bid": 4055.0,
+      "Last": 4055.1,
+      "Expiry": null,
+      "TimeStamp": "2021-11-27T21:02:03.384222Z",
+      "Key": "ETH/USD-Spot"
+    }
+  ],
+  "FTT": [
+    {
+      "Name": "FTT-PERP",
+      "BaseAsset": "FTT",
+      "QuoteAsset": null,
+      "AssetType": 1,
+      "PriceStep": 0.0005,
+      "QuantityStep": 0.1,
+      "Ask": 47.6755,
+      "Bid": 47.675,
+      "Last": 47.679,
+      "Expiry": null,
+      "TimeStamp": "2021-11-27T21:02:03.384232Z",
+      "Key": "FTT-PERP-Future"
+    },
+    {
+      "Name": "FTT/USD",
+      "BaseAsset": "FTT",
+      "QuoteAsset": "USD",
+      "AssetType": 0,
+      "PriceStep": 0.001,
+      "QuantityStep": 0.1,
+      "Ask": 47.67,
+      "Bid": 47.669,
+      "Last": 47.667,
+      "Expiry": null,
+      "TimeStamp": "2021-11-27T21:02:03.384245Z",
+      "Key": "FTT/USD-Spot"
+    }
+  ],
+  "LINK": [
+    {
+      "Name": "LINK-PERP",
+      "BaseAsset": "LINK",
+      "QuoteAsset": null,
+      "AssetType": 1,
+      "PriceStep": 0.0005,
+      "QuantityStep": 0.1,
+      "Ask": 23.955,
+      "Bid": 23.95,
+      "Last": 23.9545,
+      "Expiry": null,
+      "TimeStamp": "2021-11-27T21:02:03.384256Z",
+      "Key": "LINK-PERP-Future"
+    },
+    {
+      "Name": "LINK/USD",
+      "BaseAsset": "LINK",
+      "QuoteAsset": "USD",
+      "AssetType": 0,
+      "PriceStep": 0.0005,
+      "QuantityStep": 0.1,
+      "Ask": 23.9585,
+      "Bid": 23.9505,
+      "Last": 23.9565,
+      "Expiry": null,
+      "TimeStamp": "2021-11-27T21:02:03.384264Z",
+      "Key": "LINK/USD-Spot"
+    }
+  ],
+  "LTC": [
+    {
+      "Name": "LTC-PERP",
+      "BaseAsset": "LTC",
+      "QuoteAsset": null,
+      "AssetType": 1,
+      "PriceStep": 0.01,
+      "QuantityStep": 0.01,
+      "Ask": 192.43,
+      "Bid": 192.42,
+      "Last": 192.42,
+      "Expiry": null,
+      "TimeStamp": "2021-11-27T21:02:03.384273Z",
+      "Key": "LTC-PERP-Future"
+    },
+    {
+      "Name": "LTC/USD",
+      "BaseAsset": "LTC",
+      "QuoteAsset": "USD",
+      "AssetType": 0,
+      "PriceStep": 0.005,
+      "QuantityStep": 0.01,
+      "Ask": 192.45,
+      "Bid": 192.43,
+      "Last": 192.44,
+      "Expiry": null,
+      "TimeStamp": "2021-11-27T21:02:03.384282Z",
+      "Key": "LTC/USD-Spot"
+    }
+  ],
+  "UNI": [
+    {
+      "Name": "UNI-PERP",
+      "BaseAsset": "UNI",
+      "QuoteAsset": null,
+      "AssetType": 1,
+      "PriceStep": 0.001,
+      "QuantityStep": 0.1,
+      "Ask": 19.286,
+      "Bid": 19.28,
+      "Last": 19.285,
+      "Expiry": null,
+      "TimeStamp": "2021-11-27T21:02:03.384292Z",
+      "Key": "UNI-PERP-Future"
+    },
+    {
+      "Name": "UNI/USD",
+      "BaseAsset": "UNI",
+      "QuoteAsset": "USD",
+      "AssetType": 0,
+      "PriceStep": 0.001,
+      "QuantityStep": 0.1,
+      "Ask": 19.29,
+      "Bid": 19.282,
+      "Last": 19.29,
+      "Expiry": null,
+      "TimeStamp": "2021-11-27T21:02:03.3843Z",
+      "Key": "UNI/USD-Spot"
+    }
+  ],
+  "XRP": [
+    {
+      "Name": "XRP-PERP",
+      "BaseAsset": "XRP",
+      "QuoteAsset": null,
+      "AssetType": 1,
+      "PriceStep": 0.000025,
+      "QuantityStep": 1.0,
+      "Ask": 0.939725,
+      "Bid": 0.9397,
+      "Last": 0.939575,
+      "Expiry": null,
+      "TimeStamp": "2021-11-27T21:02:03.384339Z",
+      "Key": "XRP-PERP-Future"
+    },
+    {
+      "Name": "XRP/USD",
+      "BaseAsset": "XRP",
+      "QuoteAsset": "USD",
+      "AssetType": 0,
+      "PriceStep": 0.000025,
+      "QuantityStep": 1.0,
+      "Ask": 0.93975,
+      "Bid": 0.939525,
+      "Last": 0.939425,
+      "Expiry": null,
+      "TimeStamp": "2021-11-27T21:02:03.384349Z",
+      "Key": "XRP/USD-Spot"
+    }
+  ]
+}

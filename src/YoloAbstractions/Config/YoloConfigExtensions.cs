@@ -10,7 +10,7 @@ public static class YoloConfigExtensions
         return configuration
             .GetSection(Yolo)
             .Get<YoloConfig>()
-            .Ensure(c => c.BaseCurrency)
+            .Ensure(c => c.BaseAsset)
             .Ensure(c => c.WeightsUrl)
             .Ensure(c => c.TradeBuffer);
     }

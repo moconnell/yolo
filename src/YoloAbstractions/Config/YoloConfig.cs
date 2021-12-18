@@ -7,10 +7,8 @@ public class YoloConfig
     public decimal MaxLeverage { get; init; } = 1;
     public decimal TradeBuffer { get; init; }
     public decimal? NominalCash { get; init; }
-    public AssetTypePreference TradePreference { get; init; } =
-        AssetTypePreference.MatchExistingPosition;
     public AssetPermissions AssetPermissions { get; init; } = AssetPermissions.SpotAndPerp;
-    public string BaseCurrency { get; init; }
+    public string BaseAsset { get; init; }
     public RebalanceMode RebalanceMode { get; init; } =
         RebalanceMode.Slow;
     public decimal SpreadSplit { get; init; } = 0.5m;
