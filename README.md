@@ -17,7 +17,7 @@ There is a pre-built win64 console app in the releases section, which can be sch
 
 Sample configuration below. 
    
-````
+```
 {
   "Logging": {
     "PathFormat": "C:\\logs\\yolo-{Date}.json",
