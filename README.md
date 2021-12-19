@@ -83,6 +83,8 @@ The default setting of 0.5 ensures that the limit price will always be placed ex
 
 e.g. a setting of 0.618 would place the limit price for a sell order at the bid price + 61.8% of the current bid-ask spread; conversely for a sell it would be the ask price - 61.8% of the current bid-ask spread.
 
+Limit price is specified must be divisible by the intrument price step i.e. in the case where the spread equals the minimum price increment, an order will be submitted that matches the current best bid or ask price.
+
 #### Ftx/PostOnly
 
 The application seeks always to place limit orders at or better than best bid/ask. Setting this flag additionally ensures that FTX will reject any order that would cross the book.
