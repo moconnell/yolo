@@ -43,7 +43,11 @@ public class FtxBroker : IYoloBroker
                 BaseAddress = config.BaseAddress,
                 SubaccountName = config.SubAccount
             });
+
+        PostOnly = config.PostOnly;
     }
+    
+    private bool? PostOnly { get; }
 
     public void Dispose()
     {
@@ -69,6 +73,7 @@ public class FtxBroker : IYoloBroker
                 orderType,
                 quantity,
                 trade.LimitPrice,
+                postOnly: PostOnly,
                 ct: ct);
 
             yield return new TradeResult(

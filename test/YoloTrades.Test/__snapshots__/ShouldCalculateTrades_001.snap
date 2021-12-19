@@ -1,0 +1,50 @@
+﻿[
+  {
+    "AssetName": "XRP/USD",
+    "AssetType": "Spot",
+    "Amount": -680.0,
+    "LimitPrice": 0.784975,
+    "Expiry": null,
+    "IsTradeable": true
+  },
+  {
+    "AssetName": "LINK/USD",
+    "AssetType": "Spot",
+    "Amount": -44.6,
+    "LimitPrice": 19.4420,
+    "Expiry": null,
+    "IsTradeable": true
+  },
+  {
+    "AssetName": "FTT-PERP",
+    "AssetType": "Future",
+    "Amount": -6.6,
+    "LimitPrice": 43.1870,
+    "Expiry": null,
+    "IsTradeable": true
+  },
+  {
+    "AssetName": "CRO-PERP",
+    "AssetType": "Future",
+    "Amount": 1980.0,
+    "LimitPrice": 0.548750,
+    "Expiry": null,
+    "IsTradeable": true
+  },
+  {
+    "AssetName": "DOGE/USD",
+    "AssetType": "Spot",
+    "Amount": -3774.0,
+    "LimitPrice": 0.1636025,
+    "Expiry": null,
+    "IsTradeable": true
+  },
+  {
+    "AssetName": "ETH/USD",
+    "AssetType": "Spot",
+    "Amount": 0.106,
+    "LimitPrice": 3957.5,
+    "Expiry": null,
+    "IsTradeable": true
+  }
+]

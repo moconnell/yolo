@@ -4,62 +4,71 @@
     "AssetType": "Spot",
     "Amount": -0.5986,
     "LimitPrice": 459.5500,
-    "Expiry": null
+    "Expiry": null,
+    "IsTradeable": true
   },
   {
     "AssetName": "BTC/USD",
     "AssetType": "Spot",
     "Amount": 0.0025,
     "LimitPrice": 49413.0000,
-    "Expiry": null
+    "Expiry": null,
+    "IsTradeable": true
   },
   {
     "AssetName": "CRO/USD",
     "AssetType": "Spot",
     "Amount": 947.4349,
     "LimitPrice": 0.5783,
-    "Expiry": null
+    "Expiry": null,
+    "IsTradeable": true
   },
   {
     "AssetName": "DOGE/USD",
     "AssetType": "Spot",
     "Amount": -4131.0624,
-    "LimitPrice": 0.1688,
-    "Expiry": null
+    "LimitPrice": 0.1689,
+    "Expiry": null,
+    "IsTradeable": true
   },
   {
     "AssetName": "ETH/USD",
     "AssetType": "Spot",
     "Amount": 0.0949,
     "LimitPrice": 4091.2000,
-    "Expiry": null
+    "Expiry": null,
+    "IsTradeable": true
   },
   {
     "AssetName": "FTT/USD",
     "AssetType": "Spot",
     "Amount": -13.1617,
     "LimitPrice": 40.4420,
-    "Expiry": null
+    "Expiry": null,
+    "IsTradeable": true
   },
   {
     "AssetName": "LINK/USD",
     "AssetType": "Spot",
     "Amount": -30.3962,
     "LimitPrice": 19.9700,
-    "Expiry": null
+    "Expiry": null,
+    "IsTradeable": true
   },
   {
     "AssetName": "LTC/USD",
     "AssetType": "Spot",
     "Amount": -3.3773,
     "LimitPrice": 158.0900,
-    "Expiry": null
+    "Expiry": null,
+    "IsTradeable": true
   },
   {
     "AssetName": "UNI/USD",
     "AssetType": "Spot",
     "Amount": -64.4732,
     "LimitPrice": 15.8900,
-    "Expiry": null
+    "Expiry": null,
+    "IsTradeable": true
   }
 ]

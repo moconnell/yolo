@@ -82,4 +82,14 @@ public static partial class LoggerExtensions
         decimal currentWeight,
         decimal constrainedTargetWeight,
         decimal delta);
+
+    [LoggerMessage(
+        EventId = TradeEventIds.DeltaTooSmall,
+        Level = LogLevel.Information,
+        Message =
+            "({Token}): no action - delta too small to trade (delta: {Delta:0.0000})")]
+    public static partial void DeltaTooSmall(
+        this ILogger logger,
+        string token,
+        decimal delta);
 }

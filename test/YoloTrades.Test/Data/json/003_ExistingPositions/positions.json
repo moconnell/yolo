@@ -1,0 +1,120 @@
+{
+  "BTC": [
+    {
+      "AssetName": "BTC-PERP",
+      "BaseAsset": "BTC",
+      "AssetType": "Future",
+      "Amount": 0.0
+    },
+    {
+      "AssetName": "BTC",
+      "BaseAsset": "BTC",
+      "AssetType": "Spot",
+      "Amount": 0.02
+    }
+  ],
+  "ETH": [
+    {
+      "AssetName": "ETH-PERP",
+      "BaseAsset": "ETH",
+      "AssetType": "Future",
+      "Amount": 0.005
+    }
+  ],
+  "LINK": [
+    {
+      "AssetName": "LINK-PERP",
+      "BaseAsset": "LINK",
+      "AssetType": "Future",
+      "Amount": 0.0
+    },
+    {
+      "AssetName": "LINK",
+      "BaseAsset": "LINK",
+      "AssetType": "Spot",
+      "Amount": -1.10049568
+    }
+  ],
+  "DOGE": [
+    {
+      "AssetName": "DOGE-PERP",
+      "BaseAsset": "DOGE",
+      "AssetType": "Future",
+      "Amount": 0.0
+    },
+    {
+      "AssetName": "DOGE",
+      "BaseAsset": "DOGE",
+      "AssetType": "Spot",
+      "Amount": -231.08172185
+    }
+  ],
+  "UNI": [
+    {
+      "AssetName": "UNI-PERP",
+      "BaseAsset": "UNI",
+      "AssetType": "Future",
+      "Amount": 0.0
+    },
+    {
+      "AssetName": "UNI",
+      "BaseAsset": "UNI",
+      "AssetType": "Spot",
+      "Amount": -3.20056165
+    }
+  ],
+  "FTT": [
+    {
+      "AssetName": "FTT-PERP",
+      "BaseAsset": "FTT",
+      "AssetType": "Future",
+      "Amount": 0.0
+    },
+    {
+      "AssetName": "FTT",
+      "BaseAsset": "FTT",
+      "AssetType": "Spot",
+      "Amount": 0.0
+    }
+  ],
+  "CRO": [
+    {
+      "AssetName": "CRO-PERP",
+      "BaseAsset": "CRO",
+      "AssetType": "Future",
+      "Amount": 50.0
+    }
+  ],
+  "USD": [
+    {
+      "AssetName": "USD",
+      "BaseAsset": "USD",
+      "AssetType": "Spot",
+      "Amount": 210.68488425
+    }
+  ],
+  "BCH": [
+    {
+      "AssetName": "BCH",
+      "BaseAsset": "BCH",
+      "AssetType": "Spot",
+      "Amount": -0.06106879
+    }
+  ],
+  "LTC": [
+    {
+      "AssetName": "LTC",
+      "BaseAsset": "LTC",
+      "AssetType": "Spot",
+      "Amount": -0.2102401
+    }
+  ],
+  "XRP": [
+    {
+      "AssetName": "XRP",
+      "BaseAsset": "XRP",
+      "AssetType": "Spot",
+      "Amount": -1.00047798
+    }
+  ]
+}
