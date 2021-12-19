@@ -1,0 +1,58 @@
+﻿[
+  {
+    "AssetName": "FTT-PERP",
+    "AssetType": "Future",
+    "Amount": -10.4,
+    "LimitPrice": 47.6750,
+    "Expiry": null
+  },
+  {
+    "AssetName": "ETH-PERP",
+    "AssetType": "Future",
+    "Amount": 0.004,
+    "LimitPrice": 4054.0,
+    "Expiry": null
+  },
+  {
+    "AssetName": "LTC-PERP",
+    "AssetType": "Future",
+    "Amount": 0.29,
+    "LimitPrice": 192.42,
+    "Expiry": null
+  },
+  {
+    "AssetName": "DOGE-PERP",
+    "AssetType": "Future",
+    "Amount": -3195.0,
+    "LimitPrice": 0.2032005,
+    "Expiry": null
+  },
+  {
+    "AssetName": "CRO/USD",
+    "AssetType": "Spot",
+    "Amount": 1390.0,
+    "LimitPrice": 0.787100,
+    "Expiry": null
+  },
+  {
+    "AssetName": "BCH/USD",
+    "AssetType": "Spot",
+    "Amount": 0.218,
+    "LimitPrice": 558.700,
+    "Expiry": null
+  },
+  {
+    "AssetName": "UNI-PERP",
+    "AssetType": "Future",
+    "Amount": -29.4,
+    "LimitPrice": 19.283,
+    "Expiry": null
+  },
+  {
+    "AssetName": "LINK-PERP",
+    "AssetType": "Future",
+    "Amount": -20.2,
+    "LimitPrice": 23.9525,
+    "Expiry": null
+  }
+]

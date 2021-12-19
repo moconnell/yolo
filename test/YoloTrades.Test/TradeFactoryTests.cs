@@ -72,8 +72,11 @@ public class TradeFactoryTests
 
     [Theory]
     [InlineData("./Data/json/001")]
+    [InlineData("./Data/json/002_LongSpotAndPerp", AssetPermissions.LongSpotAndPerp)]
+    [InlineData("./Data/json/003_ExistingPositions")]
     public async Task ShouldCalculateTrades(
         string path,
+        AssetPermissions assetPermissions = AssetPermissions.All,
         string baseCurrency = "USD",
         decimal nominalCash = 10000,
         decimal tradeBuffer = 0.04m,
@@ -83,6 +86,7 @@ public class TradeFactoryTests
 
         var config = new YoloConfig
         {
+            AssetPermissions = assetPermissions,
             BaseAsset = baseCurrency,
             NominalCash = nominalCash,
             RebalanceMode = rebalanceMode,
@@ -95,7 +99,9 @@ public class TradeFactoryTests
         var trades = tradeFactory.CalculateTrades(weights, positions, markets);
 
         Assert.NotNull(trades);
-        trades.MatchSnapshot();
+        
+        var directory = path[(path.LastIndexOf("/", StringComparison.InvariantCulture) + 1)..];
+        trades.MatchSnapshot($"ShouldCalculateTrades_{directory}");
     }
 
     private static
