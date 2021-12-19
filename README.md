@@ -39,6 +39,7 @@ Sample configuration below.
     "ApiKey": "",
     "Secret": "",
     "BaseAddress": "https://ftx.com/api",
+    "PostOnly": true,
     "SubAccount": ""
   }
 }
@@ -54,11 +55,11 @@ This determines where the application will write logs to. Windows paths using `\
     "PathFormat": "C:\\logs\\yolo-{Date}.json",
 ```
 
-#### BaseAsset
+#### Yolo/BaseAsset
 
 This is the token that the application will trade in and out of. It defaults to `USD` but you could equally change to `USDT` etc. if preferred.
 
-#### AssetPermissions
+#### Yolo/AssetPermissions
 
 In case your account does not have margin trading or futures enabled, it is possible to configure accordingly via the `AssetPermissions` setting - possible settings of which are currently:
 
@@ -74,10 +75,14 @@ In case your account does not have margin trading or futures enabled, it is poss
     All
 ```
 
-#### SpreadSplit
+#### Yolo/SpreadSplit
 
 This setting determines the placement of the limit price within the bid-ask price spread and can take any value between 0 and 1 (values greater than 1 will be treated as 1).
 
 The default setting of 0.5 ensures that the limit price will always be placed exactly in the middle of the spread.
 
 e.g. a setting of 0.618 would place the limit price for a sell order at the bid price + 61.8% of the current bid-ask spread; conversely for a sell it would be the ask price - 61.8% of the current bid-ask spread.
+
+#### Ftx/PostOnly
+
+The application seeks always to place limit orders at or better than best bid/ask. Setting this flag additionally ensures that FTX will reject any order that would cross the book.
