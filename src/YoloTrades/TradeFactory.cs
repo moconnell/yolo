@@ -137,7 +137,12 @@ public class TradeFactory : ITradeFactory
                     var currentProjectedPosition = projectedPositions[trade.AssetName];
                     var newProjectedPosition = currentProjectedPosition + trade;
                     projectedPositions[trade.AssetName] = newProjectedPosition;
-                    yield return trade;
+                    if (trade.IsTradeable)
+                        yield return trade;
+                    else
+                    {
+                        _logger.DeltaTooSmall(token, remainingDelta);
+                    }
                     remainingDelta = remainingDeltaPostTrade;
                 }
             }
@@ -205,16 +210,18 @@ public class TradeFactory : ITradeFactory
             var factor = isBuy ? SpreadSplit : 1 - SpreadSplit;
             var spread = market.Ask!.Value - market.Bid!.Value;
             var rawLimitPrice = market.Bid!.Value + spread * factor;
-            var limitPrice = Math.Floor(rawLimitPrice / market.PriceStep) * market.PriceStep;
+            var limitPriceSteps = rawLimitPrice / market.PriceStep;
+            var limitPrice = (isBuy ? Math.Floor(limitPriceSteps) : Math.Ceiling(limitPriceSteps)) * market.PriceStep;
             var trade = new Trade(market.Name, market.AssetType, size, limitPrice);
 
-            _logger.GeneratedTrade(token, delta, trade);
+            if (trade.IsTradeable)
+                _logger.GeneratedTrade(token, delta, trade);
 
             remainingDelta -= delta;
             
             yield return (trade, remainingDelta);
             
-            if (restart)
+            if (restart || remainingDelta == 0)
             {
                 break;
             }

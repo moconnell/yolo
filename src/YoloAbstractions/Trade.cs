@@ -7,4 +7,7 @@ public record Trade(
     AssetType AssetType,
     decimal Amount,
     decimal? LimitPrice = null,
-    DateTime? Expiry = null);
+    DateTime? Expiry = null)
+{
+    public bool IsTradeable => Amount != 0;
+}
