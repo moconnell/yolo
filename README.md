@@ -88,3 +88,9 @@ Limit price is specified must be divisible by the intrument price step i.e. in t
 #### Ftx/PostOnly
 
 The application seeks always to place limit orders at or better than best bid/ask. Setting this flag additionally ensures that FTX will reject any order that would cross the book.
+
+### Order Management
+
+The application is currently fire-and-forget, so this is left as an exercise for the user :wink:
+
+As a safety feature, the application will bug out if the account has any open orders.
