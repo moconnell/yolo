@@ -25,7 +25,6 @@ public class TradeFactory : ITradeFactory
         MaxLeverage = yoloConfig.MaxLeverage;
         NominalCash = yoloConfig.NominalCash;
         BaseCurrencyToken = yoloConfig.BaseAsset;
-        RebalanceMode = yoloConfig.RebalanceMode;
         SpreadSplit = Math.Max(0, Math.Min(1, yoloConfig.SpreadSplit));
     }
 
@@ -34,7 +33,6 @@ public class TradeFactory : ITradeFactory
     private decimal? NominalCash { get; }
     private decimal MaxLeverage { get; }
     private decimal TradeBuffer { get; }
-    private RebalanceMode RebalanceMode { get; }
     private decimal SpreadSplit { get; }
 
     public IEnumerable<Trade> CalculateTrades(
@@ -69,25 +67,25 @@ public class TradeFactory : ITradeFactory
 
             var projectedPositions = markets.GetMarkets(token)
                 .ToDictionary(
-                    market => market.Name, 
+                    market => market.Name,
                     market =>
-                {
-                    if (market.Bid is null)
-                        _logger.NoBid(token, market.Key);
-                    if (market.Ask is null)
-                        _logger.NoAsk(token, market.Key);
+                    {
+                        if (market.Bid is null)
+                            _logger.NoBid(token, market.Key);
+                        if (market.Ask is null)
+                            _logger.NoAsk(token, market.Key);
 
-                    var position = tokenPositions
-                                       .FirstOrDefault(p =>
-                                           p.AssetType == market.AssetType &&
-                                           (p.AssetName == market.Name &&
-                                            market.AssetType == AssetType.Future ||
-                                            p.BaseAsset == market.BaseAsset &&
-                                            market.AssetType == AssetType.Spot)) ??
-                                   Position.Null;
+                        var position = tokenPositions
+                                           .FirstOrDefault(p =>
+                                               p.AssetType == market.AssetType &&
+                                               (p.AssetName == market.Name &&
+                                                market.AssetType == AssetType.Future ||
+                                                p.BaseAsset == market.BaseAsset &&
+                                                market.AssetType == AssetType.Spot)) ??
+                                       Position.Null;
 
-                    return new ProjectedPosition(market, position.Amount, nominal);
-                });
+                        return new ProjectedPosition(market, position.Amount, nominal);
+                    });
 
             if (!projectedPositions.Any())
             {
@@ -96,7 +94,7 @@ public class TradeFactory : ITradeFactory
             }
 
             bool HasPosition(KeyValuePair<string, ProjectedPosition> keyValuePair) => keyValuePair.Value.HasPosition;
-            
+
             if (projectedPositions.Count(HasPosition) > 1)
             {
                 _logger.MultiplePositions(token);
@@ -104,11 +102,10 @@ public class TradeFactory : ITradeFactory
             }
 
             var currentWeight = projectedPositions.Values.Sum(projectedPosition => projectedPosition.ProjectedWeight);
-            if (currentWeight is null)  
+            if (currentWeight is null)
                 yield break;
 
-            if (RebalanceMode == RebalanceMode.Slow &&
-                currentWeight >= constrainedTargetWeight - TradeBuffer &&
+            if (currentWeight >= constrainedTargetWeight - TradeBuffer &&
                 currentWeight <= constrainedTargetWeight + TradeBuffer)
             {
                 _logger.WithinTradeBuffer(
@@ -119,19 +116,18 @@ public class TradeFactory : ITradeFactory
                 yield break;
             }
 
-            var tradeBufferAdjustment = TradeBuffer * RebalanceMode switch
-            {
-                RebalanceMode.Slow => constrainedTargetWeight < currentWeight ? 1 : -1,
-                _ => 0
-            };
-
+            var tradeBufferAdjustment = TradeBuffer * (constrainedTargetWeight < currentWeight ? 1 : -1);
             var bufferedTargetWeight = constrainedTargetWeight + tradeBufferAdjustment;
             var remainingDelta = bufferedTargetWeight - currentWeight.Value;
 
             while (remainingDelta != 0)
             {
-                var trades = CalcTrades(token, projectedPositions.Values.ToArray(), bufferedTargetWeight, remainingDelta);
-                
+                var trades = CalcTrades(
+                    token, 
+                    projectedPositions.Values.ToArray(), 
+                    bufferedTargetWeight,
+                    remainingDelta);
+
                 foreach (var (trade, remainingDeltaPostTrade) in trades)
                 {
                     var currentProjectedPosition = projectedPositions[trade.AssetName];
@@ -140,9 +136,7 @@ public class TradeFactory : ITradeFactory
                     if (trade.IsTradeable)
                         yield return trade;
                     else
-                    {
                         _logger.DeltaTooSmall(token, remainingDelta);
-                    }
                     remainingDelta = remainingDeltaPostTrade;
                 }
             }
@@ -170,14 +164,14 @@ public class TradeFactory : ITradeFactory
 
         var isBuy = remainingDelta >= 0;
         var priceMultiplier = isBuy ? 1 : -1;
-            
+
         var orderedMarkets = marketPositions
             .OrderByDescending(HasPosition)
             .ThenBy(projectedPosition => priceMultiplier * projectedPosition.Market.Last)
             .ToArray();
-                
+
         _logger.MarketPositions(token, orderedMarkets);
-        
+
         foreach (var projectedPosition in orderedMarkets)
         {
             var market = projectedPosition.Market;
@@ -218,13 +212,10 @@ public class TradeFactory : ITradeFactory
                 _logger.GeneratedTrade(token, delta, trade);
 
             remainingDelta -= delta;
-            
+
             yield return (trade, remainingDelta);
-            
-            if (restart || remainingDelta == 0)
-            {
-                break;
-            }
+
+            if (restart || remainingDelta == 0) break;
         }
     }
 
