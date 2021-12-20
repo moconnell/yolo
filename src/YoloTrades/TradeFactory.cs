@@ -93,10 +93,7 @@ public class TradeFactory : ITradeFactory
                 yield break;
             }
 
-            bool HasPosition(KeyValuePair<string, ProjectedPosition> keyValuePair)
-            {
-                return keyValuePair.Value.HasPosition;
-            }
+            bool HasPosition(KeyValuePair<string, ProjectedPosition> keyValuePair) => keyValuePair.Value.HasPosition;
 
             if (projectedPositions.Count(HasPosition) > 1)
             {
@@ -154,10 +151,7 @@ public class TradeFactory : ITradeFactory
         decimal bufferedTargetWeight,
         decimal remainingDelta)
     {
-        bool HasPosition(ProjectedPosition p)
-        {
-            return p.HasPosition;
-        }
+        bool HasPosition(ProjectedPosition p) => p.HasPosition;
 
         var startingWeight = bufferedTargetWeight - remainingDelta;
         var crossingZeroWeightBoundary = startingWeight != 0 && bufferedTargetWeight / startingWeight < 0;
