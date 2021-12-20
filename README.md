@@ -20,7 +20,7 @@ Sample configuration below.
 ```
 {
   "Logging": {
-    "PathFormat": "C:\\logs\\yolo-{Date}.json",
+    "PathFormat": "C:\\logs\\yolo-{Date}.log",
     "LogLevel": {
       "Default": "Information",
       "Microsoft": "Warning"
