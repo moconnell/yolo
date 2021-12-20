@@ -9,6 +9,5 @@ public class YoloConfig
     public decimal? NominalCash { get; init; }
     public AssetPermissions AssetPermissions { get; init; } = AssetPermissions.SpotAndPerp;
     public string BaseAsset { get; init; }
-    public RebalanceMode RebalanceMode { get; init; } = RebalanceMode.Slow;
     public decimal SpreadSplit { get; init; } = 0.5m;
 }

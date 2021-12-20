@@ -26,7 +26,6 @@ public class TradeFactoryTests
         string baseCurrency = "USD",
         decimal nominalCash = 10000,
         decimal tradeBuffer = 0.02m,
-        RebalanceMode rebalanceMode = RebalanceMode.Slow,
         decimal stepSize = 0.0001m)
     {
         var mockLogger = new Mock<ILogger<TradeFactory>>();
@@ -35,7 +34,6 @@ public class TradeFactoryTests
         {
             BaseAsset = baseCurrency,
             NominalCash = nominalCash,
-            RebalanceMode = rebalanceMode,
             TradeBuffer = tradeBuffer
         };
         var tradeFactory = new TradeFactory(mockLogger.Object, config);
@@ -79,8 +77,7 @@ public class TradeFactoryTests
         AssetPermissions assetPermissions = AssetPermissions.All,
         string baseCurrency = "USD",
         decimal nominalCash = 10000,
-        decimal tradeBuffer = 0.04m,
-        RebalanceMode rebalanceMode = RebalanceMode.Slow)
+        decimal tradeBuffer = 0.04m)
     {
         var mockLogger = new Mock<ILogger<TradeFactory>>();
 
@@ -89,7 +86,6 @@ public class TradeFactoryTests
             AssetPermissions = assetPermissions,
             BaseAsset = baseCurrency,
             NominalCash = nominalCash,
-            RebalanceMode = rebalanceMode,
             TradeBuffer = tradeBuffer
         };
         var tradeFactory = new TradeFactory(mockLogger.Object, config);
@@ -99,7 +95,7 @@ public class TradeFactoryTests
         var trades = tradeFactory.CalculateTrades(weights, positions, markets);
 
         Assert.NotNull(trades);
-        
+
         var directory = path[(path.LastIndexOf("/", StringComparison.InvariantCulture) + 1)..];
         trades.MatchSnapshot($"ShouldCalculateTrades_{directory}");
     }
