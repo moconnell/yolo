@@ -6,10 +6,10 @@ Automation for the RobotWealth cryptocurrency YOLO strategies
 There is a pre-built win64 console app in the releases section, which can be scheduled to run daily.
 
 ### HOWTO (win-x64):
-- download YoloKonsole.exe and appsettings.json and save to a new folder on your computer
-- ensure you have .NET 6.0 runtime installed
-- edit appsettings.json with the correct settings
-- run YoloKonsole.exe from the command line is best initially, so that you can see the output easily (Windows+R, cmd) although file logging is also provided
+- download `YoloKonsole.exe` and `appsettings.json` and save to a new folder on your computer
+- ensure you have [.NET 6.0 runtime](https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-6.0.1-windows-x64-installer) installed
+- edit `appsettings.json` with the correct settings
+- run `YoloKonsole.exe` - from the command line is recommended initially, so that you can see the output easily (Windows+R, cmd) although file logging is also provided
 - by default, the application will issue a `Proceed? (y/n)` challenge before issuing any trades to the broker
 - this can be overridden by using the command-line switch `-s`
 
@@ -83,7 +83,7 @@ The default setting of 0.5 ensures that the limit price will always be placed ex
 
 e.g. a setting of 0.618 would place the limit price for a buy order at the best bid price + 61.8% of the current bid-ask spread; conversely for a sell it would be the lowest ask price - 61.8% of the current bid-ask spread.
 
-Limit price is specified must be divisible by the intrument price step i.e. in the case where the spread equals the minimum price increment, an order will be submitted that matches the current best bid or ask price.
+Limit price must be divisible by the intrument price step i.e. in the case where the spread equals the minimum price increment, an order will be submitted that matches the current best bid or ask price.
 
 #### Ftx/PostOnly
 
@@ -93,4 +93,4 @@ The application seeks always to place limit orders at or better than best bid/as
 
 The application is currently fire-and-forget, so this is left as an exercise for the user :wink:
 
-As a safety feature, the application will bug out if the account has any open orders.
+As a safety feature, the application will bug out if the account has any open orders. It will also skip any token that has multiple positions already and log an error.
