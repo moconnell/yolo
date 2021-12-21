@@ -42,21 +42,22 @@ public class TradeFactory : ITradeFactory
     {
         var nominal = NominalCash ??
                       positions.GetTotalValue(markets, BaseCurrencyToken);
-        var weightsList = weights.ToList();
+        var weightsDict = weights.ToDictionary(w => w.Ticker.SplitConstituents().Item1, weight => (weight, isInUniverse: true));
 
-        _logger.CalculateTrades(weightsList, positions, markets);
+        _logger.CalculateTrades(weightsDict, positions, markets);
 
-        var unconstrainedTargetLeverage = weightsList
-            .Select(w => Math.Abs(w.ComboWeight))
+        var unconstrainedTargetLeverage = weightsDict
+            .Values
+            .Select(w => Math.Abs(w.weight.ComboWeight))
             .Sum();
 
         var weightConstraint = unconstrainedTargetLeverage < MaxLeverage
             ? 1
             : MaxLeverage / unconstrainedTargetLeverage;
 
-        IEnumerable<Trade> RebalancePositions(Weight w)
+        IEnumerable<Trade> RebalancePosition(KeyValuePair<string, (Weight, bool)> kvp)
         {
-            var (token, _) = w.Ticker.SplitConstituents();
+            var (token, (w, isInUniverse)) = kvp;
 
             var tokenPositions = positions.TryGetValue(token, out var pos)
                 ? pos.ToArray()
@@ -93,7 +94,10 @@ public class TradeFactory : ITradeFactory
                 yield break;
             }
 
-            bool HasPosition(KeyValuePair<string, ProjectedPosition> keyValuePair) => keyValuePair.Value.HasPosition;
+            bool HasPosition(KeyValuePair<string, ProjectedPosition> keyValuePair)
+            {
+                return keyValuePair.Value.HasPosition;
+            }
 
             if (projectedPositions.Count(HasPosition) > 1)
             {
@@ -105,7 +109,8 @@ public class TradeFactory : ITradeFactory
             if (currentWeight is null)
                 yield break;
 
-            if (currentWeight >= constrainedTargetWeight - TradeBuffer &&
+            if (isInUniverse &&
+                currentWeight >= constrainedTargetWeight - TradeBuffer &&
                 currentWeight <= constrainedTargetWeight + TradeBuffer)
             {
                 _logger.WithinTradeBuffer(
@@ -116,15 +121,15 @@ public class TradeFactory : ITradeFactory
                 yield break;
             }
 
-            var tradeBufferAdjustment = TradeBuffer * (constrainedTargetWeight < currentWeight ? 1 : -1);
+            var tradeBufferAdjustment = isInUniverse ? TradeBuffer * (constrainedTargetWeight < currentWeight ? 1 : -1) : 0;
             var bufferedTargetWeight = constrainedTargetWeight + tradeBufferAdjustment;
             var remainingDelta = bufferedTargetWeight - currentWeight.Value;
 
             while (remainingDelta != 0)
             {
                 var trades = CalcTrades(
-                    token, 
-                    projectedPositions.Values.ToArray(), 
+                    token,
+                    projectedPositions.Values.ToArray(),
                     bufferedTargetWeight,
                     remainingDelta);
 
@@ -142,8 +147,15 @@ public class TradeFactory : ITradeFactory
             }
         }
 
-        return weightsList
-            .SelectMany(RebalancePositions);
+        var droppedTokens = positions.Keys.Except(weightsDict.Keys.Union(new[] {BaseCurrencyToken}));
+        foreach (var token in droppedTokens)
+        {
+            var weight = new Weight(0, 0, DateTime.UtcNow, 0, $"{token}/{BaseCurrencyToken}", 0);
+            weightsDict[token] = (weight, false);
+        }
+
+        return weightsDict
+            .SelectMany(RebalancePosition);
     }
 
     private IEnumerable<(Trade trade, decimal remainingDelta)> CalcTrades(string token,
@@ -151,7 +163,10 @@ public class TradeFactory : ITradeFactory
         decimal bufferedTargetWeight,
         decimal remainingDelta)
     {
-        bool HasPosition(ProjectedPosition p) => p.HasPosition;
+        bool HasPosition(ProjectedPosition p)
+        {
+            return p.HasPosition;
+        }
 
         var startingWeight = bufferedTargetWeight - remainingDelta;
         var crossingZeroWeightBoundary = startingWeight != 0 && bufferedTargetWeight / startingWeight < 0;

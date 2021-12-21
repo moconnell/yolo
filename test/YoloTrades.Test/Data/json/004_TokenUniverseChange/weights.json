@@ -1,0 +1,66 @@
+[
+  {
+    "Price": 18.273,
+    "ComboWeight": -0.0820098034949625,
+    "Date": "12/17/2021 00:00:00",
+    "MomentumFactor": -0.100806451612903,
+    "Ticker": "LINK/USD",
+    "TrendFactor": -0.0632131553770217
+  },
+  {
+    "Price": 0.796925,
+    "ComboWeight": -0.000216167005514821,
+    "Date": "12/17/2021 00:00:00",
+    "MomentumFactor": 0.0685483870967743,
+    "Ticker": "XRP/USD",
+    "TrendFactor": -0.0689807211078039
+  },
+  {
+    "Price": 14.989,
+    "ComboWeight": -0.0743433377590842,
+    "Date": "12/17/2021 00:00:00",
+    "MomentumFactor": -0.0685483870967741,
+    "Ticker": "UNI/USD",
+    "TrendFactor": -0.0801382884213944
+  },
+  {
+    "Price": 37.553,
+    "ComboWeight": -0.0896005771168851,
+    "Date": " 12/17/2021 00:00:00",
+    "MomentumFactor": -0.0967741935483871,
+    "Ticker": "FTX/USD",
+    "TrendFactor": -0.0824269606853831
+  },
+  {
+    "Price": 144.04,
+    "ComboWeight": -0.12488898210476,
+    "Date": "12/17/2021 00:00:00",
+    "MomentumFactor": -0.185483870967742,
+    "Ticker": "LTC/USD",
+    "TrendFactor": -0.0642940932417782
+  },
+  {
+    "Price": 424.65,
+    "ComboWeight": -0.0647093597049423,
+    "Date": "12/17/2021 00:00:00",
+    "MomentumFactor": -0.0483870967741935,
+    "Ticker": "BCH/USD",
+    "TrendFactor": -0.0810316226356911
+  },
+  {
+    "Price": 3875.8,
+    "ComboWeight": 0.0801186410013854,
+    "Date": "12/17/2021 00:00:00",
+    "MomentumFactor": 0.205645161290323,
+    "Ticker": "ETH/USD",
+    "TrendFactor": -0.0454078792875519
+  },
+  {
+    "Price": 0.1685335,
+    "ComboWeight": 0.030171289844435,
+    "Date": "12/17/2021 00:00:00",
+    "MomentumFactor": 0.116935483870968,
+    "Ticker": "DOGE/USD",
+    "TrendFactor": -0.0565929041820976
+  }
+]

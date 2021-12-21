@@ -13,7 +13,7 @@ public static partial class LoggerExtensions
         Message = "*** CalculateTrades ***\nWeights: {Weights}\nPositions: {Positions}\nMarkets: {Markets}")]
     public static partial void CalculateTrades(
         this ILogger logger,
-        IEnumerable<Weight> weights,
+        Dictionary<string, (Weight weight, bool isInUniverse)> weights,
         IDictionary<string, IEnumerable<Position>> positions,
         IDictionary<string, IEnumerable<MarketInfo>> markets);
 
