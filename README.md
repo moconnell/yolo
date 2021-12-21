@@ -1,6 +1,8 @@
 # yolo
 Automation for the RobotWealth cryptocurrency YOLO strategies
 
+[![Coverage Status](https://coveralls.io/repos/github/moconnell/yolo/badge.svg?branch=code-coverage)](https://coveralls.io/github/moconnell/yolo?branch=code-coverage)
+
 ## YoloKonsole.exe
 
 There is a pre-built win64 console app in the releases section, which can be scheduled to run daily.
