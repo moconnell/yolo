@@ -30,6 +30,16 @@ internal class Program
         var env = "prod";
 #endif
 
+        if (!Silent)
+            Console.Write(@"
+__  ______  __    ____  __
+\ \/ / __ \/ /   / __ \/ /
+ \  / / / / /   / / / / / 
+ / / /_/ / /___/ /_/ /_/  
+/_/\____/_____/\____(_)   
+                          
+");
+
         CancellationTokenSource source = new();
         var cancellationToken = source.Token;
 
@@ -44,7 +54,6 @@ internal class Program
 
             var serviceProvider = new ServiceCollection()
                 .AddLogging(loggingBuilder => loggingBuilder
-                    .AddConsole()
                     .AddFile(config.GetSection("Logging")))
                 .AddBroker(config)
                 .AddSingleton<ITradeFactory, TradeFactory>()
@@ -57,9 +66,7 @@ internal class Program
 
             var yoloConfig = config.GetYoloConfig();
 
-            var weights = (await yoloConfig
-                    .GetWeights())
-                .ToArray();
+            var weights = (await yoloConfig.GetWeights()).ToArray();
 
             using var broker = serviceProvider.GetService<IYoloBroker>()!;
 
@@ -68,7 +75,16 @@ internal class Program
             if (orders.Any())
             {
                 _logger.OpenOrders(orders.Values);
-                
+
+                if (!Silent)
+                {
+                    Console.WriteLine("Open orders!");
+                    Console.WriteLine();
+                    foreach (var order in orders.Values)
+                        Console.WriteLine(
+                            $"{order.AssetName}:\t{ToSide(order.Amount)} {Math.Abs(order.Amount)} at {order.LimitPrice}");
+                }
+
                 return Error;
             }
 
@@ -88,37 +104,47 @@ internal class Program
 
             var trades = tradeFactory
                 .CalculateTrades(weights, positions, markets)
+                .OrderBy(trade => trade.AssetName)
                 .ToArray();
 
             if (!trades.Any())
             {
+                if (!Silent) Console.WriteLine("Nothing to do.");
+
                 return Success;
             }
 
             if (!Silent)
             {
-                _logger.LogInformation("Proceed? (y/n): ");
+                Console.WriteLine("Generated trades:");
+                Console.WriteLine();
+                foreach (var trade in trades)
+                    Console.WriteLine(
+                        $"{trade.AssetName}:\t{ToSide(trade.Amount)} {Math.Abs(trade.Amount)} at {trade.LimitPrice}");
+                Console.WriteLine();
+                Console.Write("Proceed? (y/n): ");
 
-                if (Console.Read() != 'y')
-                {
-                    return Success;
-                }
+                if (Console.Read() != 'y') return Success;
             }
 
             var returnCode = Success;
 
             await foreach (var result in broker.PlaceTradesAsync(trades, cancellationToken))
-            {
                 if (result.Success)
                 {
-                    _logger.PlacedOrder(result.Order!.AssetName, result.Order);
+                    var order = result.Order!;
+                    _logger.PlacedOrder(order.AssetName, order);
+                    if (!Silent)
+                        Console.WriteLine(
+                            $"{order.AssetName}:\t{order.OrderSide} {Math.Abs(order.Amount)} at {order.LimitPrice}\t({order.OrderStatus})");
                 }
                 else
                 {
                     _logger.OrderError(result.Trade.AssetName, result.Error, result.ErrorCode);
+                    if (!Silent)
+                        Console.WriteLine($"{result.Trade.AssetName}:\t{result.Error}");
                     returnCode = result.ErrorCode ?? Error;
                 }
-            }
 
             return returnCode;
         }
@@ -128,6 +154,8 @@ internal class Program
 
             _logger?.LogError("Error occurred: {Error}", e);
 
+            Console.WriteLine(e.Message);
+
             return Error;
         }
         finally
@@ -135,4 +163,6 @@ internal class Program
             _logger?.LogInformation("************ YOLO ended ************");
         }
     }
+
+    private static string ToSide(decimal amount) => amount >= 0 ? "BUY" : "SELL";
 }

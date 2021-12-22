@@ -7,7 +7,7 @@ namespace YoloKonsole;
 public static partial class LoggerExtensions
 {
     [LoggerMessage(
-        EventId = WellKnown.TradeEventIds.PlacedOrder,
+        EventId = WellKnown.TradeEventIds.OpenOrders,
         Level = LogLevel.Warning,
         Message =
             "Stopping execution - open orders!\n{Orders}")]

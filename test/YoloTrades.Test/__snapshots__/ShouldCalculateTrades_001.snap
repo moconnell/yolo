@@ -4,6 +4,7 @@
     "AssetType": "Spot",
     "Amount": -680.0,
     "LimitPrice": 0.784975,
+    "PostPrice": true,
     "Expiry": null,
     "IsTradable": true
   },
@@ -12,6 +13,7 @@
     "AssetType": "Spot",
     "Amount": -44.6,
     "LimitPrice": 19.4420,
+    "PostPrice": true,
     "Expiry": null,
     "IsTradable": true
   },
@@ -20,6 +22,7 @@
     "AssetType": "Future",
     "Amount": -6.6,
     "LimitPrice": 43.1870,
+    "PostPrice": true,
     "Expiry": null,
     "IsTradable": true
   },
@@ -28,6 +31,7 @@
     "AssetType": "Future",
     "Amount": 1980.0,
     "LimitPrice": 0.548750,
+    "PostPrice": true,
     "Expiry": null,
     "IsTradable": true
   },
@@ -36,6 +40,7 @@
     "AssetType": "Spot",
     "Amount": -3774.0,
     "LimitPrice": 0.1636025,
+    "PostPrice": true,
     "Expiry": null,
     "IsTradable": true
   },
@@ -44,6 +49,7 @@
     "AssetType": "Spot",
     "Amount": 0.106,
     "LimitPrice": 3957.5,
+    "PostPrice": true,
     "Expiry": null,
     "IsTradable": true
   }

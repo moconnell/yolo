@@ -9,6 +9,7 @@ public record MarketInfo(
     AssetType AssetType,
     decimal PriceStep,
     decimal QuantityStep,
+    decimal MinProvideSize,
     decimal? Ask,
     decimal? Bid,
     decimal? Last,

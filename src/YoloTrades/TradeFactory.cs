@@ -63,12 +63,12 @@ public class TradeFactory : ITradeFactory
             var (token, (w, isInUniverse)) = kvp;
 
             _logger.Weight(token, w);
-            
+
             var tokenPositions = positions.TryGetValue(token, out var pos)
                 ? pos.ToArray()
                 : Array.Empty<Position>();
             var constrainedTargetWeight = weightConstraint * w.ComboWeight;
-            
+
             var projectedPositions = markets.GetMarkets(token)
                 .ToDictionary(
                     market => market.Name,
@@ -218,15 +218,25 @@ public class TradeFactory : ITradeFactory
 
             if (delta == 0)
                 continue;
+            
+            decimal CalcLimitPrice()
+            {
+                var factor = isBuy ? SpreadSplit : 1 - SpreadSplit;
+                var spread = market.Ask!.Value - market.Bid!.Value;
+                var rawLimitPrice = market.Bid!.Value + spread * factor;
+                var limitPriceSteps = rawLimitPrice / market.PriceStep;
+                return (isBuy ? Math.Floor(limitPriceSteps) : Math.Ceiling(limitPriceSteps)) *
+                       market.PriceStep;
+            }
 
             var rawSize = delta * nominal / price.Value;
             var size = Math.Floor(rawSize / market.QuantityStep) * market.QuantityStep;
-            var factor = isBuy ? SpreadSplit : 1 - SpreadSplit;
-            var spread = market.Ask!.Value - market.Bid!.Value;
-            var rawLimitPrice = market.Bid!.Value + spread * factor;
-            var limitPriceSteps = rawLimitPrice / market.PriceStep;
-            var limitPrice = (isBuy ? Math.Floor(limitPriceSteps) : Math.Ceiling(limitPriceSteps)) * market.PriceStep;
-            var trade = new Trade(market.Name, market.AssetType, size, limitPrice);
+            
+            var trade = market.MinProvideSize switch
+            {
+                _ when Math.Abs(size) >= market.MinProvideSize => new Trade(market.Name, market.AssetType, size, CalcLimitPrice(), true),
+                _ => new Trade(market.Name, market.AssetType, size, isBuy ? market.Ask!.Value : market.Bid!.Value, false)
+            };
 
             if (trade.IsTradable)
                 _logger.GeneratedTrade(token, delta, trade);

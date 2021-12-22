@@ -154,6 +154,7 @@ public class TradeFactoryTests
                         AssetType.Spot,
                         stepSize,
                         stepSize,
+                        0,
                         x.Price,
                         x.Price,
                         x.Price,
