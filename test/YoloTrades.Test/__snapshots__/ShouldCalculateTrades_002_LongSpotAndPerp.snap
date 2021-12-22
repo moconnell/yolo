@@ -5,7 +5,7 @@
     "Amount": -10.4,
     "LimitPrice": 47.6755,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   },
   {
     "AssetName": "ETH-PERP",
@@ -13,7 +13,7 @@
     "Amount": 0.004,
     "LimitPrice": 4054.0,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   },
   {
     "AssetName": "LTC-PERP",
@@ -21,7 +21,7 @@
     "Amount": 0.29,
     "LimitPrice": 192.42,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   },
   {
     "AssetName": "DOGE-PERP",
@@ -29,7 +29,7 @@
     "Amount": -3195.0,
     "LimitPrice": 0.2032005,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   },
   {
     "AssetName": "CRO/USD",
@@ -37,7 +37,7 @@
     "Amount": 1390.0,
     "LimitPrice": 0.787100,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   },
   {
     "AssetName": "BCH/USD",
@@ -45,7 +45,7 @@
     "Amount": 0.218,
     "LimitPrice": 558.700,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   },
   {
     "AssetName": "UNI-PERP",
@@ -53,7 +53,7 @@
     "Amount": -29.4,
     "LimitPrice": 19.283,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   },
   {
     "AssetName": "LINK-PERP",
@@ -61,6 +61,6 @@
     "Amount": -20.2,
     "LimitPrice": 23.9525,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   }
 ]

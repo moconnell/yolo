@@ -1,0 +1,24 @@
+{
+  "BTC": [
+    {
+      "AssetName": "BTC-PERP",
+      "BaseAsset": "BTC",
+      "AssetType": "Future",
+      "Amount": -0.0003
+    },
+    {
+      "AssetName": "BTC",
+      "BaseAsset": "BTC",
+      "AssetType": "Spot",
+      "Amount": 0.0
+    }
+  ],
+  "USD": [
+    {
+      "AssetName": "USD",
+      "BaseAsset": "USD",
+      "AssetType": "Spot",
+      "Amount": 1094.36046231
+    }
+  ]
+}

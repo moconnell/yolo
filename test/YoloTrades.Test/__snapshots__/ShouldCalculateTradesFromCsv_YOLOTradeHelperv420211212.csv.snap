@@ -5,7 +5,7 @@
     "Amount": -0.5986,
     "LimitPrice": 459.5500,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   },
   {
     "AssetName": "BTC/USD",
@@ -13,7 +13,7 @@
     "Amount": 0.0025,
     "LimitPrice": 49413.0000,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   },
   {
     "AssetName": "CRO/USD",
@@ -21,7 +21,7 @@
     "Amount": 947.4349,
     "LimitPrice": 0.5783,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   },
   {
     "AssetName": "DOGE/USD",
@@ -29,7 +29,7 @@
     "Amount": -4131.0624,
     "LimitPrice": 0.1689,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   },
   {
     "AssetName": "ETH/USD",
@@ -37,7 +37,7 @@
     "Amount": 0.0949,
     "LimitPrice": 4091.2000,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   },
   {
     "AssetName": "FTT/USD",
@@ -45,7 +45,7 @@
     "Amount": -13.1617,
     "LimitPrice": 40.4420,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   },
   {
     "AssetName": "LINK/USD",
@@ -53,7 +53,7 @@
     "Amount": -30.3962,
     "LimitPrice": 19.9700,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   },
   {
     "AssetName": "LTC/USD",
@@ -61,7 +61,7 @@
     "Amount": -3.3773,
     "LimitPrice": 158.0900,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   },
   {
     "AssetName": "UNI/USD",
@@ -69,6 +69,6 @@
     "Amount": -64.4732,
     "LimitPrice": 15.8900,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   }
 ]

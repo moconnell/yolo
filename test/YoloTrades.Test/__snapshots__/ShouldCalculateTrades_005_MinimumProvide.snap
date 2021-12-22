@@ -1,0 +1,10 @@
+﻿[
+  {
+    "AssetName": "BTC-PERP",
+    "AssetType": "Future",
+    "Amount": 0.0003,
+    "LimitPrice": 49205.0,
+    "Expiry": null,
+    "IsTradable": true
+  }
+]

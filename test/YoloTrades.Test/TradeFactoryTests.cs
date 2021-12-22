@@ -73,6 +73,7 @@ public class TradeFactoryTests
     [InlineData("./Data/json/002_LongSpotAndPerp", AssetPermissions.LongSpotAndPerp)]
     [InlineData("./Data/json/003_ExistingPositions")]
     [InlineData("./Data/json/004_TokenUniverseChange")]
+    [InlineData("./Data/json/005_MinimumProvide", AssetPermissions.LongSpotAndPerp, "USD", 500, 0.02)]
     public async Task ShouldCalculateTrades(
         string path,
         AssetPermissions assetPermissions = AssetPermissions.All,
