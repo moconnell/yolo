@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using YoloAbstractions;
 using YoloAbstractions.Config;
+using YoloAbstractions.Extensions;
 
 namespace YoloTrades;
 
@@ -42,7 +43,9 @@ public class TradeFactory : ITradeFactory
     {
         var nominal = NominalCash ??
                       positions.GetTotalValue(markets, BaseCurrencyToken);
-        var weightsDict = weights.ToDictionary(w => w.Ticker.SplitConstituents().Item1, weight => (weight, isInUniverse: true));
+        var weightsDict = weights.ToDictionary(
+            weight => weight.Ticker.SplitConstituents().Item1,
+            weight => (weight, isInUniverse: true));
 
         _logger.CalculateTrades(weightsDict, positions, markets);
 
@@ -59,12 +62,12 @@ public class TradeFactory : ITradeFactory
         {
             var (token, (w, isInUniverse)) = kvp;
 
+            _logger.Weight(token, w);
+
             var tokenPositions = positions.TryGetValue(token, out var pos)
                 ? pos.ToArray()
                 : Array.Empty<Position>();
             var constrainedTargetWeight = weightConstraint * w.ComboWeight;
-
-            _logger.LogDebug("Processing weight: {Weight}", w);
 
             var projectedPositions = markets.GetMarkets(token)
                 .ToDictionary(
@@ -94,10 +97,7 @@ public class TradeFactory : ITradeFactory
                 yield break;
             }
 
-            bool HasPosition(KeyValuePair<string, ProjectedPosition> keyValuePair)
-            {
-                return keyValuePair.Value.HasPosition;
-            }
+            bool HasPosition(KeyValuePair<string, ProjectedPosition> keyValuePair) => keyValuePair.Value.HasPosition;
 
             if (projectedPositions.Count(HasPosition) > 1)
             {
@@ -121,7 +121,8 @@ public class TradeFactory : ITradeFactory
                 yield break;
             }
 
-            var tradeBufferAdjustment = isInUniverse ? TradeBuffer * (constrainedTargetWeight < currentWeight ? 1 : -1) : 0;
+            var tradeBufferAdjustment =
+                isInUniverse ? TradeBuffer * (constrainedTargetWeight < currentWeight ? 1 : -1) : 0;
             var bufferedTargetWeight = constrainedTargetWeight + tradeBufferAdjustment;
             var remainingDelta = bufferedTargetWeight - currentWeight.Value;
 
@@ -138,7 +139,7 @@ public class TradeFactory : ITradeFactory
                     var currentProjectedPosition = projectedPositions[trade.AssetName];
                     var newProjectedPosition = currentProjectedPosition + trade;
                     projectedPositions[trade.AssetName] = newProjectedPosition;
-                    if (trade.IsTradeable)
+                    if (trade.IsTradable)
                         yield return trade;
                     else
                         _logger.DeltaTooSmall(token, remainingDelta);
@@ -155,7 +156,14 @@ public class TradeFactory : ITradeFactory
         }
 
         return weightsDict
-            .SelectMany(RebalancePosition);
+            .Select(RebalancePosition)
+            .SelectMany(CombineOrders);
+    }
+
+    private static IEnumerable<Trade> CombineOrders(IEnumerable<Trade> trades)
+    {
+        return trades.GroupBy(t => t.AssetName)
+            .Select(g => g.Sum());
     }
 
     private IEnumerable<(Trade trade, decimal remainingDelta)> CalcTrades(string token,
@@ -163,10 +171,7 @@ public class TradeFactory : ITradeFactory
         decimal bufferedTargetWeight,
         decimal remainingDelta)
     {
-        bool HasPosition(ProjectedPosition p)
-        {
-            return p.HasPosition;
-        }
+        bool HasPosition(ProjectedPosition p) => p.HasPosition;
 
         var startingWeight = bufferedTargetWeight - remainingDelta;
         var crossingZeroWeightBoundary = startingWeight != 0 && bufferedTargetWeight / startingWeight < 0;
@@ -213,17 +218,27 @@ public class TradeFactory : ITradeFactory
 
             if (delta == 0)
                 continue;
+            
+            decimal CalcLimitPrice()
+            {
+                var factor = isBuy ? SpreadSplit : 1 - SpreadSplit;
+                var spread = market.Ask!.Value - market.Bid!.Value;
+                var rawLimitPrice = market.Bid!.Value + spread * factor;
+                var limitPriceSteps = rawLimitPrice / market.PriceStep;
+                return (isBuy ? Math.Floor(limitPriceSteps) : Math.Ceiling(limitPriceSteps)) *
+                       market.PriceStep;
+            }
 
             var rawSize = delta * nominal / price.Value;
             var size = Math.Floor(rawSize / market.QuantityStep) * market.QuantityStep;
-            var factor = isBuy ? SpreadSplit : 1 - SpreadSplit;
-            var spread = market.Ask!.Value - market.Bid!.Value;
-            var rawLimitPrice = market.Bid!.Value + spread * factor;
-            var limitPriceSteps = rawLimitPrice / market.PriceStep;
-            var limitPrice = (isBuy ? Math.Floor(limitPriceSteps) : Math.Ceiling(limitPriceSteps)) * market.PriceStep;
-            var trade = new Trade(market.Name, market.AssetType, size, limitPrice);
+            
+            var trade = market.MinProvideSize switch
+            {
+                _ when Math.Abs(size) >= market.MinProvideSize => new Trade(market.Name, market.AssetType, size, CalcLimitPrice(), true),
+                _ => new Trade(market.Name, market.AssetType, size, isBuy ? market.Ask!.Value : market.Bid!.Value, false)
+            };
 
-            if (trade.IsTradeable)
+            if (trade.IsTradable)
                 _logger.GeneratedTrade(token, delta, trade);
 
             remainingDelta -= delta;

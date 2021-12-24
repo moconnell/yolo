@@ -10,6 +10,8 @@ using YoloAbstractions.Config;
 using YoloBroker;
 using YoloTrades;
 using YoloWeights;
+using static System.Environment;
+using static YoloKonsole.WellKnown.TradeEventIds;
 
 namespace YoloKonsole;
 
@@ -29,6 +31,17 @@ internal class Program
 #else
         var env = "prod";
 #endif
+        
+        Arguments.Populate();
+
+        ConsoleWrite(@"
+__  ______  __    ____  __
+\ \/ / __ \/ /   / __ \/ /
+ \  / / / / /   / / / / / 
+ / / /_/ / /___/ /_/ /_/  
+/_/\____/_____/\____(_)   
+                          
+");
 
         CancellationTokenSource source = new();
         var cancellationToken = source.Token;
@@ -44,7 +57,6 @@ internal class Program
 
             var serviceProvider = new ServiceCollection()
                 .AddLogging(loggingBuilder => loggingBuilder
-                    .AddConsole()
                     .AddFile(config.GetSection("Logging")))
                 .AddBroker(config)
                 .AddSingleton<ITradeFactory, TradeFactory>()
@@ -57,9 +69,7 @@ internal class Program
 
             var yoloConfig = config.GetYoloConfig();
 
-            var weights = (await yoloConfig
-                    .GetWeights())
-                .ToArray();
+            var weights = (await yoloConfig.GetWeights()).ToArray();
 
             using var broker = serviceProvider.GetService<IYoloBroker>()!;
 
@@ -68,8 +78,17 @@ internal class Program
             if (orders.Any())
             {
                 _logger.OpenOrders(orders.Values);
-                
-                return Error;
+
+                if (!Silent)
+                {
+                    Console.WriteLine("Open orders!");
+                    Console.WriteLine();
+                    foreach (var order in orders.Values)
+                        Console.WriteLine(
+                            $"{order.AssetName}:\t{ToSide(order.Amount)} {Math.Abs(order.Amount)} at {order.LimitPrice}");
+                }
+
+                return OpenOrders;
             }
 
             var positions = await broker.GetPositionsAsync(cancellationToken);
@@ -88,37 +107,49 @@ internal class Program
 
             var trades = tradeFactory
                 .CalculateTrades(weights, positions, markets)
+                .OrderBy(trade => trade.AssetName)
                 .ToArray();
 
             if (!trades.Any())
             {
+                ConsoleWriteLine("Nothing to do.");
+
                 return Success;
             }
 
             if (!Silent)
             {
-                _logger.LogInformation("Proceed? (y/n): ");
+                Console.WriteLine("Generated trades:");
+                Console.WriteLine();
+                foreach (var trade in trades)
+                    Console.WriteLine(
+                        $"{trade.AssetName}:\t{ToSide(trade.Amount)} {Math.Abs(trade.Amount)} at {trade.LimitPrice}");
+                Console.WriteLine();
+                Console.Write("Proceed? (y/n): ");
 
-                if (Console.Read() != 'y')
-                {
-                    return Success;
-                }
+                if (Console.Read() != 'y') return Success;
             }
 
             var returnCode = Success;
 
+            ConsoleWrite($"{NewLine}Placing orders...");
+
             await foreach (var result in broker.PlaceTradesAsync(trades, cancellationToken))
-            {
                 if (result.Success)
                 {
-                    _logger.PlacedOrder(result.Order!.AssetName, result.Order);
+                    var order = result.Order!;
+                    _logger.PlacedOrder(order.AssetName, order);
+                    ConsoleWrite(".");
                 }
                 else
                 {
                     _logger.OrderError(result.Trade.AssetName, result.Error, result.ErrorCode);
-                    returnCode = result.ErrorCode ?? Error;
+                    ConsoleWriteLine($"{result.Trade.AssetName}:\t{result.Error}");
+                    returnCode = new [] {result.ErrorCode.GetValueOrDefault(), Error, returnCode}.Max();
                 }
-            }
+            
+            if (returnCode == Success)
+                ConsoleWrite(" done.");
 
             return returnCode;
         }
@@ -128,6 +159,8 @@ internal class Program
 
             _logger?.LogError("Error occurred: {Error}", e);
 
+            Console.WriteLine(e.Message);
+
             return Error;
         }
         finally
@@ -135,4 +168,18 @@ internal class Program
             _logger?.LogInformation("************ YOLO ended ************");
         }
     }
+
+    private static void ConsoleWrite(string s)
+    {
+        if (!Silent)
+            Console.Write(s);
+    }
+
+    private static void ConsoleWriteLine(string s)
+    {
+        if (!Silent)
+            Console.WriteLine(s);
+    }
+
+    private static string ToSide(decimal amount) => amount >= 0 ? "Buy" : "Sell";
 }

@@ -4,71 +4,80 @@
     "AssetType": "Spot",
     "Amount": -20.6,
     "LimitPrice": 19.3660,
+    "PostPrice": true,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   },
   {
     "AssetName": "UNI/USD",
     "AssetType": "Spot",
     "Amount": -18.6,
     "LimitPrice": 15.813,
+    "PostPrice": true,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   },
   {
     "AssetName": "FTX-PERP",
     "AssetType": "Future",
     "Amount": -12.5,
     "LimitPrice": 39.8090,
+    "PostPrice": true,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   },
   {
     "AssetName": "LTC/USD",
     "AssetType": "Spot",
     "Amount": -5.50,
     "LimitPrice": 148.800,
+    "PostPrice": true,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   },
   {
     "AssetName": "BCH/USD",
     "AssetType": "Spot",
     "Amount": -0.508,
     "LimitPrice": 434.325,
+    "PostPrice": true,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   },
   {
     "AssetName": "ETH-PERP",
     "AssetType": "Future",
     "Amount": 0.096,
     "LimitPrice": 3942.8,
+    "PostPrice": true,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   },
   {
     "AssetName": "BTC/USD",
     "AssetType": "Spot",
     "Amount": -0.0200,
     "LimitPrice": 46735.0,
+    "PostPrice": true,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   },
   {
     "AssetName": "FTT-PERP",
     "AssetType": "Future",
     "Amount": -300.0,
     "LimitPrice": 39.8090,
+    "PostPrice": true,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   },
   {
     "AssetName": "CRO-PERP",
     "AssetType": "Future",
     "Amount": -50.0,
     "LimitPrice": 0.526425,
+    "PostPrice": true,
     "Expiry": null,
-    "IsTradeable": true
+    "IsTradable": true
   }
 ]

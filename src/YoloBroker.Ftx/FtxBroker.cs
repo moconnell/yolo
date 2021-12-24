@@ -73,7 +73,7 @@ public class FtxBroker : IYoloBroker
                 orderType,
                 quantity,
                 trade.LimitPrice,
-                postOnly: PostOnly,
+                postOnly: PostOnly == true && trade.PostPrice != false,
                 ct: ct);
 
             yield return new TradeResult(
@@ -200,6 +200,7 @@ public class FtxBroker : IYoloBroker
                         s.Type.ToAssetType(),
                         s.PriceStep,
                         s.QuantityStep,
+                        s.MinProvideSize,
                         s.BestAsk,
                         s.BestBid,
                         s.LastPrice,
