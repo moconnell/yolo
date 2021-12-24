@@ -10,6 +10,8 @@ using YoloAbstractions.Config;
 using YoloBroker;
 using YoloTrades;
 using YoloWeights;
+using static System.Environment;
+using static YoloKonsole.WellKnown.TradeEventIds;
 
 namespace YoloKonsole;
 
@@ -29,9 +31,10 @@ internal class Program
 #else
         var env = "prod";
 #endif
+        
+        Arguments.Populate();
 
-        if (!Silent)
-            Console.Write(@"
+        ConsoleWrite(@"
 __  ______  __    ____  __
 \ \/ / __ \/ /   / __ \/ /
  \  / / / / /   / / / / / 
@@ -85,7 +88,7 @@ __  ______  __    ____  __
                             $"{order.AssetName}:\t{ToSide(order.Amount)} {Math.Abs(order.Amount)} at {order.LimitPrice}");
                 }
 
-                return Error;
+                return OpenOrders;
             }
 
             var positions = await broker.GetPositionsAsync(cancellationToken);
@@ -109,7 +112,7 @@ __  ______  __    ____  __
 
             if (!trades.Any())
             {
-                if (!Silent) Console.WriteLine("Nothing to do.");
+                ConsoleWriteLine("Nothing to do.");
 
                 return Success;
             }
@@ -129,22 +132,24 @@ __  ______  __    ____  __
 
             var returnCode = Success;
 
+            ConsoleWrite($"{NewLine}Placing orders...");
+
             await foreach (var result in broker.PlaceTradesAsync(trades, cancellationToken))
                 if (result.Success)
                 {
                     var order = result.Order!;
                     _logger.PlacedOrder(order.AssetName, order);
-                    if (!Silent)
-                        Console.WriteLine(
-                            $"{order.AssetName}:\t{order.OrderSide} {Math.Abs(order.Amount)} at {order.LimitPrice}\t({order.OrderStatus})");
+                    ConsoleWrite(".");
                 }
                 else
                 {
                     _logger.OrderError(result.Trade.AssetName, result.Error, result.ErrorCode);
-                    if (!Silent)
-                        Console.WriteLine($"{result.Trade.AssetName}:\t{result.Error}");
-                    returnCode = result.ErrorCode ?? Error;
+                    ConsoleWriteLine($"{result.Trade.AssetName}:\t{result.Error}");
+                    returnCode = new [] {result.ErrorCode.GetValueOrDefault(), Error, returnCode}.Max();
                 }
+            
+            if (returnCode == Success)
+                ConsoleWrite(" done.");
 
             return returnCode;
         }
@@ -164,5 +169,17 @@ __  ______  __    ____  __
         }
     }
 
-    private static string ToSide(decimal amount) => amount >= 0 ? "BUY" : "SELL";
+    private static void ConsoleWrite(string s)
+    {
+        if (!Silent)
+            Console.Write(s);
+    }
+
+    private static void ConsoleWriteLine(string s)
+    {
+        if (!Silent)
+            Console.WriteLine(s);
+    }
+
+    private static string ToSide(decimal amount) => amount >= 0 ? "Buy" : "Sell";
 }
