@@ -1,7 +1,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/moconnell/yolo/badge.svg?branch=master)](https://coveralls.io/github/moconnell/yolo?branch=master)
 
 # yolo
-Automation for the RobotWealth cryptocurrency YOLO strategies
+Automation for the [RobotWealth](https://robotwealth.com) cryptocurrency YOLO strategies
 
 ## YoloKonsole.exe
 
