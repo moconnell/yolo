@@ -19,4 +19,7 @@ public interface IYoloBroker : IDisposable
         string? quoteCurrency = null,
         AssetPermissions assetPermissions = AssetPermissions.All,
         CancellationToken ct = default);
+
+    IObservable<MarketInfo> MarketUpdates { get; }
+    IObservable<OrderUpdate> OrderUpdates { get; }
 }

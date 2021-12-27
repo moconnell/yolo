@@ -1,9 +1,14 @@
+using System.Collections.Concurrent;
+using System.Reactive.Subjects;
 using System.Runtime.CompilerServices;
 using CryptoExchange.Net.Authentication;
 using CryptoExchange.Net.Objects;
+using CryptoExchange.Net.Sockets;
 using FTX.Net;
 using FTX.Net.Enums;
+using FTX.Net.Interfaces;
 using FTX.Net.Objects;
+using FTX.Net.Objects.SocketObjects;
 using Microsoft.Extensions.Configuration;
 using YoloAbstractions;
 using YoloBroker.Ftx.Config;
@@ -15,9 +20,16 @@ namespace YoloBroker.Ftx;
 
 public class FtxBroker : IYoloBroker
 {
-    private readonly FTXClient _ftxClient;
-    private readonly FTXSocketClient _ftxSocketClient;
+    private readonly IFTXClient _ftxClient;
+    private readonly IFTXSocketClient _ftxSocketClient;
+    private readonly Subject<MarketInfo> _marketUpdatesSubject;
+    private readonly ConcurrentDictionary<long, OrderUpdate> _orderUpdates;
+    private readonly Subject<OrderUpdate> _orderUpdatesSubject;
+    private readonly bool? _postOnly;
+    private readonly ConcurrentDictionary<string, FTXSymbol> _subscribedSymbols;
     private bool _disposed;
+    private bool _subscribedOrderUpdates;
+    private static readonly TimeSpan MinTradeSendInterval = TimeSpan.FromMilliseconds(100);
 
     public FtxBroker(IConfiguration configuration)
         : this(configuration.GetFtxConfig())
@@ -25,29 +37,39 @@ public class FtxBroker : IYoloBroker
     }
 
     public FtxBroker(FtxConfig config)
+        : this(new FTXClient(
+                new FTXClientOptions
+                {
+                    ApiCredentials = new ApiCredentials(config.ApiKey, config.Secret),
+                    BaseAddress = config.BaseAddress,
+                    SubaccountName = config.SubAccount
+                }),
+            new FTXSocketClient(
+                new FTXSocketClientOptions
+                {
+                    ApiCredentials = new ApiCredentials(config.ApiKey, config.Secret),
+                    AutoReconnect = true,
+                    BaseAddress = config.BaseAddress,
+                    SubaccountName = config.SubAccount
+                }),
+            config.PostOnly
+        )
     {
-        var credentials = new ApiCredentials(config.ApiKey, config.Secret);
-
-        _ftxClient = new FTXClient(
-            new FTXClientOptions
-            {
-                ApiCredentials = credentials,
-                BaseAddress = config.BaseAddress,
-                SubaccountName = config.SubAccount
-            });
-
-        _ftxSocketClient = new FTXSocketClient(
-            new FTXSocketClientOptions
-            {
-                ApiCredentials = credentials,
-                BaseAddress = config.BaseAddress,
-                SubaccountName = config.SubAccount
-            });
-
-        PostOnly = config.PostOnly;
     }
-    
-    private bool? PostOnly { get; }
+
+    public FtxBroker(IFTXClient ftxClient, IFTXSocketClient ftxSocketClient, bool? postOnly = null)
+    {
+        _ftxClient = ftxClient;
+        _ftxSocketClient = ftxSocketClient;
+        _postOnly = postOnly;
+        _orderUpdates = new ConcurrentDictionary<long, OrderUpdate>();
+        _subscribedSymbols = new ConcurrentDictionary<string, FTXSymbol>();
+        _marketUpdatesSubject = new Subject<MarketInfo>();
+        _orderUpdatesSubject = new Subject<OrderUpdate>();
+    }
+
+    public IObservable<MarketInfo> MarketUpdates => _marketUpdatesSubject;
+    public IObservable<OrderUpdate> OrderUpdates => _orderUpdatesSubject;
 
     public void Dispose()
     {
@@ -59,13 +81,27 @@ public class FtxBroker : IYoloBroker
         IEnumerable<Trade> trades,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
+        async Task<DateTime> Throttle(DateTime? dateTime)
+        {
+            // throttle as FTX errors if > 2 orders in 200ms
+            var timeSinceLastTrade = DateTime.UtcNow - dateTime;
+            if (timeSinceLastTrade < MinTradeSendInterval)
+                await Task.Delay(MinTradeSendInterval - timeSinceLastTrade.Value, ct); 
+
+            return DateTime.UtcNow;
+        }
+        
+        await SubscribeOrderUpdates();
+
+        DateTime? lastTradeTime = null;
+        
         foreach (var trade in trades)
         {
-            await Task.Delay(123, ct); // throttle as FTX errors if > 2 orders in 200ms
-
             var orderSide = trade.Amount < 0 ? OrderSide.Sell : OrderSide.Buy;
             var orderType = trade.LimitPrice.HasValue ? OrderType.Limit : OrderType.Market;
             var quantity = Math.Abs(trade.Amount);
+
+            lastTradeTime = await Throttle(lastTradeTime);
 
             var result = await _ftxClient.PlaceOrderAsync(
                 trade.AssetName,
@@ -73,15 +109,23 @@ public class FtxBroker : IYoloBroker
                 orderType,
                 quantity,
                 trade.LimitPrice,
-                postOnly: PostOnly == true && trade.PostPrice != false,
+                postOnly: _postOnly == true && trade.PostPrice != false,
                 ct: ct);
 
-            yield return new TradeResult(
+            var order = result.Data.ToOrder();
+            var tradeResult = new TradeResult(
                 trade,
                 result.Success,
-                result.Data.ToOrder(),
+                order,
                 result.Error?.Message,
                 result.Error?.Code);
+
+            yield return tradeResult;
+
+            if (order is null) 
+                continue;
+            
+            OnNext(new OrderUpdate(trade, order));
         }
     }
 
@@ -108,7 +152,7 @@ public class FtxBroker : IYoloBroker
             var baseAsset = position.Future
                 .Split("-")
                 .First();
-            
+
             result[baseAsset] = new List<Position>
             {
                 new(
@@ -132,17 +176,12 @@ public class FtxBroker : IYoloBroker
                 holding.Total);
 
             if (result.TryGetValue(holding.Asset, out var positionsList))
-            {
                 (positionsList as List<Position>)?.Add(position);
-                //result[holding.Asset] = positionsList;
-            }
             else
-            {
                 result[holding.Asset] = new List<Position>
                 {
                     position
                 };
-            }
         }
 
         return result;
@@ -186,26 +225,77 @@ public class FtxBroker : IYoloBroker
             };
         }
 
-
-        return symbols
+        var filteredSymbols = symbols
             .Where(Filter)
+            .ToArray();
+
+        await SubscribeUpdates(filteredSymbols);
+
+        return filteredSymbols
             .GroupBy(s => s.BaseCurrency ?? s.Underlying)
-            .ToDictionary(
-                g => g.Key,
-                g => g.Select(s =>
-                    new MarketInfo(
-                        s.Name,
-                        g.Key,
-                        s.QuoteCurrency,
-                        s.Type.ToAssetType(),
-                        s.PriceStep,
-                        s.QuantityStep,
-                        s.MinProvideSize,
-                        s.BestAsk,
-                        s.BestBid,
-                        s.LastPrice,
-                        s.GetExpiry(),
-                        DateTime.UtcNow)));
+            .ToDictionary(g => g.Key, g => g.Select(s => ToMarketInfo(s)));
+    }
+
+    private static MarketInfo ToMarketInfo(
+        FTXSymbol s,
+        decimal? ask = null,
+        decimal? bid = null,
+        decimal? last = null,
+        DateTime? timeStamp = null) =>
+        new(
+            s.Name,
+            s.BaseCurrency ?? s.Underlying,
+            s.QuoteCurrency,
+            s.Type.ToAssetType(),
+            s.PriceStep,
+            s.QuantityStep,
+            s.MinProvideSize,
+            ask ?? s.BestAsk,
+            bid ?? s.BestBid,
+            last ?? s.LastPrice,
+            s.GetExpiry(),
+            timeStamp ?? DateTime.UtcNow);
+
+    private async Task SubscribeUpdates(IEnumerable<FTXSymbol> symbols)
+    {
+        foreach (var symbol in symbols)
+        {
+            if (_subscribedSymbols.ContainsKey(symbol.Name))
+                continue;
+
+            _subscribedSymbols[symbol.Name] = symbol;
+            await _ftxSocketClient.SubscribeToTickerUpdatesAsync(symbol.Name, OnNext);
+        }
+    }
+
+    private void OnNext(DataEvent<FTXStreamTicker> e)
+    {
+        if (e.Topic is { } && _subscribedSymbols.TryGetValue(e.Topic, out var symbol))
+        {
+            var marketInfo = ToMarketInfo(symbol, e.Data.BestAsk, e.Data.BestBid, e.Data.LastTrade, e.Timestamp);
+            _marketUpdatesSubject.OnNext(marketInfo);
+        }
+    }
+
+    private async Task SubscribeOrderUpdates()
+    {
+        if (!_subscribedOrderUpdates)
+            await GetDataAsync(
+                () => _ftxSocketClient.SubscribeToOrderUpdatesAsync(OnNext),
+                "Unable to subscribe to order updates");
+        _subscribedOrderUpdates = true;
+    }
+
+    private void OnNext(DataEvent<FTXOrder> e)
+    {
+        if (_orderUpdates.TryGetValue(e.Data.Id, out var orderUpdate))
+            OnNext(new OrderUpdate(orderUpdate.Trade, e.Data.ToOrder()!));
+    }
+
+    private void OnNext(OrderUpdate orderUpdate)
+    {
+        _orderUpdates[orderUpdate.Order.Id] = orderUpdate;
+        _orderUpdatesSubject.OnNext(orderUpdate);
     }
 
     protected virtual void Dispose(bool disposing)
@@ -215,6 +305,8 @@ public class FtxBroker : IYoloBroker
 
         if (disposing)
         {
+            _orderUpdatesSubject.Dispose();
+            _marketUpdatesSubject.Dispose();
             _ftxClient.Dispose();
             _ftxSocketClient.Dispose();
         }
@@ -227,6 +319,18 @@ public class FtxBroker : IYoloBroker
         string exceptionMessage)
     {
         var result = await webCallFunc();
+
+        if (!result.Success)
+            throw new FtxException(exceptionMessage, result);
+
+        return result.Data;
+    }
+
+    private static async Task<T> GetDataAsync<T>(
+        Func<Task<CallResult<T>>> callFunc,
+        string exceptionMessage)
+    {
+        var result = await callFunc();
 
         if (!result.Success)
             throw new FtxException(exceptionMessage, result);

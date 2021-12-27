@@ -13,6 +13,7 @@
     <ItemGroup>
       <PackageReference Include="FTX.Net" Version="0.1.8" />
       <PackageReference Include="System.Linq.Async" Version="5.0.0" />
+      <PackageReference Include="System.Reactive" Version="5.0.0" />
     </ItemGroup>
 
 </Project>
