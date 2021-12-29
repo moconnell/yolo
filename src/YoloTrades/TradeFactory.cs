@@ -37,15 +37,15 @@ public class TradeFactory : ITradeFactory
     private decimal SpreadSplit { get; }
 
     public IEnumerable<Trade> CalculateTrades(
-        IEnumerable<Weight> weights,
+        IDictionary<string, Weight> weights,
         IDictionary<string, IEnumerable<Position>> positions,
         IDictionary<string, IEnumerable<MarketInfo>> markets)
     {
         var nominal = NominalCash ??
                       positions.GetTotalValue(markets, BaseCurrencyToken);
         var weightsDict = weights.ToDictionary(
-            weight => weight.Ticker.SplitConstituents().Item1,
-            weight => (weight, isInUniverse: true));
+            kvp => kvp.Key,
+            kvp => (weight: kvp.Value, isInUniverse: true));
 
         _logger.CalculateTrades(weightsDict, positions, markets);
 
@@ -234,8 +234,8 @@ public class TradeFactory : ITradeFactory
             
             var trade = market.MinProvideSize switch
             {
-                _ when Math.Abs(size) >= market.MinProvideSize => new Trade(market.Name, market.AssetType, size, CalcLimitPrice(), true),
-                _ => new Trade(market.Name, market.AssetType, size, isBuy ? market.Ask!.Value : market.Bid!.Value, false)
+                _ when Math.Abs(size) >= market.MinProvideSize => new Trade(market.Name, market.AssetType, market.BaseAsset, size, CalcLimitPrice(), true),
+                _ => new Trade(market.Name, market.AssetType, market.BaseAsset, size, isBuy ? market.Ask!.Value : market.Bid!.Value, false)
             };
 
             if (trade.IsTradable)

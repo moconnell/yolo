@@ -33,6 +33,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\..\src\YoloTrades\YoloTrades.csproj" />
+      <ProjectReference Include="..\YoloTestUtils\YoloTestUtils.csproj" />
     </ItemGroup>
 
     <ItemGroup>

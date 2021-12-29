@@ -5,6 +5,7 @@ namespace YoloAbstractions;
 public record Trade(
     string AssetName,
     AssetType AssetType,
+    string BaseAsset,
     decimal Amount,
     decimal? LimitPrice = null,
     bool? PostPrice = null,
@@ -30,6 +31,7 @@ public record Trade(
         return new Trade(
             one.AssetName,
             one.AssetType,
+            one.BaseAsset,
             totalAmount,
             one.LimitPrice,
             postPrice,

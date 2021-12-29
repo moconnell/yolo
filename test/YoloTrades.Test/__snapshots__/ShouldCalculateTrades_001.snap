@@ -2,6 +2,7 @@
   {
     "AssetName": "XRP/USD",
     "AssetType": "Spot",
+    "BaseAsset": "XRP",
     "Amount": -680.0,
     "LimitPrice": 0.784975,
     "PostPrice": true,
@@ -11,6 +12,7 @@
   {
     "AssetName": "LINK/USD",
     "AssetType": "Spot",
+    "BaseAsset": "LINK",
     "Amount": -44.6,
     "LimitPrice": 19.4420,
     "PostPrice": true,
@@ -20,6 +22,7 @@
   {
     "AssetName": "FTT-PERP",
     "AssetType": "Future",
+    "BaseAsset": "FTT",
     "Amount": -6.6,
     "LimitPrice": 43.1870,
     "PostPrice": true,
@@ -29,6 +32,7 @@
   {
     "AssetName": "CRO-PERP",
     "AssetType": "Future",
+    "BaseAsset": "CRO",
     "Amount": 1980.0,
     "LimitPrice": 0.548750,
     "PostPrice": true,
@@ -38,6 +42,7 @@
   {
     "AssetName": "DOGE/USD",
     "AssetType": "Spot",
+    "BaseAsset": "DOGE",
     "Amount": -3774.0,
     "LimitPrice": 0.1636025,
     "PostPrice": true,
@@ -47,6 +52,7 @@
   {
     "AssetName": "ETH/USD",
     "AssetType": "Spot",
+    "BaseAsset": "ETH",
     "Amount": 0.106,
     "LimitPrice": 3957.5,
     "PostPrice": true,

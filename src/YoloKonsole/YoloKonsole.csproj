@@ -23,6 +23,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\YoloBroker.Ftx\YoloBroker.Ftx.csproj" />
+      <ProjectReference Include="..\YoloRuntime\YoloRuntime.csproj" />
       <ProjectReference Include="..\YoloTrades\YoloTrades.csproj" />
       <ProjectReference Include="..\YoloWeights\YoloWeights.csproj" />
     </ItemGroup>

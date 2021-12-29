@@ -11,6 +11,7 @@ using FTX.Net.Objects;
 using FTX.Net.Objects.SocketObjects;
 using Microsoft.Extensions.Configuration;
 using YoloAbstractions;
+using YoloAbstractions.Config;
 using YoloBroker.Ftx.Config;
 using YoloBroker.Ftx.Exceptions;
 using YoloBroker.Ftx.Extensions;
@@ -20,56 +21,70 @@ namespace YoloBroker.Ftx;
 
 public class FtxBroker : IYoloBroker
 {
+    private static readonly TimeSpan MinTradeSendInterval = TimeSpan.FromMilliseconds(100);
+    private readonly AssetPermissions _assetPermissions;
     private readonly IFTXClient _ftxClient;
     private readonly IFTXSocketClient _ftxSocketClient;
     private readonly Subject<MarketInfo> _marketUpdatesSubject;
     private readonly ConcurrentDictionary<long, OrderUpdate> _orderUpdates;
     private readonly Subject<OrderUpdate> _orderUpdatesSubject;
+    private readonly Subject<Position> _positionUpdatesSubject;
     private readonly bool? _postOnly;
+    private readonly string? _quoteCurrency;
     private readonly ConcurrentDictionary<string, FTXSymbol> _subscribedSymbols;
     private bool _disposed;
     private bool _subscribedOrderUpdates;
-    private static readonly TimeSpan MinTradeSendInterval = TimeSpan.FromMilliseconds(100);
 
     public FtxBroker(IConfiguration configuration)
-        : this(configuration.GetFtxConfig())
+        : this(configuration.GetFtxConfig(), configuration.GetYoloConfig())
     {
     }
 
-    public FtxBroker(FtxConfig config)
+    public FtxBroker(FtxConfig ftxConfig, YoloConfig yoloConfig)
         : this(new FTXClient(
                 new FTXClientOptions
                 {
-                    ApiCredentials = new ApiCredentials(config.ApiKey, config.Secret),
-                    BaseAddress = config.BaseAddress,
-                    SubaccountName = config.SubAccount
+                    ApiCredentials = new ApiCredentials(ftxConfig.ApiKey, ftxConfig.Secret),
+                    BaseAddress = ftxConfig.BaseAddress,
+                    SubaccountName = ftxConfig.SubAccount
                 }),
             new FTXSocketClient(
                 new FTXSocketClientOptions
                 {
-                    ApiCredentials = new ApiCredentials(config.ApiKey, config.Secret),
+                    ApiCredentials = new ApiCredentials(ftxConfig.ApiKey, ftxConfig.Secret),
                     AutoReconnect = true,
-                    BaseAddress = config.BaseAddress,
-                    SubaccountName = config.SubAccount
+                    BaseAddress = ftxConfig.BaseAddress,
+                    SubaccountName = ftxConfig.SubAccount
                 }),
-            config.PostOnly
+            yoloConfig.AssetPermissions,
+            yoloConfig.BaseAsset,
+            ftxConfig.PostOnly
         )
     {
     }
 
-    public FtxBroker(IFTXClient ftxClient, IFTXSocketClient ftxSocketClient, bool? postOnly = null)
+    public FtxBroker(
+        IFTXClient ftxClient,
+        IFTXSocketClient ftxSocketClient,
+        AssetPermissions assetPermissions,
+        string? quoteCurrency,
+        bool? postOnly = null)
     {
         _ftxClient = ftxClient;
         _ftxSocketClient = ftxSocketClient;
+        _assetPermissions = assetPermissions;
+        _quoteCurrency = quoteCurrency;
         _postOnly = postOnly;
         _orderUpdates = new ConcurrentDictionary<long, OrderUpdate>();
         _subscribedSymbols = new ConcurrentDictionary<string, FTXSymbol>();
         _marketUpdatesSubject = new Subject<MarketInfo>();
         _orderUpdatesSubject = new Subject<OrderUpdate>();
+        _positionUpdatesSubject = new Subject<Position>();
     }
 
     public IObservable<MarketInfo> MarketUpdates => _marketUpdatesSubject;
     public IObservable<OrderUpdate> OrderUpdates => _orderUpdatesSubject;
+    public IObservable<Position> PositionUpdates => _positionUpdatesSubject;
 
     public void Dispose()
     {
@@ -86,15 +101,15 @@ public class FtxBroker : IYoloBroker
             // throttle as FTX errors if > 2 orders in 200ms
             var timeSinceLastTrade = DateTime.UtcNow - dateTime;
             if (timeSinceLastTrade < MinTradeSendInterval)
-                await Task.Delay(MinTradeSendInterval - timeSinceLastTrade.Value, ct); 
+                await Task.Delay(MinTradeSendInterval - timeSinceLastTrade.Value, ct);
 
             return DateTime.UtcNow;
         }
-        
+
         await SubscribeOrderUpdates();
 
         DateTime? lastTradeTime = null;
-        
+
         foreach (var trade in trades)
         {
             var orderSide = trade.Amount < 0 ? OrderSide.Sell : OrderSide.Buy;
@@ -122,9 +137,9 @@ public class FtxBroker : IYoloBroker
 
             yield return tradeResult;
 
-            if (order is null) 
+            if (order is null)
                 continue;
-            
+
             OnNext(new OrderUpdate(trade, order));
         }
     }
@@ -189,8 +204,6 @@ public class FtxBroker : IYoloBroker
 
     public async Task<IDictionary<string, IEnumerable<MarketInfo>>> GetMarketsAsync(
         ISet<string>? baseAssetFilter = null,
-        string? quoteCurrency = null,
-        AssetPermissions assetPermissions = AssetPermissions.All,
         CancellationToken ct = default)
     {
         var symbols = await GetDataAsync(
@@ -200,9 +213,9 @@ public class FtxBroker : IYoloBroker
 
         bool Filter(FTXSymbol s)
         {
-            if (quoteCurrency is { } &&
+            if (_quoteCurrency is { } &&
                 s.QuoteCurrency is { } &&
-                quoteCurrency != s.QuoteCurrency)
+                _quoteCurrency != s.QuoteCurrency)
                 return false;
 
             if (baseAssetFilter is { } &&
@@ -213,12 +226,12 @@ public class FtxBroker : IYoloBroker
 
             return s.Type switch
             {
-                SymbolType.Future when expiry.HasValue => assetPermissions.HasFlag(
+                SymbolType.Future when expiry.HasValue => _assetPermissions.HasFlag(
                     AssetPermissions.ExpiringFutures),
-                SymbolType.Future when !expiry.HasValue => assetPermissions.HasFlag(
+                SymbolType.Future when !expiry.HasValue => _assetPermissions.HasFlag(
                     AssetPermissions.PerpetualFutures),
-                SymbolType.Spot => assetPermissions.HasFlag(AssetPermissions.LongSpot) ||
-                                   assetPermissions.HasFlag(AssetPermissions.ShortSpot),
+                SymbolType.Spot => _assetPermissions.HasFlag(AssetPermissions.LongSpot) ||
+                                   _assetPermissions.HasFlag(AssetPermissions.ShortSpot),
                 _ => throw new ArgumentOutOfRangeException(nameof(s.Type),
                     s.Type,
                     "unknown asset type")
@@ -307,6 +320,7 @@ public class FtxBroker : IYoloBroker
         {
             _orderUpdatesSubject.Dispose();
             _marketUpdatesSubject.Dispose();
+            _positionUpdatesSubject.Dispose();
             _ftxClient.Dispose();
             _ftxSocketClient.Dispose();
         }
@@ -314,9 +328,7 @@ public class FtxBroker : IYoloBroker
         _disposed = true;
     }
 
-    private static async Task<T> GetDataAsync<T>(
-        Func<Task<WebCallResult<T>>> webCallFunc,
-        string exceptionMessage)
+    private static async Task<T> GetDataAsync<T>(Func<Task<WebCallResult<T>>> webCallFunc, string exceptionMessage)
     {
         var result = await webCallFunc();
 
@@ -326,9 +338,7 @@ public class FtxBroker : IYoloBroker
         return result.Data;
     }
 
-    private static async Task<T> GetDataAsync<T>(
-        Func<Task<CallResult<T>>> callFunc,
-        string exceptionMessage)
+    private static async Task<T> GetDataAsync<T>(Func<Task<CallResult<T>>> callFunc, string exceptionMessage)
     {
         var result = await callFunc();
 

@@ -11,43 +11,35 @@ namespace YoloWeights;
 
 public static class WeightsExtensions
 {
-    public static async Task<IEnumerable<YoloAbstractions.Weight>> GetWeights(
-        this YoloConfig config)
-    {
-        return await GetWeights(config.WeightsUrl, config.DateFormat);
-    }
+    public static async Task<IDictionary<string, YoloAbstractions.Weight>> GetWeights(this YoloConfig config) =>
+        await GetWeights(config.WeightsUrl, config.DateFormat);
 
-    public static async Task<IEnumerable<YoloAbstractions.Weight>> GetWeights(
+    private static async Task<IDictionary<string, YoloAbstractions.Weight>> GetWeights(
         this string weightsUrl,
         string dateFormat = "yyyy-MM-dd")
     {
-        YoloAbstractions.Weight MapWeight(Weight arg)
-        {
-            return new YoloAbstractions.Weight(
+        YoloAbstractions.Weight MapWeight(Weight arg) =>
+            new(
                 Convert.ToDecimal(arg.ArrivalPrice),
                 Convert.ToDecimal(arg.ComboWeight),
                 DateTime.ParseExact(arg.Date, dateFormat, CultureInfo.InvariantCulture),
                 Convert.ToDecimal(arg.MomentumMegafactor),
                 arg.Ticker,
                 Convert.ToDecimal(arg.TrendMegafactor));
-        }
 
         using var httpClient = new HttpClient();
         var response = await httpClient.GetAsync(weightsUrl);
 
         if (!response.IsSuccessStatusCode)
-        {
             throw new WeightsException(
                 $"Could not fetch weights: {response.ReasonPhrase} ({response.StatusCode})");
-        }
 
         var weightsResponse = await response.Content.ReadFromJsonAsync<WeightsResponse>();
 
-        if (weightsResponse is null)
-        {
-            throw new WeightsException("No weights returned - response was empty");
-        }
+        if (weightsResponse is null) throw new WeightsException("No weights returned - response was empty");
 
-        return weightsResponse.Data.Select(MapWeight);
+        return weightsResponse.Data
+            .Select(MapWeight)
+            .ToDictionary(w => w.BaseAsset);
     }
 }

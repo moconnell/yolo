@@ -2,6 +2,7 @@
   {
     "AssetName": "BTC-PERP",
     "AssetType": "Future",
+    "BaseAsset": "BTC",
     "Amount": 0.0003,
     "LimitPrice": 49206.0,
     "PostPrice": false,

@@ -16,10 +16,9 @@ public interface IYoloBroker : IDisposable
 
     Task<IDictionary<string, IEnumerable<MarketInfo>>> GetMarketsAsync(
         ISet<string>? baseAssetFilter = null,
-        string? quoteCurrency = null,
-        AssetPermissions assetPermissions = AssetPermissions.All,
         CancellationToken ct = default);
 
     IObservable<MarketInfo> MarketUpdates { get; }
     IObservable<OrderUpdate> OrderUpdates { get; }
+    IObservable<Position> PositionUpdates { get; }
 }

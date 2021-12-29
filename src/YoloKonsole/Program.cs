@@ -1,17 +1,16 @@
 ﻿using System;
-using System.Linq;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Utility.CommandLine;
+using YoloAbstractions;
 using YoloAbstractions.Config;
-using YoloBroker;
+using YoloRuntime;
 using YoloTrades;
 using YoloWeights;
-using static System.Environment;
-using static YoloKonsole.WellKnown.TradeEventIds;
 
 namespace YoloKonsole;
 
@@ -60,6 +59,7 @@ __  ______  __    ____  __
                     .AddFile(config.GetSection("Logging")))
                 .AddBroker(config)
                 .AddSingleton<ITradeFactory, TradeFactory>()
+                .AddSingleton<IYoloRuntime, Runtime>()
                 .AddSingleton<IConfiguration>(config)
                 .BuildServiceProvider();
 
@@ -68,90 +68,16 @@ __  ______  __    ____  __
             _logger.LogInformation("************ YOLO started ************");
 
             var yoloConfig = config.GetYoloConfig();
+            var weights = await yoloConfig.GetWeights();
 
-            var weights = (await yoloConfig.GetWeights()).ToArray();
-
-            using var broker = serviceProvider.GetService<IYoloBroker>()!;
-
-            var orders = await broker.GetOrdersAsync(cancellationToken);
-
-            if (orders.Any())
-            {
-                _logger.OpenOrders(orders.Values);
-
-                if (!Silent)
-                {
-                    Console.WriteLine("Open orders!");
-                    Console.WriteLine();
-                    foreach (var order in orders.Values)
-                        Console.WriteLine(
-                            $"{order.AssetName}:\t{ToSide(order.Amount)} {Math.Abs(order.Amount)} at {order.LimitPrice}");
-                }
-
-                return OpenOrders;
-            }
-
-            var positions = await broker.GetPositionsAsync(cancellationToken);
-
-            var baseAssetFilter = positions
-                .Keys
-                .ToHashSet();
-
-            var markets = await broker.GetMarketsAsync(
-                baseAssetFilter,
-                yoloConfig.BaseAsset,
-                yoloConfig.AssetPermissions,
-                cancellationToken);
-
-            var tradeFactory = serviceProvider.GetService<ITradeFactory>()!;
-
-            var trades = tradeFactory
-                .CalculateTrades(weights, positions, markets)
-                .OrderBy(trade => trade.AssetName)
-                .ToArray();
-
-            if (!trades.Any())
-            {
-                ConsoleWriteLine("Nothing to do.");
-
-                return Success;
-            }
-
+            using var runtime = serviceProvider.GetService<IYoloRuntime>()!;
+            runtime.TradeUpdates.Subscribe(TradeResultOnNext);
             if (!Silent)
-            {
-                Console.WriteLine("Generated trades:");
-                Console.WriteLine();
-                foreach (var trade in trades)
-                    Console.WriteLine(
-                        $"{trade.AssetName}:\t{ToSide(trade.Amount)} {Math.Abs(trade.Amount)} at {trade.LimitPrice}");
-                Console.WriteLine();
-                Console.Write("Proceed? (y/n): ");
-
-                if (Console.Read() != 'y') return Success;
-            }
-
-            var returnCode = Success;
-
-            ConsoleWrite($"{NewLine}Placing orders...");
-
-            await foreach (var result in broker.PlaceTradesAsync(trades, cancellationToken))
-                if (result.Success)
-                {
-                    var order = result.Order!;
-                    _logger.PlacedOrder(order.AssetName, order);
-                    ConsoleWrite(".");
-                }
-                else
-                {
-                    _logger.OrderError(result.Trade.AssetName, result.Error, result.ErrorCode);
-                    ConsoleWriteLine($"{result.Trade.AssetName}:\t{result.Error}");
-                    returnCode = new [] {result.ErrorCode.GetValueOrDefault(), Error, returnCode}.Max();
-                }
+                runtime.Challenge = ProceedChallenge; 
             
-            if (returnCode == Success)
-                ConsoleWrite(" done.");
-
-            return returnCode;
+            await runtime.Rebalance(weights, cancellationToken);
+            
+            return Success;
         }
         catch (Exception e)
         {
@@ -167,6 +93,24 @@ __  ______  __    ____  __
         {
             _logger?.LogInformation("************ YOLO ended ************");
         }
+    }
+
+    private static bool ProceedChallenge(IEnumerable<Trade> trades)
+    {
+        Console.WriteLine("Generated trades:");
+        Console.WriteLine();
+        foreach (var trade in trades)
+            Console.WriteLine(
+                $"{trade.AssetName}:\t{ToSide(trade.Amount)} {Math.Abs(trade.Amount)} at {trade.LimitPrice}");
+        Console.WriteLine();
+        Console.Write("Proceed? (y/n): ");
+
+        return Console.Read() != 'y'; // return Success;
+    }
+
+    private static void TradeResultOnNext(TradeResult result)
+    {
+        
     }
 
     private static void ConsoleWrite(string s)
