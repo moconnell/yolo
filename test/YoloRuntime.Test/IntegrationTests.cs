@@ -12,7 +12,6 @@ using FTX.Net.Objects;
 using FTX.Net.Objects.Futures;
 using FTX.Net.Objects.SocketObjects;
 using Microsoft.Extensions.Logging;
-using Microsoft.VisualStudio.TestPlatform.CommunicationUtilities;
 using Moq;
 using Xunit;
 using YoloAbstractions;
@@ -66,7 +65,14 @@ public class IntegrationTests
                 tickerUpdateHandlers[symbol] = handler;
             });
 
-        var broker = new FtxBroker(ftxClient.Object, ftxSocketClient.Object, assetPermissions, quoteCurrency, postOnly);
+        var ftxBrokerLogger = new Mock<ILogger<FtxBroker>>();
+        var broker = new FtxBroker(
+            ftxClient.Object, 
+            ftxSocketClient.Object, 
+            ftxBrokerLogger.Object, 
+            assetPermissions,
+            quoteCurrency, 
+            postOnly);
 
         var tradeFactoryLogger = new Mock<ILogger<TradeFactory>>();
         var yoloConfig = new YoloConfig
@@ -75,14 +81,17 @@ public class IntegrationTests
             BaseAsset = quoteCurrency,
             NominalCash = nominalCash,
             SpreadSplit = spreadSplit,
-            TradeBuffer = tradeBuffer
+            TradeBuffer = tradeBuffer,
+            UnfilledOrderTimeout = TimeSpan.FromSeconds(1)
         };
         var tradeFactory = new TradeFactory(tradeFactoryLogger.Object, yoloConfig);
 
         var weights = (await $"{path}/weights.json".DeserializeAsync<Weight[]>())
             .ToDictionary(x => x.BaseAsset);
 
-        var runtime = new Runtime(broker, tradeFactory);
+        var runtimeLogger = new Mock<ILogger<Runtime>>();
+        var runtime = new Runtime(broker, tradeFactory, yoloConfig, runtimeLogger.Object);
+        runtime.TradeUpdates.Subscribe();
         await runtime.Rebalance(weights, CancellationToken.None);
     }
 }

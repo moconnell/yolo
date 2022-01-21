@@ -10,6 +10,8 @@ using FTX.Net.Interfaces;
 using FTX.Net.Objects;
 using FTX.Net.Objects.SocketObjects;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using YoloAbstractions;
 using YoloAbstractions.Config;
 using YoloBroker.Ftx.Config;
@@ -25,6 +27,7 @@ public class FtxBroker : IYoloBroker
     private readonly AssetPermissions _assetPermissions;
     private readonly IFTXClient _ftxClient;
     private readonly IFTXSocketClient _ftxSocketClient;
+    private readonly ILogger<FtxBroker> _logger;
     private readonly Subject<MarketInfo> _marketUpdatesSubject;
     private readonly ConcurrentDictionary<long, OrderUpdate> _orderUpdates;
     private readonly Subject<OrderUpdate> _orderUpdatesSubject;
@@ -35,17 +38,18 @@ public class FtxBroker : IYoloBroker
     private bool _disposed;
     private bool _subscribedOrderUpdates;
 
-    public FtxBroker(IConfiguration configuration)
-        : this(configuration.GetFtxConfig(), configuration.GetYoloConfig())
+    public FtxBroker(IConfiguration configuration, ILogger<FtxBroker> logger)
+        : this(configuration.GetFtxConfig(), configuration.GetYoloConfig(), logger)
     {
     }
 
-    public FtxBroker(FtxConfig ftxConfig, YoloConfig yoloConfig)
+    public FtxBroker(FtxConfig ftxConfig, YoloConfig yoloConfig, ILogger<FtxBroker> logger)
         : this(new FTXClient(
                 new FTXClientOptions
                 {
                     ApiCredentials = new ApiCredentials(ftxConfig.ApiKey, ftxConfig.Secret),
-                    BaseAddress = ftxConfig.BaseAddress,
+                    BaseAddress = ftxConfig.RestApi,
+  //                  LogLevel = LogLevel.Debug,
                     SubaccountName = ftxConfig.SubAccount
                 }),
             new FTXSocketClient(
@@ -53,9 +57,11 @@ public class FtxBroker : IYoloBroker
                 {
                     ApiCredentials = new ApiCredentials(ftxConfig.ApiKey, ftxConfig.Secret),
                     AutoReconnect = true,
-                    BaseAddress = ftxConfig.BaseAddress,
+ //                   LogLevel = LogLevel.Debug,
+                    BaseAddress = ftxConfig.WebSocketApi,
                     SubaccountName = ftxConfig.SubAccount
                 }),
+            logger,
             yoloConfig.AssetPermissions,
             yoloConfig.BaseAsset,
             ftxConfig.PostOnly
@@ -66,12 +72,14 @@ public class FtxBroker : IYoloBroker
     public FtxBroker(
         IFTXClient ftxClient,
         IFTXSocketClient ftxSocketClient,
+        ILogger<FtxBroker> logger,
         AssetPermissions assetPermissions,
         string? quoteCurrency,
         bool? postOnly = null)
     {
         _ftxClient = ftxClient;
         _ftxSocketClient = ftxSocketClient;
+        _logger = logger;
         _assetPermissions = assetPermissions;
         _quoteCurrency = quoteCurrency;
         _postOnly = postOnly;
@@ -126,6 +134,8 @@ public class FtxBroker : IYoloBroker
                 trade.LimitPrice,
                 postOnly: _postOnly == true && trade.PostPrice != false,
                 ct: ct);
+            
+            LogData(result);
 
             var order = result.Data.ToOrder();
             var tradeResult = new TradeResult(
@@ -149,7 +159,7 @@ public class FtxBroker : IYoloBroker
         var orders =
             await GetDataAsync(() => _ftxClient.GetOpenOrdersAsync(ct: ct),
                 "Could not get open orders");
-
+        
         return orders.ToDictionary(x => x.Id, x => x.ToOrder()!);
     }
 
@@ -249,6 +259,11 @@ public class FtxBroker : IYoloBroker
             .ToDictionary(g => g.Key, g => g.Select(s => ToMarketInfo(s)));
     }
 
+    public async Task CancelOrderAsync(long orderId, CancellationToken ct)
+    {
+        await _ftxClient.CancelOrderAsync(orderId, ct: ct);
+    }
+
     private static MarketInfo ToMarketInfo(
         FTXSymbol s,
         decimal? ask = null,
@@ -283,6 +298,8 @@ public class FtxBroker : IYoloBroker
 
     private void OnNext(DataEvent<FTXStreamTicker> e)
     {
+        LogData(e.Data);
+        
         if (e.Topic is { } && _subscribedSymbols.TryGetValue(e.Topic, out var symbol))
         {
             var marketInfo = ToMarketInfo(symbol, e.Data.BestAsk, e.Data.BestBid, e.Data.LastTrade, e.Timestamp);
@@ -301,6 +318,8 @@ public class FtxBroker : IYoloBroker
 
     private void OnNext(DataEvent<FTXOrder> e)
     {
+        LogData(e.Data);
+        
         if (_orderUpdates.TryGetValue(e.Data.Id, out var orderUpdate))
             OnNext(new OrderUpdate(orderUpdate.Trade, e.Data.ToOrder()!));
     }
@@ -328,23 +347,33 @@ public class FtxBroker : IYoloBroker
         _disposed = true;
     }
 
-    private static async Task<T> GetDataAsync<T>(Func<Task<WebCallResult<T>>> webCallFunc, string exceptionMessage)
+    private async Task<T> GetDataAsync<T>(Func<Task<WebCallResult<T>>> webCallFunc, string exceptionMessage)
     {
         var result = await webCallFunc();
 
         if (!result.Success)
             throw new FtxException(exceptionMessage, result);
 
+        LogData(result.Data);
+
         return result.Data;
     }
 
-    private static async Task<T> GetDataAsync<T>(Func<Task<CallResult<T>>> callFunc, string exceptionMessage)
+    private async Task<T> GetDataAsync<T>(Func<Task<CallResult<T>>> callFunc, string exceptionMessage)
     {
         var result = await callFunc();
 
         if (!result.Success)
             throw new FtxException(exceptionMessage, result);
 
+        LogData(result.Data);
+
         return result.Data;
+    }
+
+    private void LogData<T>(T data)
+    {
+        if (_logger.IsEnabled(LogLevel.Debug))
+            _logger.LogTrace("Received: {Data}", JsonConvert.SerializeObject(data));
     }
 }

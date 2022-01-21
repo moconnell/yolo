@@ -7,5 +7,5 @@ public interface IYoloRuntime : IDisposable
     Task Rebalance(IDictionary<string, Weight> weights, CancellationToken cancellationToken);
 
     IObservable<TradeResult> TradeUpdates { get; }
-    Func<IEnumerable<Trade>, bool> Challenge { get; set; }
+    Func<IReadOnlyList<Trade>, bool> Challenge { get; set; }
 }

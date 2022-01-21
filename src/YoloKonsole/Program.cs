@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
@@ -58,6 +59,7 @@ __  ______  __    ____  __
                 .AddLogging(loggingBuilder => loggingBuilder
                     .AddFile(config.GetSection("Logging")))
                 .AddBroker(config)
+                .AddSingleton(config.GetYoloConfig())
                 .AddSingleton<ITradeFactory, TradeFactory>()
                 .AddSingleton<IYoloRuntime, Runtime>()
                 .AddSingleton<IConfiguration>(config)
@@ -95,8 +97,14 @@ __  ______  __    ____  __
         }
     }
 
-    private static bool ProceedChallenge(IEnumerable<Trade> trades)
+    private static bool ProceedChallenge(IReadOnlyList<Trade> trades)
     {
+        if (!trades.Any())
+        {
+            Console.WriteLine("Nothing to do");
+            return false;
+        }
+
         Console.WriteLine("Generated trades:");
         Console.WriteLine();
         foreach (var trade in trades)
@@ -105,12 +113,12 @@ __  ______  __    ____  __
         Console.WriteLine();
         Console.Write("Proceed? (y/n): ");
 
-        return Console.Read() != 'y'; // return Success;
+        return Console.Read() == 'y'; // return Success;
     }
 
     private static void TradeResultOnNext(TradeResult result)
     {
-        
+        ConsoleWriteLine($"{result.Trade.AssetName}:\t{result.Order?.AmountRemaining/result.Order?.Amount:P0}");
     }
 
     private static void ConsoleWrite(string s)

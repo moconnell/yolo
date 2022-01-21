@@ -13,11 +13,6 @@ public class TradeFactory : ITradeFactory
 {
     private readonly ILogger<TradeFactory> _logger;
 
-    public TradeFactory(ILogger<TradeFactory> logger, IConfiguration configuration)
-        : this(logger, configuration.GetYoloConfig())
-    {
-    }
-
     public TradeFactory(ILogger<TradeFactory> logger, YoloConfig yoloConfig)
     {
         _logger = logger;
@@ -47,7 +42,7 @@ public class TradeFactory : ITradeFactory
             kvp => kvp.Key,
             kvp => (weight: kvp.Value, isInUniverse: true));
 
-        _logger.CalculateTrades(weightsDict, positions, markets);
+        _logger.CalculateTrades(weightsDict);
 
         var unconstrainedTargetLeverage = weightsDict
             .Values

@@ -21,4 +21,5 @@ public interface IYoloBroker : IDisposable
     IObservable<MarketInfo> MarketUpdates { get; }
     IObservable<OrderUpdate> OrderUpdates { get; }
     IObservable<Position> PositionUpdates { get; }
+    Task CancelOrderAsync(long orderId, CancellationToken ct);
 }
