@@ -11,4 +11,7 @@ public record Order(
     decimal Amount,
     decimal AmountRemaining,
     decimal? LimitPrice,
-    string? ClientId);
+    string? ClientId)
+{
+    public decimal Completed => 1 - AmountRemaining / Amount;
+}

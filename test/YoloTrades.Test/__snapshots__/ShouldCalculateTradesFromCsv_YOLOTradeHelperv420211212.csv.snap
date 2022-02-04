@@ -7,7 +7,9 @@
     "LimitPrice": 459.5500,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "a5e36760-b84c-4ba4-93d3-679f34424430",
+    "IsTradable": true,
+    "Side": "Sell"
   },
   {
     "AssetName": "BTC/USD",
@@ -17,7 +19,9 @@
     "LimitPrice": 49413.0000,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "d8ab9de5-fe7f-447c-9a6b-1b31e03d4a0e",
+    "IsTradable": true,
+    "Side": "Buy"
   },
   {
     "AssetName": "CRO/USD",
@@ -27,7 +31,9 @@
     "LimitPrice": 0.5783,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "cd1962d2-3f01-4a43-a6ea-88691c55ea07",
+    "IsTradable": true,
+    "Side": "Buy"
   },
   {
     "AssetName": "DOGE/USD",
@@ -37,7 +43,9 @@
     "LimitPrice": 0.1689,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "c1694d31-459d-4511-8bb1-b18f9f682ca1",
+    "IsTradable": true,
+    "Side": "Sell"
   },
   {
     "AssetName": "ETH/USD",
@@ -47,7 +55,9 @@
     "LimitPrice": 4091.2000,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "e99cf61b-a871-4433-8428-1257c122e02f",
+    "IsTradable": true,
+    "Side": "Buy"
   },
   {
     "AssetName": "FTT/USD",
@@ -57,7 +67,9 @@
     "LimitPrice": 40.4420,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "bdf285ec-4f59-451e-b332-bc67ae5552ad",
+    "IsTradable": true,
+    "Side": "Sell"
   },
   {
     "AssetName": "LINK/USD",
@@ -67,7 +79,9 @@
     "LimitPrice": 19.9700,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "70002879-b797-4a81-b824-d5e825a52f2d",
+    "IsTradable": true,
+    "Side": "Sell"
   },
   {
     "AssetName": "LTC/USD",
@@ -77,7 +91,9 @@
     "LimitPrice": 158.0900,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "b27f85e8-61f6-49be-a675-42f2c85ca548",
+    "IsTradable": true,
+    "Side": "Sell"
   },
   {
     "AssetName": "UNI/USD",
@@ -87,6 +103,8 @@
     "LimitPrice": 15.8900,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "0d66a3c0-59f0-4816-b0df-3c966b56981b",
+    "IsTradable": true,
+    "Side": "Sell"
   }
 ]

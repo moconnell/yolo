@@ -11,7 +11,9 @@ public record Trade(
     bool? PostPrice = null,
     DateTime? Expiry = null)
 {
+    public Guid Id { get; } = Guid.NewGuid();
     public bool IsTradable => Amount != 0;
+    public OrderSide Side => Amount >= 0 ? OrderSide.Buy : OrderSide.Sell;
 
     public static Trade operator +(Trade one, Trade two)
     {

@@ -49,7 +49,7 @@ public class TradeFactoryTests
 
         var filename = path[(path.LastIndexOf("/", StringComparison.Ordinal) + 1)..]
             .Replace(" ", string.Empty);
-        trades.MatchSnapshot($"ShouldCalculateTradesFromCsv_{filename}");
+        trades.MatchSnapshot($"ShouldCalculateTradesFromCsv_{filename}", options => options.IgnoreFields("[*].Id"));
 
         Assert.Equal(expectedTrades.Count, trades.Length);
 
@@ -99,7 +99,7 @@ public class TradeFactoryTests
         Assert.NotNull(trades);
 
         var directory = path[(path.LastIndexOf("/", StringComparison.InvariantCulture) + 1)..];
-        trades.MatchSnapshot($"ShouldCalculateTrades_{directory}");
+        trades.MatchSnapshot($"ShouldCalculateTrades_{directory}", options => options.IgnoreFields("[*].Id"));
     }
 
     private static

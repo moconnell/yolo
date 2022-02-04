@@ -7,6 +7,8 @@ using YoloAbstractions;
 using YoloAbstractions.Config;
 using YoloBroker;
 using YoloTrades;
+using YoloWeights;
+using Weight = YoloAbstractions.Weight;
 
 namespace YoloRuntime;
 
@@ -23,12 +25,19 @@ public class Runtime : IYoloRuntime
     private readonly IDisposable _positionUpdatesSubscription;
     private readonly ITradeFactory _tradeFactory;
     private readonly Subject<TradeResult> _tradeResultsSubject;
+    private readonly IYoloWeightsService _weightsService;
     private CancellationToken _cancellationToken;
     private bool _disposed;
 
-    public Runtime(IYoloBroker broker, ITradeFactory tradeFactory, YoloConfig config, ILogger<Runtime> logger)
+    public Runtime(
+        IYoloWeightsService weightsService,
+        IYoloBroker broker,
+        ITradeFactory tradeFactory,
+        YoloConfig config,
+        ILogger<Runtime> logger)
     {
         _tradeResultsSubject = new Subject<TradeResult>();
+        _weightsService = weightsService;
         _broker = broker;
         _marketUpdatesSubscription = _broker.MarketUpdates.Subscribe(OnUpdate);
         _orderUpdatesSubscription = _broker.OrderUpdates.SelectMany(OnUpdate).Subscribe();
@@ -50,19 +59,18 @@ public class Runtime : IYoloRuntime
 
     public TimeSpan? UnfilledOrderTimeout { get; set; }
 
-    public Func<IReadOnlyList<Trade>, bool> Challenge { get; set; } = _ => true;
-
     public IObservable<TradeResult> TradeUpdates => _tradeResultsSubject;
 
-    public async Task Rebalance(IDictionary<string, Weight> weights, CancellationToken cancellationToken)
+    public async Task RebalanceAsync(CancellationToken cancellationToken)
     {
         _cancellationToken = cancellationToken;
 
         var orders = await _broker.GetOrdersAsync(cancellationToken);
 
-        if (orders.Any()) throw new OpenOrdersException("Open orders!", orders.Values);
-
-        weights.CopyTo(_cachedWeights);
+        if (orders.Any())
+        {
+            throw new OpenOrdersException("Open orders!", orders.Values);
+        }
 
         var positions = await _broker.GetPositionsAsync(cancellationToken);
 
@@ -78,15 +86,29 @@ public class Runtime : IYoloRuntime
 
         markets.CopyTo(_cachedMarkets);
 
-        if (!await CalculateTrades(_cachedWeights, cancellationToken)) return;
+        await CalculateTradesAsync(cancellationToken);
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    public async Task PlaceTradesAsync(IEnumerable<Trade> trades, CancellationToken cancellationToken)
+    {
+        await PlaceTradesImplAsync(trades, cancellationToken);
 
         if (UnfilledOrderTimeout.HasValue)
+        {
             while (!AllFilled)
             {
                 await Task.Delay(UnfilledOrderTimeout.Value, cancellationToken);
                 await CancelOrdersAsync(UnfilledOrders);
-                if (!await CalculateTrades(_cachedWeights, cancellationToken)) return;
+                var newTrades = await CalculateTradesAsync(cancellationToken);
+                await PlaceTradesImplAsync(newTrades, cancellationToken);
             }
+        }
     }
 
     private async Task CancelOrdersAsync(IEnumerable<Order> orders)
@@ -97,37 +119,49 @@ public class Runtime : IYoloRuntime
         }
     }
 
-    public void Dispose()
+    private async Task<IEnumerable<Trade>> CalculateTradesAsync(CancellationToken cancellationToken)
     {
-        Dispose(true);
-        GC.SuppressFinalize(this);
+        var weights = await _weightsService.GetWeightsAsync(cancellationToken);
+        _cachedWeights.Clear();
+        weights.CopyTo(_cachedWeights);
+        
+        return CalculateTrades(weights);
     }
 
-    private async Task<bool> CalculateTrades(IDictionary<string, Weight> weights, CancellationToken cancellationToken)
+    private IEnumerable<Trade> CalculateTrades(IDictionary<string, Weight> weights)
     {
         var trades = _tradeFactory
             .CalculateTrades(weights, _cachedPositions, _cachedMarkets)
             .OrderBy(trade => trade.AssetName)
             .ToArray();
 
-        if (!Challenge(trades))
-            return false;
+        foreach (var trade in trades)
+        {
+            OnNext(new TradeResult(trade));
+        }
 
+        return trades;
+    }
+
+    private async Task PlaceTradesImplAsync(IEnumerable<Trade> trades, CancellationToken cancellationToken)
+    {
         await foreach (var result in _broker.PlaceTradesAsync(trades, cancellationToken))
         {
             if (result.Order is { })
+            {
                 _cachedOrders[result.Trade.BaseAsset] = result.Order;
+            }
 
             OnNext(result);
         }
-
-        return true;
     }
 
     protected virtual void Dispose(bool disposing)
     {
         if (_disposed)
+        {
             return;
+        }
 
         if (disposing)
         {
@@ -148,7 +182,9 @@ public class Runtime : IYoloRuntime
         var baseAsset = marketInfo.BaseAsset;
 
         if (!_cachedMarkets.TryGetValue(baseAsset, out var markets))
+        {
             return;
+        }
 
         var baseAssetMarkets = markets.ToDictionary(mkt => mkt.Name, mkt => mkt);
         baseAssetMarkets[marketInfo.Name] = marketInfo;
@@ -185,6 +221,7 @@ public class Runtime : IYoloRuntime
     {
         var baseAsset = trade.BaseAsset;
         var weight = _cachedWeights[baseAsset];
-        await CalculateTrades(new Dictionary<string, Weight> {{baseAsset, weight}}, _cancellationToken);
+        var newTrades = CalculateTrades(new Dictionary<string, Weight> { { baseAsset, weight } });
+        await PlaceTradesAsync(newTrades, _cancellationToken);
     }
 }

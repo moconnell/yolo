@@ -1,13 +1,13 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.Reactive.Concurrency;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using ReactiveUI;
+using Terminal.Gui;
 using Utility.CommandLine;
-using YoloAbstractions;
 using YoloAbstractions.Config;
 using YoloRuntime;
 using YoloTrades;
@@ -31,7 +31,7 @@ internal class Program
 #else
         var env = "prod";
 #endif
-        
+
         Arguments.Populate();
 
         ConsoleWrite(@"
@@ -43,8 +43,7 @@ __  ______  __    ____  __
                           
 ");
 
-        CancellationTokenSource source = new();
-        var cancellationToken = source.Token;
+        CancellationTokenSource cancellationTokenSource = new();
 
         try
         {
@@ -54,36 +53,38 @@ __  ______  __    ____  __
                 .AddEnvironmentVariables();
 
             var config = builder.Build();
+            var yoloConfig = config.GetYoloConfig();
 
             var serviceProvider = new ServiceCollection()
                 .AddLogging(loggingBuilder => loggingBuilder
                     .AddFile(config.GetSection("Logging")))
                 .AddBroker(config)
                 .AddSingleton(config.GetYoloConfig())
+                .AddSingleton<IYoloWeightsService, YoloWeightsService>()
                 .AddSingleton<ITradeFactory, TradeFactory>()
                 .AddSingleton<IYoloRuntime, Runtime>()
                 .AddSingleton<IConfiguration>(config)
+                .AddSingleton(yoloConfig)
                 .BuildServiceProvider();
 
             _logger = serviceProvider.GetService<ILoggerFactory>()!
                 .CreateLogger<Program>();
             _logger.LogInformation("************ YOLO started ************");
 
-            var yoloConfig = config.GetYoloConfig();
-            var weights = await yoloConfig.GetWeights();
 
             using var runtime = serviceProvider.GetService<IYoloRuntime>()!;
-            runtime.TradeUpdates.Subscribe(TradeResultOnNext);
-            if (!Silent)
-                runtime.Challenge = ProceedChallenge; 
-            
-            await runtime.Rebalance(weights, cancellationToken);
-            
+
+            Application.Init();
+            RxApp.MainThreadScheduler = TerminalScheduler.Default;
+            RxApp.TaskpoolScheduler = TaskPoolScheduler.Default;
+            Application.Run(new YoloView(new YoloViewModel(runtime, cancellationTokenSource)));
+            Application.Shutdown();
+
             return Success;
         }
         catch (Exception e)
         {
-            source.Cancel();
+            cancellationTokenSource.Cancel();
 
             _logger?.LogError("Error occurred: {Error}", e);
 
@@ -96,42 +97,10 @@ __  ______  __    ____  __
             _logger?.LogInformation("************ YOLO ended ************");
         }
     }
-
-    private static bool ProceedChallenge(IReadOnlyList<Trade> trades)
-    {
-        if (!trades.Any())
-        {
-            Console.WriteLine("Nothing to do");
-            return false;
-        }
-
-        Console.WriteLine("Generated trades:");
-        Console.WriteLine();
-        foreach (var trade in trades)
-            Console.WriteLine(
-                $"{trade.AssetName}:\t{ToSide(trade.Amount)} {Math.Abs(trade.Amount)} at {trade.LimitPrice}");
-        Console.WriteLine();
-        Console.Write("Proceed? (y/n): ");
-
-        return Console.Read() == 'y'; // return Success;
-    }
-
-    private static void TradeResultOnNext(TradeResult result)
-    {
-        ConsoleWriteLine($"{result.Trade.AssetName}:\t{result.Order?.AmountRemaining/result.Order?.Amount:P0}");
-    }
-
+    
     private static void ConsoleWrite(string s)
     {
         if (!Silent)
             Console.Write(s);
     }
-
-    private static void ConsoleWriteLine(string s)
-    {
-        if (!Silent)
-            Console.WriteLine(s);
-    }
-
-    private static string ToSide(decimal amount) => amount >= 0 ? "Buy" : "Sell";
 }

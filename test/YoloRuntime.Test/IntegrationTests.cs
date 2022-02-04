@@ -19,6 +19,8 @@ using YoloAbstractions.Config;
 using YoloBroker.Ftx;
 using YoloTestUtils;
 using YoloTrades;
+using YoloWeights;
+using Weight = YoloAbstractions.Weight;
 
 namespace YoloRuntime.Test;
 
@@ -67,11 +69,11 @@ public class IntegrationTests
 
         var ftxBrokerLogger = new Mock<ILogger<FtxBroker>>();
         var broker = new FtxBroker(
-            ftxClient.Object, 
-            ftxSocketClient.Object, 
-            ftxBrokerLogger.Object, 
+            ftxClient.Object,
+            ftxSocketClient.Object,
+            ftxBrokerLogger.Object,
             assetPermissions,
-            quoteCurrency, 
+            quoteCurrency,
             postOnly);
 
         var tradeFactoryLogger = new Mock<ILogger<TradeFactory>>();
@@ -88,10 +90,12 @@ public class IntegrationTests
 
         var weights = (await $"{path}/weights.json".DeserializeAsync<Weight[]>())
             .ToDictionary(x => x.BaseAsset);
+        var weightsService = new Mock<IYoloWeightsService>();
+        weightsService.Setup(x => x.GetWeightsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(weights);
 
         var runtimeLogger = new Mock<ILogger<Runtime>>();
-        var runtime = new Runtime(broker, tradeFactory, yoloConfig, runtimeLogger.Object);
+        var runtime = new Runtime(weightsService.Object, broker, tradeFactory, yoloConfig, runtimeLogger.Object);
         runtime.TradeUpdates.Subscribe();
-        await runtime.Rebalance(weights, CancellationToken.None);
+        await runtime.RebalanceAsync(CancellationToken.None);
     }
 }

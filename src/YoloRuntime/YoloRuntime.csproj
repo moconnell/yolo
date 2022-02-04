@@ -9,6 +9,7 @@
     <ItemGroup>
       <ProjectReference Include="..\YoloBroker\YoloBroker.csproj" />
       <ProjectReference Include="..\YoloTrades\YoloTrades.csproj" />
+      <ProjectReference Include="..\YoloWeights\YoloWeights.csproj" />
     </ItemGroup>
 
     <ItemGroup>

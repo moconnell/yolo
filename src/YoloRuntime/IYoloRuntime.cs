@@ -4,8 +4,7 @@ namespace YoloRuntime;
 
 public interface IYoloRuntime : IDisposable
 {
-    Task Rebalance(IDictionary<string, Weight> weights, CancellationToken cancellationToken);
-
+    Task PlaceTradesAsync(IEnumerable<Trade> trades, CancellationToken cancellationToken);
+    Task RebalanceAsync(CancellationToken cancellationToken);
     IObservable<TradeResult> TradeUpdates { get; }
-    Func<IReadOnlyList<Trade>, bool> Challenge { get; set; }
 }

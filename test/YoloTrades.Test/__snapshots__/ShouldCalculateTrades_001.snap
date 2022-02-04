@@ -7,7 +7,9 @@
     "LimitPrice": 0.784975,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "cda5bff1-a030-46a9-8794-f2148a3f309c",
+    "IsTradable": true,
+    "Side": "Sell"
   },
   {
     "AssetName": "LINK/USD",
@@ -17,7 +19,9 @@
     "LimitPrice": 19.4420,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "aa460ecd-0093-4948-987f-83fb94d3d81e",
+    "IsTradable": true,
+    "Side": "Sell"
   },
   {
     "AssetName": "FTT-PERP",
@@ -27,7 +31,9 @@
     "LimitPrice": 43.1870,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "ecc64329-0df2-46ce-ba43-6490819935fd",
+    "IsTradable": true,
+    "Side": "Sell"
   },
   {
     "AssetName": "CRO-PERP",
@@ -37,7 +43,9 @@
     "LimitPrice": 0.548750,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "8915a973-f65e-468c-a79d-8bcebca8655d",
+    "IsTradable": true,
+    "Side": "Buy"
   },
   {
     "AssetName": "DOGE/USD",
@@ -47,7 +55,9 @@
     "LimitPrice": 0.1636025,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "cdd8e090-a8b4-4c9f-bca5-6b8f0af145d7",
+    "IsTradable": true,
+    "Side": "Sell"
   },
   {
     "AssetName": "ETH/USD",
@@ -57,6 +67,8 @@
     "LimitPrice": 3957.5,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "0e38e5ff-e684-463b-a8b0-c30a7f3ccb35",
+    "IsTradable": true,
+    "Side": "Buy"
   }
 ]

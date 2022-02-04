@@ -7,7 +7,9 @@
     "LimitPrice": 47.6755,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "9c43ec0f-e4fa-49ce-9dcf-eb7c182a1fe0",
+    "IsTradable": true,
+    "Side": "Sell"
   },
   {
     "AssetName": "ETH-PERP",
@@ -17,7 +19,9 @@
     "LimitPrice": 4054.0,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "c7051840-5529-44da-a1da-c4f168d4056a",
+    "IsTradable": true,
+    "Side": "Buy"
   },
   {
     "AssetName": "LTC-PERP",
@@ -27,7 +31,9 @@
     "LimitPrice": 192.42,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "c32580db-2025-45eb-8531-a3c336e36152",
+    "IsTradable": true,
+    "Side": "Buy"
   },
   {
     "AssetName": "DOGE-PERP",
@@ -37,7 +43,9 @@
     "LimitPrice": 0.2032005,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "814970c1-938c-4f5f-8642-28dba6d13c6c",
+    "IsTradable": true,
+    "Side": "Sell"
   },
   {
     "AssetName": "CRO/USD",
@@ -47,7 +55,9 @@
     "LimitPrice": 0.787100,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "0206bb87-5149-42d0-94cd-4cea707083b7",
+    "IsTradable": true,
+    "Side": "Buy"
   },
   {
     "AssetName": "BCH/USD",
@@ -57,7 +67,9 @@
     "LimitPrice": 558.700,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "5856b5b3-b92a-4741-83d8-8a41472d2efd",
+    "IsTradable": true,
+    "Side": "Buy"
   },
   {
     "AssetName": "UNI-PERP",
@@ -67,7 +79,9 @@
     "LimitPrice": 19.283,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "aca14e1d-3015-4b49-8007-5fcfe63f8c14",
+    "IsTradable": true,
+    "Side": "Sell"
   },
   {
     "AssetName": "LINK-PERP",
@@ -77,6 +91,8 @@
     "LimitPrice": 23.9525,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "d05506eb-a744-4966-993a-6f3703799e30",
+    "IsTradable": true,
+    "Side": "Sell"
   }
 ]

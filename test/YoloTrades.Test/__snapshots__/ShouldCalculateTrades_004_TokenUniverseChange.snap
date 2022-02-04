@@ -7,7 +7,9 @@
     "LimitPrice": 19.3660,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "34295b09-c776-4dbd-82da-0a5262c74394",
+    "IsTradable": true,
+    "Side": "Sell"
   },
   {
     "AssetName": "UNI/USD",
@@ -17,7 +19,9 @@
     "LimitPrice": 15.813,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "f7a18b2f-0c9f-4c9f-b4f1-172c5002b19a",
+    "IsTradable": true,
+    "Side": "Sell"
   },
   {
     "AssetName": "FTX-PERP",
@@ -27,7 +31,9 @@
     "LimitPrice": 39.8090,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "710704db-e761-434b-9b82-dccba308ddff",
+    "IsTradable": true,
+    "Side": "Sell"
   },
   {
     "AssetName": "LTC/USD",
@@ -37,7 +43,9 @@
     "LimitPrice": 148.800,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "f228c353-6a84-4d6d-931e-f5c25d41e6ff",
+    "IsTradable": true,
+    "Side": "Sell"
   },
   {
     "AssetName": "BCH/USD",
@@ -47,7 +55,9 @@
     "LimitPrice": 434.325,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "264dcb55-55c8-4a33-938d-0ed841023f0c",
+    "IsTradable": true,
+    "Side": "Sell"
   },
   {
     "AssetName": "ETH-PERP",
@@ -57,7 +67,9 @@
     "LimitPrice": 3942.8,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "7dbb8746-b7d1-46ae-9311-16ce7a481f32",
+    "IsTradable": true,
+    "Side": "Buy"
   },
   {
     "AssetName": "BTC/USD",
@@ -67,7 +79,9 @@
     "LimitPrice": 46735.0,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "dd6f0a77-f96f-4fa8-8792-5d3a777c5284",
+    "IsTradable": true,
+    "Side": "Sell"
   },
   {
     "AssetName": "FTT-PERP",
@@ -77,7 +91,9 @@
     "LimitPrice": 39.8090,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "2f158021-3fa7-498c-8c21-ef5defe501c6",
+    "IsTradable": true,
+    "Side": "Sell"
   },
   {
     "AssetName": "CRO-PERP",
@@ -87,6 +103,8 @@
     "LimitPrice": 0.526425,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "682ca107-27ca-453f-a9ee-4a1c2b8dea7c",
+    "IsTradable": true,
+    "Side": "Sell"
   }
 ]
