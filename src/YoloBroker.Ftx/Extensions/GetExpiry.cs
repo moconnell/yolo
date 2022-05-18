@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using FTX.Net.Enums;
 using FTX.Net.Objects;
+using FTX.Net.Objects.Models;
 
 namespace YoloBroker.Ftx.Extensions;
 

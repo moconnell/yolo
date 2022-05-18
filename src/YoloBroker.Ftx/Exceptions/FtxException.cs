@@ -1,5 +1,6 @@
 using CryptoExchange.Net.Objects;
 using FTX.Net.Objects;
+using FTX.Net.Objects.Models;
 using YoloAbstractions;
 using static System.Environment;
 

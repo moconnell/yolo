@@ -1,4 +1,5 @@
 using FTX.Net.Objects;
+using FTX.Net.Objects.Models;
 using YoloAbstractions;
 
 namespace YoloBroker.Ftx.Extensions;
@@ -10,13 +11,13 @@ public static partial class FtxExtensions
             ? new Order(
                 order.Id,
                 order.Symbol,
-                order.CreatedAt,
+                order.CreateTime,
                 order.Side.ToOrderSide(),
-                order.Status.ToOrderStatus(order.RemainingQuantity),
+                order.Status.ToOrderStatus(order.QuantityRemaining),
                 order.Quantity,
-                order.RemainingQuantity,
-                order.OrderPrice,
-                order.ClientId
+                order.QuantityRemaining,
+                order.Price,
+                order.ClientOrderId
             )
             : null;
 }

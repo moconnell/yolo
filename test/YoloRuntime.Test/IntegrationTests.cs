@@ -4,19 +4,20 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using CryptoExchange.Net;
 using CryptoExchange.Net.Interfaces;
 using CryptoExchange.Net.Objects;
 using CryptoExchange.Net.Sockets;
-using FTX.Net.Interfaces;
-using FTX.Net.Objects;
-using FTX.Net.Objects.Futures;
-using FTX.Net.Objects.SocketObjects;
+using FTX.Net.Interfaces.Clients;
+using FTX.Net.Objects.Models;
+using FTX.Net.Objects.Models.Socket;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 using YoloAbstractions;
 using YoloAbstractions.Config;
 using YoloBroker.Ftx;
+using YoloRuntime.Test.Mocks;
 using YoloTestUtils;
 using YoloTrades;
 using YoloWeights;
@@ -37,17 +38,20 @@ public class IntegrationTests
         bool postOnly = true,
         string quoteCurrency = "USD")
     {
-        async Task<WebCallResult<IEnumerable<T>>> Response<T>(string file) =>
-            new(HttpStatusCode.OK, null, await $"{path}/{file}".DeserializeAsync<T[]>(), null);
+        async Task<WebCallResult<IEnumerable<T>>> Response<T>(string file)
+        {
+            var data = await $"{path}/{file}".DeserializeAsync<T[]>();
+            return new(HttpStatusCode.OK, null, null, null, null, null, null, null, data, null);
+        }
 
         var ftxClient = new Mock<IFTXClient>();
-        ftxClient.Setup(x => x.GetOpenOrdersAsync(null, null, It.IsAny<CancellationToken>()))
+        ftxClient.Setup(x => x.TradeApi.Trading.GetOpenOrdersAsync(null, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(await Response<FTXOrder>("openorders.json"));
-        ftxClient.Setup(x => x.GetPositionsAsync(null, null, It.IsAny<CancellationToken>()))
+        ftxClient.Setup(x => x.TradeApi.Account.GetPositionsAsync(null, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(await Response<FTXPosition>("positions.json"));
-        ftxClient.Setup(x => x.GetBalancesAsync(null, It.IsAny<CancellationToken>()))
+        ftxClient.Setup(x => x.TradeApi.Account.GetBalancesAsync(null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(await Response<FTXBalance>("balances.json"));
-        ftxClient.Setup(x => x.GetSymbolsAsync(It.IsAny<CancellationToken>()))
+        ftxClient.Setup(x => x.TradeApi.ExchangeData.GetSymbolsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(await Response<FTXSymbol>("symbols.json"));
 
         Action<DataEvent<FTXOrder>> orderUpdateHandler = _ => { };
@@ -55,14 +59,20 @@ public class IntegrationTests
         var mockWebSocket = new Mock<IWebsocket>();
         var tickerUpdateHandlers = new Dictionary<string, Action<DataEvent<FTXStreamTicker>>>();
 
+        var mockUpdateSubscription = new Mock<UpdateSubscription>();
+
         var ftxSocketClient = new Mock<IFTXSocketClient>();
         ftxSocketClient
-            .Setup(x => x.SubscribeToOrderUpdatesAsync(It.IsAny<Action<DataEvent<FTXOrder>>>()))
-            .Callback<Action<DataEvent<FTXOrder>>>(handler => { orderUpdateHandler = handler; })
-            .ReturnsAsync(new CallResult<UpdateSubscription>(null, null));
+            .Setup(x => x.Streams.SubscribeToOrderUpdatesAsync(It.IsAny<Action<DataEvent<FTXOrder>>>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<Action<DataEvent<FTXOrder>>, CancellationToken>((handler, _) => { orderUpdateHandler = handler; })
+            .ReturnsAsync(new CallResult<UpdateSubscription>(new MockUpdateSubscription()));
+
         ftxSocketClient.Setup(x =>
-                x.SubscribeToTickerUpdatesAsync(It.IsAny<string>(), It.IsAny<Action<DataEvent<FTXStreamTicker>>>()))
-            .Callback<string, Action<DataEvent<FTXStreamTicker>>>((symbol, handler) =>
+                x.Streams.SubscribeToTickerUpdatesAsync(It.IsAny<string>(),
+                    It.IsAny<Action<DataEvent<FTXStreamTicker>>>(),
+                    It.IsAny<CancellationToken>()))
+            .Callback<string, Action<DataEvent<FTXStreamTicker>>, CancellationToken>((symbol, handler, _) =>
             {
                 tickerUpdateHandlers[symbol] = handler;
             });
