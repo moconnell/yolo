@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "baseCurrency": "BTC",
+    "quoteCurrency": "USD",
+    "type": "spot",
+    "priceIncrement": 1.0,
+    "sizeIncrement": 0.0001,
+    "MinProvideSize": 0,
+    "ask": 47503.0,
+    "bid": 47502.0,
+    "last": 47491.0,
+    "price": 47491.0
+  }
+]

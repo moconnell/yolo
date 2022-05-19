@@ -1,0 +1,20 @@
+﻿[
+  {
+    "Trade": {
+      "AssetName": "",
+      "AssetType": "Spot",
+      "BaseAsset": "BTC",
+      "Amount": -10.0010,
+      "LimitPrice": 47503.0,
+      "PostPrice": true,
+      "Expiry": null,
+      "Id": "16ba1ceb-7d83-45c9-9b3a-da13369eca58",
+      "IsTradable": true,
+      "Side": "Sell"
+    },
+    "Success": null,
+    "Order": null,
+    "Error": null,
+    "ErrorCode": null
+  }
+]

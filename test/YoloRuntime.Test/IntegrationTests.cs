@@ -2,10 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using CryptoExchange.Net;
-using CryptoExchange.Net.Interfaces;
 using CryptoExchange.Net.Objects;
 using CryptoExchange.Net.Sockets;
 using FTX.Net.Interfaces.Clients;
@@ -13,6 +12,7 @@ using FTX.Net.Objects.Models;
 using FTX.Net.Objects.Models.Socket;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Snapshooter.Xunit;
 using Xunit;
 using YoloAbstractions;
 using YoloAbstractions.Config;
@@ -38,6 +38,7 @@ public class IntegrationTests
         bool postOnly = true,
         string quoteCurrency = "USD")
     {
+        // arrange
         async Task<WebCallResult<IEnumerable<T>>> Response<T>(string file)
         {
             var data = await $"{path}/{file}".DeserializeAsync<T[]>();
@@ -103,7 +104,16 @@ public class IntegrationTests
 
         var runtimeLogger = new Mock<ILogger<Runtime>>();
         var runtime = new Runtime(weightsService.Object, broker, tradeFactory, yoloConfig, runtimeLogger.Object);
-        runtime.TradeUpdates.Subscribe();
+        var tradeResults = new List<TradeResult>();
+        runtime.TradeUpdates.Subscribe(tradeResults.Add);
+
+        // act
         await runtime.RebalanceAsync(CancellationToken.None);
+
+        // assert
+        tradeResults.MatchSnapshot(
+            $"ShouldCalculateTrades_{path.Replace("/", "_")}",
+            options => options.IgnoreFields("[*].Trade.Id")
+        );
     }
 }

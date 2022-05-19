@@ -9,7 +9,7 @@ public record ProjectedPosition(MarketInfo Market, decimal Position, decimal Nom
 {
     public decimal? ProjectedWeight => CurrentWeight + (Trades?.Sum(CalcWeight) ?? 0);
 
-    public bool HasPosition => ProjectedWeight != 0;
+    public bool HasPosition => ProjectedWeight.HasValue && ProjectedWeight != 0;
 
     private decimal? CurrentWeight => CalcWeight(Position);
 
