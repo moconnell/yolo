@@ -12,5 +12,4 @@ public static partial class LoggerExtensions
     public static partial void OrderCancelled(
         this ILogger logger,
         Order order);
-    
 }

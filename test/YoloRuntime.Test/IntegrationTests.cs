@@ -55,27 +55,25 @@ public class IntegrationTests
             .ReturnsAsync(await Response<FTXSymbol>("symbols.json"));
 
         Action<DataEvent<FTXOrder>> orderUpdateHandler = _ => { };
-        var mockSocketClient = new Mock<ISocketClient>();
-        var mockWebSocket = new Mock<IWebsocket>();
         var tickerUpdateHandlers = new Dictionary<string, Action<DataEvent<FTXStreamTicker>>>();
-
-        var mockUpdateSubscription = new Mock<UpdateSubscription>();
 
         var ftxSocketClient = new Mock<IFTXSocketClient>();
         ftxSocketClient
-            .Setup(x => x.Streams.SubscribeToOrderUpdatesAsync(It.IsAny<Action<DataEvent<FTXOrder>>>(),
-                It.IsAny<CancellationToken>()))
+            .Setup(
+                x => x.Streams.SubscribeToOrderUpdatesAsync(
+                    It.IsAny<Action<DataEvent<FTXOrder>>>(),
+                    It.IsAny<CancellationToken>()))
             .Callback<Action<DataEvent<FTXOrder>>, CancellationToken>((handler, _) => { orderUpdateHandler = handler; })
             .ReturnsAsync(new CallResult<UpdateSubscription>(new MockUpdateSubscription()));
 
-        ftxSocketClient.Setup(x =>
-                x.Streams.SubscribeToTickerUpdatesAsync(It.IsAny<string>(),
-                    It.IsAny<Action<DataEvent<FTXStreamTicker>>>(),
-                    It.IsAny<CancellationToken>()))
-            .Callback<string, Action<DataEvent<FTXStreamTicker>>, CancellationToken>((symbol, handler, _) =>
-            {
-                tickerUpdateHandlers[symbol] = handler;
-            });
+        ftxSocketClient.Setup(
+                x =>
+                    x.Streams.SubscribeToTickerUpdatesAsync(
+                        It.IsAny<string>(),
+                        It.IsAny<Action<DataEvent<FTXStreamTicker>>>(),
+                        It.IsAny<CancellationToken>()))
+            .Callback<string, Action<DataEvent<FTXStreamTicker>>, CancellationToken>(
+                (symbol, handler, _) => { tickerUpdateHandlers[symbol] = handler; });
 
         var ftxBrokerLogger = new Mock<ILogger<FtxBroker>>();
         var broker = new FtxBroker(

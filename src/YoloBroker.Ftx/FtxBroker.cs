@@ -48,7 +48,8 @@ public class FtxBroker : IYoloBroker
     }
 
     public FtxBroker(FtxConfig ftxConfig, YoloConfig yoloConfig, ILogger<FtxBroker> logger)
-        : this(new FTXClient(
+        : this(
+            new FTXClient(
                 new FTXClientOptions
                 {
                     ApiCredentials = new ApiCredentials(ftxConfig.ApiKey, ftxConfig.Secret),
@@ -161,7 +162,8 @@ public class FtxBroker : IYoloBroker
     public async Task<Dictionary<long, Order>> GetOrdersAsync(CancellationToken ct)
     {
         var orders =
-            await GetDataAsync(() => _ftxClient.TradeApi.Trading.GetOpenOrdersAsync(ct: ct),
+            await GetDataAsync(
+                () => _ftxClient.TradeApi.Trading.GetOpenOrdersAsync(ct: ct),
                 "Could not get open orders");
 
         return orders.ToDictionary(x => x.Id, x => x.ToOrder()!);
@@ -171,7 +173,8 @@ public class FtxBroker : IYoloBroker
         CancellationToken ct = default)
     {
         var positions =
-            await GetDataAsync(() => _ftxClient.TradeApi.Account.GetPositionsAsync(ct: ct),
+            await GetDataAsync(
+                () => _ftxClient.TradeApi.Account.GetPositionsAsync(ct: ct),
                 "Could not get account info");
 
         var result = new Dictionary<string, IEnumerable<Position>>();
@@ -246,7 +249,8 @@ public class FtxBroker : IYoloBroker
                     AssetPermissions.PerpetualFutures),
                 SymbolType.Spot => _assetPermissions.HasFlag(AssetPermissions.LongSpot) ||
                                    _assetPermissions.HasFlag(AssetPermissions.ShortSpot),
-                _ => throw new ArgumentOutOfRangeException(nameof(s.Type),
+                _ => throw new ArgumentOutOfRangeException(
+                    nameof(s.Type),
                     s.Type,
                     "unknown asset type")
             };
@@ -309,11 +313,13 @@ public class FtxBroker : IYoloBroker
             return;
         }
 
-        _marketUpdatesSubject.OnNext(ToMarketInfo(symbol,
-            e.Data.BestAskPrice,
-            e.Data.BestBidPrice,
-            e.Data.LastPrice,
-            e.Timestamp));
+        _marketUpdatesSubject.OnNext(
+            ToMarketInfo(
+                symbol,
+                e.Data.BestAskPrice,
+                e.Data.BestBidPrice,
+                e.Data.LastPrice,
+                e.Timestamp));
     }
 
     private async Task SubscribeOrderUpdates()

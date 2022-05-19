@@ -34,7 +34,8 @@ internal class Program
 
         Arguments.Populate();
 
-        ConsoleWrite(@"
+        ConsoleWrite(
+            @"
 __  ______  __    ____  __
 \ \/ / __ \/ /   / __ \/ /
  \  / / / / /   / / / / / 
@@ -56,8 +57,9 @@ __  ______  __    ____  __
             var yoloConfig = config.GetYoloConfig();
 
             var serviceProvider = new ServiceCollection()
-                .AddLogging(loggingBuilder => loggingBuilder
-                    .AddFile(config.GetSection("Logging")))
+                .AddLogging(
+                    loggingBuilder => loggingBuilder
+                        .AddFile(config.GetSection("Logging")))
                 .AddBroker(config)
                 .AddSingleton(config.GetYoloConfig())
                 .AddSingleton<IYoloWeightsService, YoloWeightsService>()
@@ -97,7 +99,7 @@ __  ______  __    ____  __
             _logger?.LogInformation("************ YOLO ended ************");
         }
     }
-    
+
     private static void ConsoleWrite(string s)
     {
         if (!Silent)

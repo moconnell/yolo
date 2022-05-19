@@ -11,7 +11,9 @@ public static partial class LoggerExtensions
         EventId = TradeEventIds.CalculateTrades,
         Level = LogLevel.Debug,
         Message = "CalculateTrades: weights = {Weights}")]
-    public static partial void CalculateTrades(this ILogger logger, IDictionary<string, (Weight weight, bool isInUniverse)> weights);
+    public static partial void CalculateTrades(
+        this ILogger logger,
+        IDictionary<string, (Weight weight, bool isInUniverse)> weights);
 
     [LoggerMessage(
         EventId = TradeEventIds.Weight,

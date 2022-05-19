@@ -42,11 +42,13 @@ public static partial class FtxExtensions
 
         var match = FutureQuarterlyExpiryRegex.Match(name);
 
-        var year = Convert.ToInt32(match.Groups["year"]
-            .Value);
+        var year = Convert.ToInt32(
+            match.Groups["year"]
+                .Value);
 
-        var q = Convert.ToInt32(match.Groups["quarter"]
-            .Value);
+        var q = Convert.ToInt32(
+            match.Groups["quarter"]
+                .Value);
 
         var month = q * 3;
 
@@ -57,11 +59,13 @@ public static partial class FtxExtensions
     {
         var match = FutureMonthDayExpiryRegex.Match(name);
 
-        var month = Convert.ToInt32(match.Groups["month"]
-            .Value);
+        var month = Convert.ToInt32(
+            match.Groups["month"]
+                .Value);
 
-        var day = Convert.ToInt32(match.Groups["day"]
-            .Value);
+        var day = Convert.ToInt32(
+            match.Groups["day"]
+                .Value);
 
         return new DateTime(DateTime.Now.Year, month, day);
     }

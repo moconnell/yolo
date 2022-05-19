@@ -1,3 +1,9 @@
 namespace YoloAbstractions;
 
-public enum OrderStatus { New, Open, Filled, Cancelled }
+public enum OrderStatus
+{
+    New,
+    Open,
+    Filled,
+    Cancelled
+}

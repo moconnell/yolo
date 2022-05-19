@@ -32,21 +32,22 @@ public class YoloViewModel : ReactiveObject, IDisposable
             .Throttle(TimeSpan.FromMilliseconds(250))
             .ToObservableChangeSet(x => x.Trade.Id)
             .AsObservableCache();
-        
+
         _tradeUpdatesSubscription = TradeUpdates
             .Connect()
-            .Subscribe(x =>
-            {
-                var canSubmit = TradeUpdates.Items.Any(y => y.Order is null);
-                _canSubmitSubject.OnNext(canSubmit);
-            });
+            .Subscribe(
+                x =>
+                {
+                    var canSubmit = TradeUpdates.Items.Any(y => y.Order is null);
+                    _canSubmitSubject.OnNext(canSubmit);
+                });
 
         Submit = ReactiveCommand.CreateFromTask(
             () =>
             {
                 _canSubmitSubject.OnNext(false);
                 return _yoloRuntime.PlaceTradesAsync(Trades, cancellationTokenSource.Token);
-            }, 
+            },
             _canSubmitSubject);
         Cancel = ReactiveCommand.Create(cancellationTokenSource.Cancel);
     }

@@ -54,14 +54,15 @@ public class TradeFactoryTests
         Assert.Equal(expectedTrades.Count, trades.Length);
 
         var tradesWithDeviatingQuantity = trades
-            .Select(t =>
-            {
-                var baseAsset = t.AssetName.Split('-', '/')[0];
-                var expectedTradeQuantity = expectedTrades[baseAsset];
+            .Select(
+                t =>
+                {
+                    var baseAsset = t.AssetName.Split('-', '/')[0];
+                    var expectedTradeQuantity = expectedTrades[baseAsset];
 
-                return (baseAsset, expectedTradeQuantity, t.Amount,
-                    deviation: t.Amount - expectedTradeQuantity);
-            })
+                    return (baseAsset, expectedTradeQuantity, t.Amount,
+                        deviation: t.Amount - expectedTradeQuantity);
+                })
             .Where(tuple => Math.Abs(tuple.deviation) > stepSize)
             .ToArray();
 

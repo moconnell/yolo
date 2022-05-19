@@ -4,9 +4,7 @@ namespace YoloWeights;
 
 public class WeightsResponse
 {
-    [JsonPropertyName("data")]
-    public Weight[] Data { get; set; }
+    [JsonPropertyName("data")] public Weight[] Data { get; set; }
 
-    [JsonPropertyName("success")]
-    public string Success { get; set; }
+    [JsonPropertyName("success")] public string Success { get; set; }
 }
