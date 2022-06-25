@@ -151,11 +151,6 @@ public class FtxBroker : IYoloBroker
                 result.Error?.Code);
 
             yield return tradeResult;
-
-            if (order is null)
-                continue;
-
-            OnNext(new OrderUpdate(trade, order));
         }
     }
 
@@ -336,7 +331,7 @@ public class FtxBroker : IYoloBroker
         LogData(e.Data);
 
         if (_orderUpdates.TryGetValue(e.Data.Id, out var orderUpdate))
-            OnNext(new OrderUpdate(orderUpdate.Trade, e.Data.ToOrder()!));
+            OnNext(orderUpdate with { Order = e.Data.ToOrder()! });
     }
 
     private void OnNext(OrderUpdate orderUpdate)
@@ -345,7 +340,7 @@ public class FtxBroker : IYoloBroker
         _orderUpdatesSubject.OnNext(orderUpdate);
     }
 
-    protected void Dispose(bool disposing)
+    private void Dispose(bool disposing)
     {
         if (_disposed)
             return;
