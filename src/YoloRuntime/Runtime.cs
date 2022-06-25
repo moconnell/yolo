@@ -61,7 +61,7 @@ public class Runtime : IYoloRuntime
 
     public IObservable<TradeResult> TradeUpdates => _tradeResultsSubject;
 
-    public async Task RebalanceAsync(CancellationToken cancellationToken)
+    public async Task<IEnumerable<Trade>> RebalanceAsync(CancellationToken cancellationToken)
     {
         _cancellationToken = cancellationToken;
 
@@ -86,7 +86,7 @@ public class Runtime : IYoloRuntime
 
         markets.CopyTo(_cachedMarkets);
 
-        await CalculateTradesAsync(cancellationToken);
+        return await CalculateTradesAsync(cancellationToken);
     }
 
     public void Dispose()
