@@ -1,7 +1,7 @@
 ﻿[
   {
     "Trade": {
-      "AssetName": "",
+d      "AssetName": "BTC/USD",
       "AssetType": "Spot",
       "BaseAsset": "BTC",
       "Amount": -10.0010,

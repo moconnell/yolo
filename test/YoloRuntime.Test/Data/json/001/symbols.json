@@ -2,6 +2,7 @@
   {
     "baseCurrency": "BTC",
     "quoteCurrency": "USD",
+    "Name": "BTC/USD",
     "type": "spot",
     "priceIncrement": 1.0,
     "sizeIncrement": 0.0001,

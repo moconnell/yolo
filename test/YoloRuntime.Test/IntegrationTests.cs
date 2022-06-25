@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using CryptoExchange.Net.Objects;
 using CryptoExchange.Net.Sockets;
+using FTX.Net.Enums;
 using FTX.Net.Interfaces.Clients;
 using FTX.Net.Objects.Models;
 using FTX.Net.Objects.Models.Socket;
@@ -16,10 +16,12 @@ using Xunit;
 using YoloAbstractions;
 using YoloAbstractions.Config;
 using YoloBroker.Ftx;
+using YoloRuntime.Test.Data;
 using YoloRuntime.Test.Mocks;
 using YoloTestUtils;
 using YoloTrades;
 using YoloWeights;
+using OrderStatus = FTX.Net.Enums.OrderStatus;
 using Weight = YoloAbstractions.Weight;
 
 namespace YoloRuntime.Test;
@@ -38,10 +40,10 @@ public class IntegrationTests
         string quoteCurrency = "USD")
     {
         // arrange
-        async Task<WebCallResult<IEnumerable<T>>> Response<T>(string file)
+        async Task<WebCallResult<IEnumerable<T>?>> Response<T>(string file)
         {
-            var data = await $"{path}/{file}".DeserializeAsync<T[]>();
-            return new(HttpStatusCode.OK, null, null, null, null, null, null, null, data, null);
+            var data = (await $"{path}/{file}".DeserializeAsync<T[]>())?.AsEnumerable();
+            return data.ToWebCallResult();
         }
 
         var ftxClient = new Mock<IFTXClient>();
@@ -53,6 +55,48 @@ public class IntegrationTests
             .ReturnsAsync(await Response<FTXBalance>("balances.json"));
         ftxClient.Setup(x => x.TradeApi.ExchangeData.GetSymbolsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(await Response<FTXSymbol>("symbols.json"));
+        ftxClient.Setup(
+                x => x.TradeApi.Trading.PlaceOrderAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<FTX.Net.Enums.OrderSide>(),
+                    It.IsAny<OrderType>(),
+                    It.IsAny<decimal>(),
+                    It.IsAny<decimal?>(),
+                    It.IsAny<bool?>(),
+                    It.IsAny<bool?>(),
+                    It.IsAny<bool?>(),
+                    It.IsAny<string?>(),
+                    It.IsAny<bool?>(),
+                    It.IsAny<string?>(),
+                    It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                (
+                        string symbol,
+                        FTX.Net.Enums.OrderSide side,
+                        OrderType type,
+                        decimal quantity,
+                        decimal? price,
+                        bool? reduceOnly,
+                        bool? immediateOrCancel,
+                        bool? postOnly,
+                        string? clientOrderId,
+                        bool? _,
+                        string? _,
+                        CancellationToken _) =>
+                    new FTXOrder
+                    {
+                        Symbol = symbol,
+                        Side = side,
+                        Type = type,
+                        Quantity = quantity,
+                        QuantityRemaining = quantity,
+                        Price = price,
+                        ReduceOnly = reduceOnly.GetValueOrDefault(),
+                        ImmediateOrCancel = immediateOrCancel.GetValueOrDefault(),
+                        PostOnly = postOnly.GetValueOrDefault(),
+                        ClientOrderId = clientOrderId,
+                        Status = OrderStatus.New
+                    }.ToWebCallResult());
 
         Action<DataEvent<FTXOrder>> orderUpdateHandler = _ => { };
         var tickerUpdateHandlers = new Dictionary<string, Action<DataEvent<FTXStreamTicker>>>();
@@ -106,8 +150,35 @@ public class IntegrationTests
         var tradeResults = new List<TradeResult>();
         runtime.TradeUpdates.Subscribe(tradeResults.Add);
 
+        (DateTime timestamp, Action action) ToTimeStampedAction<T>(TestDataEvent<T> e, Action<DataEvent<T>> action) =>
+            (e.Timestamp, () => action(e.ToDataEvent()));
+
+        var orderUpdates =
+            (await $"{path}/streams/orders.json".DeserializeAsync<TestDataEvent<FTXOrder>[]>())
+            .Select(e => ToTimeStampedAction(e, orderUpdateHandler));
+        var tickerUpdates = (await $"{path}/streams/tickers.json".DeserializeAsync<TestDataEvent<FTXStreamTicker>[]>())
+            .Select(e => ToTimeStampedAction(e, de => tickerUpdateHandlers[de.Topic](de)));
+        var updates = orderUpdates.Union(tickerUpdates).OrderBy(x => x.timestamp);
+
         // act
-        await runtime.RebalanceAsync(CancellationToken.None);
+        var trades = await runtime.RebalanceAsync(CancellationToken.None);
+
+        var tradesTask = Task.Factory
+            .StartNew(async () => await runtime.PlaceTradesAsync(trades, CancellationToken.None))
+            .Unwrap();
+
+        var updatesTask = Task.Factory.StartNew(
+                async () =>
+                {
+                    foreach (var (_, action) in updates)
+                    {
+                        await Task.Delay(50);
+                        action();
+                    }
+                })
+            .Unwrap();
+
+        await Task.WhenAll(updatesTask, tradesTask);
 
         // assert
         tradeResults.MatchSnapshot(

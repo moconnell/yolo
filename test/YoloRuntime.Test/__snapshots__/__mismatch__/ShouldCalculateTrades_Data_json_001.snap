@@ -1,0 +1,49 @@
+﻿[
+  {
+    "Trade": {
+      "AssetName": "BTC/USD",
+      "AssetType": "Spot",
+      "BaseAsset": "BTC",
+      "Amount": -10.0010,
+      "LimitPrice": 47503.0,
+      "PostPrice": true,
+      "Expiry": null,
+      "Id": "8d08aed0-0db3-4416-8a62-4a971248f7f5",
+      "IsTradable": true,
+      "Side": "Sell"
+    },
+    "Success": null,
+    "Order": null,
+    "Error": null,
+    "ErrorCode": null
+  },
+  {
+    "Trade": {
+      "AssetName": "BTC/USD",
+      "AssetType": "Spot",
+      "BaseAsset": "BTC",
+      "Amount": -10.0010,
+      "LimitPrice": 47503.0,
+      "PostPrice": true,
+      "Expiry": null,
+      "Id": "8d08aed0-0db3-4416-8a62-4a971248f7f5",
+      "IsTradable": true,
+      "Side": "Sell"
+    },
+    "Success": true,
+    "Order": {
+      "Id": 0,
+      "AssetName": "BTC/USD",
+      "Created": "0001-01-01T00:00:00",
+      "OrderSide": "Sell",
+      "OrderStatus": "New",
+      "Amount": 10.0010,
+      "AmountRemaining": 10.0010,
+      "LimitPrice": 47503.0,
+      "ClientId": null,
+      "Completed": 0.0
+    },
+    "Error": null,
+    "ErrorCode": null
+  }
+]

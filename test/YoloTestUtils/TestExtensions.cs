@@ -1,4 +1,6 @@
-﻿using Newtonsoft.Json;
+﻿using System.Net;
+using CryptoExchange.Net.Objects;
+using Newtonsoft.Json;
 
 namespace YoloTestUtils;
 
@@ -12,7 +14,7 @@ public static class TestExtensions
             kvp => kvp.Value.Cast<TValue>());
     }
 
-    public static async Task<T> DeserializeAsync<T>(this string path)
+    public static async Task<T?> DeserializeAsync<T>(this string path)
     {
         await using var stream = File.OpenRead(path);
         using var streamReader = new StreamReader(stream);
@@ -20,4 +22,16 @@ public static class TestExtensions
 
         return JsonConvert.DeserializeObject<T>(json);
     }
+
+    public static WebCallResult<T> ToWebCallResult<T>(this T data) => new(
+        HttpStatusCode.OK,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        data,
+        null);
 }
