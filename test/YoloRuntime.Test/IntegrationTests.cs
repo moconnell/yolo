@@ -46,6 +46,8 @@ public class IntegrationTests
             return data.ToWebCallResult();
         }
 
+        var ftxOrderId = 1;
+
         var ftxClient = new Mock<IFTXClient>();
         ftxClient.Setup(x => x.TradeApi.Trading.GetOpenOrdersAsync(null, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(await Response<FTXOrder>("openorders.json"));
@@ -85,6 +87,7 @@ public class IntegrationTests
                         CancellationToken _) =>
                     new FTXOrder
                     {
+                        Id = ftxOrderId++,
                         Symbol = symbol,
                         Side = side,
                         Type = type,
@@ -98,7 +101,7 @@ public class IntegrationTests
                         Status = OrderStatus.New
                     }.ToWebCallResult());
 
-        Action<DataEvent<FTXOrder>> orderUpdateHandler = _ => { };
+        List<Action<DataEvent<FTXOrder>>> orderUpdateHandlers = new List<Action<DataEvent<FTXOrder>>>();
         var tickerUpdateHandlers = new Dictionary<string, Action<DataEvent<FTXStreamTicker>>>();
 
         var ftxSocketClient = new Mock<IFTXSocketClient>();
@@ -107,7 +110,8 @@ public class IntegrationTests
                 x => x.Streams.SubscribeToOrderUpdatesAsync(
                     It.IsAny<Action<DataEvent<FTXOrder>>>(),
                     It.IsAny<CancellationToken>()))
-            .Callback<Action<DataEvent<FTXOrder>>, CancellationToken>((handler, _) => { orderUpdateHandler = handler; })
+            .Callback<Action<DataEvent<FTXOrder>>, CancellationToken>(
+                (handler, _) => { orderUpdateHandlers.Add(handler); })
             .ReturnsAsync(new CallResult<UpdateSubscription>(new MockUpdateSubscription()));
 
         ftxSocketClient.Setup(
@@ -155,7 +159,7 @@ public class IntegrationTests
 
         var orderUpdates =
             (await $"{path}/streams/orders.json".DeserializeAsync<TestDataEvent<FTXOrder>[]>())
-            .Select(e => ToTimeStampedAction(e, orderUpdateHandler));
+            .Select(e => ToTimeStampedAction(e, dataEvent => orderUpdateHandlers.ForEach(x => x(dataEvent))));
         var tickerUpdates = (await $"{path}/streams/tickers.json".DeserializeAsync<TestDataEvent<FTXStreamTicker>[]>())
             .Select(e => ToTimeStampedAction(e, de => tickerUpdateHandlers[de.Topic](de)));
         var updates = orderUpdates.Union(tickerUpdates).OrderBy(x => x.timestamp);

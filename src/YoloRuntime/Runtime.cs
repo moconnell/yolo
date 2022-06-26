@@ -101,13 +101,16 @@ public class Runtime : IYoloRuntime
 
         if (UnfilledOrderTimeout.HasValue)
         {
-            while (!AllFilled)
+            do
             {
                 await Task.Delay(UnfilledOrderTimeout.Value, cancellationToken);
+                if (AllFilled)
+                    return;
+                
                 await CancelOrdersAsync(UnfilledOrders);
                 var newTrades = await CalculateTradesAsync(cancellationToken);
                 await PlaceTradesImplAsync(newTrades, cancellationToken);
-            }
+            } while (!AllFilled);
         }
     }
 
@@ -124,7 +127,7 @@ public class Runtime : IYoloRuntime
         var weights = await _weightsService.GetWeightsAsync(cancellationToken);
         _cachedWeights.Clear();
         weights.CopyTo(_cachedWeights);
-        
+
         return CalculateTrades(weights);
     }
 

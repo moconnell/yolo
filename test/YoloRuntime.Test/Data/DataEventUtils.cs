@@ -12,7 +12,7 @@ public static class DataEventUtils
     {
         var type = typeof(T);
 
-        return (T?) type.Assembly.CreateInstance(
+        var instance = (T?) type.Assembly.CreateInstance(
             type.FullName,
             false,
             BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public,
@@ -20,5 +20,7 @@ public static class DataEventUtils
             args,
             null,
             null);
+        
+        return instance;
     }
 }

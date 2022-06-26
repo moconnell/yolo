@@ -143,13 +143,17 @@ public class FtxBroker : IYoloBroker
             LogData(result);
 
             var order = result.Data.ToOrder();
+            
+            if (order is {})
+                _orderUpdates[order.Id] = new OrderUpdate(trade, order);
+            
             var tradeResult = new TradeResult(
                 trade,
                 result.Success,
                 order,
                 result.Error?.Message,
                 result.Error?.Code);
-
+            
             yield return tradeResult;
         }
     }

@@ -19,8 +19,9 @@ public static class TestExtensions
         await using var stream = File.OpenRead(path);
         using var streamReader = new StreamReader(stream);
         var json = await streamReader.ReadToEndAsync();
+        var deserializedObject = JsonConvert.DeserializeObject<T>(json);
 
-        return JsonConvert.DeserializeObject<T>(json);
+        return deserializedObject;
     }
 
     public static WebCallResult<T> ToWebCallResult<T>(this T data) => new(
