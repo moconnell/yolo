@@ -30,6 +30,7 @@ public class IntegrationTests
 {
     [Theory]
     [InlineData("Data/json/001", 10000, 0.5, 0.02)]
+    [InlineData("Data/json/002-PostOnly", 10000, 0.5, 0.02)]
     public async Task ShouldRebalance(
         string path,
         decimal nominalCash,
