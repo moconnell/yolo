@@ -9,7 +9,8 @@
     "Expiry": null,
     "Id": "cda5bff1-a030-46a9-8794-f2148a3f309c",
     "IsTradable": true,
-    "Side": "Sell"
+    "Side": "Sell",
+    "Value": 533.7830000
   },
   {
     "AssetName": "LINK/USD",
@@ -21,7 +22,8 @@
     "Expiry": null,
     "Id": "aa460ecd-0093-4948-987f-83fb94d3d81e",
     "IsTradable": true,
-    "Side": "Sell"
+    "Side": "Sell",
+    "Value": 867.11320
   },
   {
     "AssetName": "FTT-PERP",
@@ -33,7 +35,8 @@
     "Expiry": null,
     "Id": "ecc64329-0df2-46ce-ba43-6490819935fd",
     "IsTradable": true,
-    "Side": "Sell"
+    "Side": "Sell",
+    "Value": 285.03420
   },
   {
     "AssetName": "CRO-PERP",
@@ -45,7 +48,8 @@
     "Expiry": null,
     "Id": "8915a973-f65e-468c-a79d-8bcebca8655d",
     "IsTradable": true,
-    "Side": "Buy"
+    "Side": "Buy",
+    "Value": 1086.5250000
   },
   {
     "AssetName": "DOGE/USD",
@@ -57,7 +61,8 @@
     "Expiry": null,
     "Id": "cdd8e090-a8b4-4c9f-bca5-6b8f0af145d7",
     "IsTradable": true,
-    "Side": "Sell"
+    "Side": "Sell",
+    "Value": 617.43583500
   },
   {
     "AssetName": "ETH/USD",
@@ -69,6 +74,7 @@
     "Expiry": null,
     "Id": "0e38e5ff-e684-463b-a8b0-c30a7f3ccb35",
     "IsTradable": true,
-    "Side": "Buy"
+    "Side": "Buy",
+    "Value": 419.4950
   }
 ]

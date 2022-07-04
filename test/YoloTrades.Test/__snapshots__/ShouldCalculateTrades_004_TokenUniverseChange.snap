@@ -9,7 +9,8 @@
     "Expiry": null,
     "Id": "34295b09-c776-4dbd-82da-0a5262c74394",
     "IsTradable": true,
-    "Side": "Sell"
+    "Side": "Sell",
+    "Value": 398.93960
   },
   {
     "AssetName": "UNI/USD",
@@ -21,7 +22,8 @@
     "Expiry": null,
     "Id": "f7a18b2f-0c9f-4c9f-b4f1-172c5002b19a",
     "IsTradable": true,
-    "Side": "Sell"
+    "Side": "Sell",
+    "Value": 294.1218
   },
   {
     "AssetName": "FTX-PERP",
@@ -33,7 +35,8 @@
     "Expiry": null,
     "Id": "710704db-e761-434b-9b82-dccba308ddff",
     "IsTradable": true,
-    "Side": "Sell"
+    "Side": "Sell",
+    "Value": 497.61250
   },
   {
     "AssetName": "LTC/USD",
@@ -45,7 +48,8 @@
     "Expiry": null,
     "Id": "f228c353-6a84-4d6d-931e-f5c25d41e6ff",
     "IsTradable": true,
-    "Side": "Sell"
+    "Side": "Sell",
+    "Value": 818.40000
   },
   {
     "AssetName": "BCH/USD",
@@ -57,7 +61,8 @@
     "Expiry": null,
     "Id": "264dcb55-55c8-4a33-938d-0ed841023f0c",
     "IsTradable": true,
-    "Side": "Sell"
+    "Side": "Sell",
+    "Value": 220.637100
   },
   {
     "AssetName": "ETH-PERP",
@@ -69,7 +74,8 @@
     "Expiry": null,
     "Id": "7dbb8746-b7d1-46ae-9311-16ce7a481f32",
     "IsTradable": true,
-    "Side": "Buy"
+    "Side": "Buy",
+    "Value": 378.5088
   },
   {
     "AssetName": "BTC/USD",
@@ -81,7 +87,8 @@
     "Expiry": null,
     "Id": "dd6f0a77-f96f-4fa8-8792-5d3a777c5284",
     "IsTradable": true,
-    "Side": "Sell"
+    "Side": "Sell",
+    "Value": 934.70000
   },
   {
     "AssetName": "FTT-PERP",
@@ -93,7 +100,8 @@
     "Expiry": null,
     "Id": "2f158021-3fa7-498c-8c21-ef5defe501c6",
     "IsTradable": true,
-    "Side": "Sell"
+    "Side": "Sell",
+    "Value": 11942.70000
   },
   {
     "AssetName": "CRO-PERP",
@@ -105,6 +113,7 @@
     "Expiry": null,
     "Id": "682ca107-27ca-453f-a9ee-4a1c2b8dea7c",
     "IsTradable": true,
-    "Side": "Sell"
+    "Side": "Sell",
+    "Value": 26.3212500
   }
 ]
