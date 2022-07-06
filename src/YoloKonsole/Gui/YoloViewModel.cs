@@ -9,6 +9,8 @@ using System.Threading;
 using DynamicData;
 using ReactiveUI;
 using YoloAbstractions;
+using YoloKonsole.Comparers;
+using YoloKonsole.Extensions;
 using YoloRuntime;
 
 namespace YoloKonsole;
@@ -32,19 +34,26 @@ public class YoloViewModel : ReactiveObject, IDisposable, IActivatableViewModel
 
         var tradeUpdates = _yoloRuntime
             .TradeUpdates
-            // .Throttle(TimeSpan.FromMilliseconds(250))
-            .ToObservableChangeSet(x => x.Trade.Id)
+            .Throttle(
+                TimeSpan.FromMilliseconds(500),
+                tuple => tuple.baseAsset,
+                tuple => tuple.results,
+                new TradeResultsComparer(),
+                cancellationTokenSource.Token)
+            .ToObservableChangeSet(x => x.Key)
             .AsObservableCache();
 
         var tradeUpdatesObservable = tradeUpdates.Connect();
 
-        TradesTable = tradeUpdatesObservable.AsDataTable(cancellationTokenSource.Token);
+        Trades = tradeUpdatesObservable.AsDataTable(cancellationTokenSource.Token);
 
         _tradeUpdatesSubscription = tradeUpdatesObservable
             .Subscribe(
                 _ =>
                 {
-                    var tradeUpdatesItems = tradeUpdates.Items.ToArray();
+                    var tradeUpdatesItems = tradeUpdates.Items
+                        .SelectMany(x => x.Value)
+                        .ToArray();
                     _canSubmitSubject.OnNext(tradeUpdatesItems.Any(y => y.Order is null));
 
                     var orders = tradeUpdatesItems
@@ -64,12 +73,15 @@ public class YoloViewModel : ReactiveObject, IDisposable, IActivatableViewModel
             () =>
             {
                 _canSubmitSubject.OnNext(false);
-                return _yoloRuntime.PlaceTradesAsync(
-                    tradeUpdates.Items.Select(x => x.Trade),
-                    cancellationTokenSource.Token);
+
+                var trades = tradeUpdates.Items
+                    .SelectMany(x => x.Value)
+                    .Select(x => x.Trade);
+
+                return _yoloRuntime.PlaceTradesAsync(trades, cancellationTokenSource.Token);
             },
             _canSubmitSubject);
-        
+
         Cancel = ReactiveCommand.Create(cancellationTokenSource.Cancel);
 
         Observable.StartAsync(() => _yoloRuntime.RebalanceAsync(cancellationTokenSource.Token))
@@ -81,7 +93,7 @@ public class YoloViewModel : ReactiveObject, IDisposable, IActivatableViewModel
     [IgnoreDataMember] public ReactiveCommand<Unit, Unit> Submit { get; }
     [IgnoreDataMember] public ReactiveCommand<Unit, Unit> Cancel { get; }
 
-    public DataTable TradesTable { get; }
+    public DataTable Trades { get; }
     public IObservable<decimal?> Completed => _completedSubject;
 
     public void Dispose()

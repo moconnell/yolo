@@ -1,107 +1,155 @@
 ﻿[
   {
-    "Trade": {
-      "AssetName": "BTC/USD",
-      "AssetType": "Spot",
-      "BaseAsset": "BTC",
-      "Amount": -10.0010,
-      "LimitPrice": 47503.0,
-      "PostPrice": true,
-      "Expiry": null,
-      "Id": "16ba1ceb-7d83-45c9-9b3a-da13369eca58",
-      "IsTradable": true,
-      "Side": "Sell"
-    },
-    "Success": null,
-    "Order": null,
-    "Error": null,
-    "ErrorCode": null
+    "Item1": "BTC",
+    "Item2": [
+      {
+        "Trade": {
+          "AssetName": "BTC/USD",
+          "AssetType": "Spot",
+          "BaseAsset": "BTC",
+          "Amount": -10.0010,
+          "LimitPrice": 47503.0,
+          "PostPrice": true,
+          "Expiry": null,
+          "Id": "9a68c1f4-ed02-42fb-af74-d80b7ddb71af",
+          "IsTradable": true,
+          "Side": "Sell",
+          "Value": 475077.50300
+        },
+        "Success": null,
+        "Order": null,
+        "Error": null,
+        "ErrorCode": null
+      }
+    ]
   },
   {
-    "Trade": {
-      "AssetName": "BTC/USD",
-      "AssetType": "Spot",
-      "BaseAsset": "BTC",
-      "Amount": -10.0010,
-      "LimitPrice": 47503.0,
-      "PostPrice": true,
-      "Expiry": null,
-      "Id": "35040cb5-f74d-4f9e-851e-9cc7d5e78808",
-      "IsTradable": true,
-      "Side": "Sell"
-    },
-    "Success": true,
-    "Order": {
-      "Id": 1,
-      "AssetName": "BTC/USD",
-      "Created": "0001-01-01T00:00:00",
-      "OrderSide": "Sell",
-      "OrderStatus": "New",
-      "Amount": 10.0010,
-      "AmountRemaining": 10.0010,
-      "LimitPrice": 47503.0,
-      "ClientId": null,
-      "Completed": 0.0
-    },
-    "Error": null,
-    "ErrorCode": null
+    "Item1": "BTC",
+    "Item2": [
+      {
+        "Trade": {
+          "AssetName": "BTC/USD",
+          "AssetType": "Spot",
+          "BaseAsset": "BTC",
+          "Amount": -10.0010,
+          "LimitPrice": 47503.0,
+          "PostPrice": true,
+          "Expiry": null,
+          "Id": "9a68c1f4-ed02-42fb-af74-d80b7ddb71af",
+          "IsTradable": true,
+          "Side": "Sell",
+          "Value": 475077.50300
+        },
+        "Success": true,
+        "Order": {
+          "Id": 1,
+          "AssetName": "BTC/USD",
+          "Created": "0001-01-01T00:00:00",
+          "OrderSide": "Sell",
+          "OrderStatus": "New",
+          "Amount": 10.0010,
+          "AmountRemaining": 10.0010,
+          "LimitPrice": 47503.0,
+          "ClientId": null,
+          "Completed": 0.0
+        },
+        "Error": null,
+        "ErrorCode": null
+      }
+    ]
   },
   {
-    "Trade": {
-      "AssetName": "BTC/USD",
-      "AssetType": "Spot",
-      "BaseAsset": "BTC",
-      "Amount": -10.0010,
-      "LimitPrice": 47503.0,
-      "PostPrice": true,
-      "Expiry": null,
-      "Id": "35040cb5-f74d-4f9e-851e-9cc7d5e78808",
-      "IsTradable": true,
-      "Side": "Sell"
-    },
-    "Success": true,
-    "Order": {
-      "Id": 1,
-      "AssetName": "BTC/USD",
-      "Created": "2021-12-04T12:22:28.401104Z",
-      "OrderSide": "Sell",
-      "OrderStatus": "Open",
-      "Amount": 10.0010,
-      "AmountRemaining": 10.0010,
-      "LimitPrice": 47503.0,
-      "ClientId": null,
-      "Completed": 0.0
-    },
-    "Error": null,
-    "ErrorCode": null
+    "Item1": "BTC",
+    "Item2": [
+      {
+        "Trade": {
+          "AssetName": "BTC/USD",
+          "AssetType": "Spot",
+          "BaseAsset": "BTC",
+          "Amount": -10.0010,
+          "LimitPrice": 47503.0,
+          "PostPrice": true,
+          "Expiry": null,
+          "Id": "9a68c1f4-ed02-42fb-af74-d80b7ddb71af",
+          "IsTradable": true,
+          "Side": "Sell",
+          "Value": 475077.50300
+        },
+        "Success": true,
+        "Order": {
+          "Id": 1,
+          "AssetName": "BTC/USD",
+          "Created": "2021-12-04T12:22:28.401104Z",
+          "OrderSide": "Sell",
+          "OrderStatus": "Open",
+          "Amount": 10.0010,
+          "AmountRemaining": 10.0010,
+          "LimitPrice": 47503.0,
+          "ClientId": null,
+          "Completed": 0.0
+        },
+        "Error": null,
+        "ErrorCode": null
+      }
+    ]
   },
   {
-    "Trade": {
-      "AssetName": "BTC/USD",
-      "AssetType": "Spot",
-      "BaseAsset": "BTC",
-      "Amount": -10.0010,
-      "LimitPrice": 47503.0,
-      "PostPrice": true,
-      "Expiry": null,
-      "Id": "35040cb5-f74d-4f9e-851e-9cc7d5e78808",
-      "IsTradable": true,
-      "Side": "Sell"
-    },
-    "Success": true,
-    "Order": {
-      "Id": 1,
-      "AssetName": "BTC/USD",
-      "Created": "2021-12-04T12:22:28.401104Z",
-      "OrderSide": "Sell",
-      "OrderStatus": "Filled",
-      "Amount": 10.0010,
-      "AmountRemaining": 0.0,
-      "LimitPrice": 47503.0,
-      "ClientId": null,
-      "Completed": 1.0
-    },
-    "Error": null,
-    "ErrorCode": null
+    "Item1": "BTC",
+    "Item2": [
+      {
+        "Trade": {
+          "AssetName": "BTC/USD",
+          "AssetType": "Spot",
+          "BaseAsset": "BTC",
+          "Amount": -10.0010,
+          "LimitPrice": 47504.0,
+          "PostPrice": true,
+          "Expiry": null,
+          "Id": "47c09921-b3c2-4f6d-bc54-6ff8704823ce",
+          "IsTradable": true,
+          "Side": "Sell",
+          "Value": 475087.50400
+        },
+        "Success": null,
+        "Order": null,
+        "Error": null,
+        "ErrorCode": null
+      }
+    ]
+  },
+  {
+    "Item1": "BTC",
+    "Item2": [
+      {
+        "Trade": {
+          "AssetName": "BTC/USD",
+          "AssetType": "Spot",
+          "BaseAsset": "BTC",
+          "Amount": -10.0010,
+          "LimitPrice": 47503.0,
+          "PostPrice": true,
+          "Expiry": null,
+          "Id": "9a68c1f4-ed02-42fb-af74-d80b7ddb71af",
+          "IsTradable": true,
+          "Side": "Sell",
+          "Value": 475077.50300
+        },
+        "Success": true,
+        "Order": {
+          "Id": 1,
+          "AssetName": "BTC/USD",
+          "Created": "2021-12-04T12:22:28.401104Z",
+          "OrderSide": "Sell",
+          "OrderStatus": "Filled",
+          "Amount": 10.0010,
+          "AmountRemaining": 0.0,
+          "LimitPrice": 47503.0,
+          "ClientId": null,
+          "Completed": 1.0
+        },
+        "Error": null,
+        "ErrorCode": null
+      }
+    ]
   }
 ]

@@ -152,7 +152,7 @@ public class IntegrationTests
 
         var runtimeLogger = new Mock<ILogger<Runtime>>();
         var runtime = new Runtime(weightsService.Object, broker, tradeFactory, yoloConfig, runtimeLogger.Object);
-        var tradeResults = new List<TradeResult>();
+        var tradeResults = new List<(string, IEnumerable<TradeResult>)>();
         runtime.TradeUpdates.Subscribe(tradeResults.Add);
 
         (DateTime timestamp, Action action) ToTimeStampedAction<T>(TestDataEvent<T> e, Action<DataEvent<T>> action) =>
@@ -166,7 +166,8 @@ public class IntegrationTests
         var updates = orderUpdates.Union(tickerUpdates).OrderBy(x => x.timestamp);
 
         // act
-        var trades = await runtime.RebalanceAsync(CancellationToken.None);
+        var groupings = await runtime.RebalanceAsync(CancellationToken.None);
+        var trades = groupings.SelectMany(g => g.ToArray());
 
         var tradesTask = Task.Factory
             .StartNew(async () => await runtime.PlaceTradesAsync(trades, CancellationToken.None))
@@ -188,7 +189,7 @@ public class IntegrationTests
         // assert
         tradeResults.MatchSnapshot(
             $"ShouldCalculateTrades_{path.Replace("/", "_")}",
-            options => options.IgnoreFields("[*].Trade.Id")
+            options => options.IgnoreFields("[*].Item2.[*].Trade.Id")
         );
     }
 }

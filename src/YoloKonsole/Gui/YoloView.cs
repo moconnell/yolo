@@ -45,7 +45,7 @@ public class YoloView : Window, IViewFor<YoloViewModel>
 
     private TableView TradesTable(View previous)
     {
-        var tableView = new TableView(ViewModel.TradesTable)
+        var tableView = new TableView(ViewModel.Trades)
         {
             X = Pos.Left(previous),
             Y = Pos.Top(previous) + 1,

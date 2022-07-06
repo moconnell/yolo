@@ -5,6 +5,6 @@ namespace YoloRuntime;
 public interface IYoloRuntime : IDisposable
 {
     Task PlaceTradesAsync(IEnumerable<Trade> trades, CancellationToken cancellationToken);
-    Task<IEnumerable<Trade>> RebalanceAsync(CancellationToken cancellationToken);
-    IObservable<TradeResult> TradeUpdates { get; }
+    Task<IEnumerable<IGrouping<string, Trade>>> RebalanceAsync(CancellationToken cancellationToken);
+    IObservable<(string baseAsset, IEnumerable<TradeResult> results)> TradeUpdates { get; }
 }

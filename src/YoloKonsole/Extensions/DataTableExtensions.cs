@@ -1,104 +1,124 @@
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Threading;
 using DynamicData;
 using YoloAbstractions;
+using YoloAbstractions.Extensions;
 
 namespace YoloKonsole;
 
 public static class DataTableExtensions
 {
-    private const string FkIdAsset = "FK_Id_Asset";
+    private const string Token = nameof(Token);
+    private const string Instrument = nameof(Instrument);
+    private const string Side = nameof(Side);
+    private const string Amount = nameof(Amount);
+    private const string Limit = nameof(Limit);
+    private const string Value = nameof(Value);
+    private const string PostOnly = "Post-Only";
+    private const string Created = nameof(Created);
+    private const string Status = nameof(Status);
+    private const string Remaining = nameof(Remaining);
 
     public static DataTable AsDataTable(
-        this IObservable<IChangeSet<TradeResult, Guid>> observable,
+        this IObservable<IChangeSet<KeyValuePair<string, IEnumerable<TradeResult>>, string>> observable,
         CancellationToken cancellationToken)
     {
-        var linkTable = new DataTable();
-        linkTable.Columns.Add("Id", typeof(Guid));
-        linkTable.Columns.Add("Asset", typeof(string));
-        linkTable.PrimaryKey = new[] { linkTable.Columns[0] };
-
         var dataTable = new DataTable();
-        dataTable.Columns.Add("Asset", typeof(string));
-        // dataTable.Columns.Add("Version", typeof(int));
-        // dataTable.Columns.Add("Type", typeof(AssetType));
-        // dataTable.Columns.Add("BaseAsset", typeof(string));
-        dataTable.Columns.Add("Side", typeof(string));
-        dataTable.Columns.Add("Amount", typeof(decimal));
-        dataTable.Columns.Add("Limit", typeof(decimal));
-        dataTable.Columns.Add("Value", typeof(decimal));
-        dataTable.Columns.Add("Post-Only", typeof(bool));
-        // dataTable.Columns.Add("TradeExpiry", typeof(DateTime));
-        // dataTable.Columns.Add("OrderId", typeof(long));
-        dataTable.Columns.Add("Created", typeof(DateTime));
-        // dataTable.Columns.Add("OrderSide", typeof(OrderSide));
-        dataTable.Columns.Add("Status", typeof(OrderStatus));
-        // dataTable.Columns.Add("OrderAmount", typeof(decimal));
-        dataTable.Columns.Add("Remaining", typeof(decimal));
-        // dataTable.Columns.Add("OrderLimitPrice", typeof(decimal));
-        // dataTable.Columns.Add("OrderClientId", typeof(string));
-        // dataTable.Columns.Add("Success", typeof(bool?));
-        // dataTable.Columns.Add("Error", typeof(string));
-        // dataTable.Columns.Add("ErrorCode", typeof(int?));
+        dataTable.Columns.Add(Token, typeof(string));
+        dataTable.Columns.Add(Instrument, typeof(string));
+        dataTable.Columns.Add(Side, typeof(string));
+        dataTable.Columns.Add(Amount, typeof(decimal));
+        dataTable.Columns.Add(Limit, typeof(decimal));
+        dataTable.Columns.Add(Value, typeof(decimal));
+        dataTable.Columns.Add(PostOnly, typeof(bool));
+        dataTable.Columns.Add(Created, typeof(DateTime));
+        dataTable.Columns.Add(Status, typeof(OrderStatus));
+        dataTable.Columns.Add(Remaining, typeof(decimal));
 
-        dataTable.PrimaryKey = new[] { dataTable.Columns[0] };
+        dataTable.PrimaryKey = new[] { dataTable.Columns[1] };
 
-        var dataSet = new DataSet();
-        dataSet.Tables.AddRange(new[] { linkTable, dataTable });
-        dataSet.Relations.Add(
-            FkIdAsset,
-            new[] { linkTable.Columns[1] },
-            dataTable.PrimaryKey,
-            true);
+        bool SetRow(DataRow? dataRow, IReadOnlyList<object?> objects)
+        {
+            if (dataRow is null)
+            {
+                return false;
+            }
 
-        void OnNext(IChangeSet<TradeResult, Guid> changeSet)
+            dataRow.BeginEdit();
+            dataRow[Token] = objects[0];
+            dataRow[Instrument] = objects[1];
+            dataRow[Side] = objects[2];
+            dataRow[Amount] = objects[3];
+            dataRow[Limit] = objects[4];
+            dataRow[Value] = objects[5];
+            dataRow[PostOnly] = objects[6];
+            dataRow[Created] = objects[7] ?? DBNull.Value;
+            dataRow[Status] = objects[8] ?? DBNull.Value;
+            dataRow[Remaining] = objects[9] ?? DBNull.Value;
+            dataRow.EndEdit();
+
+            return true;
+        }
+
+        void OnNext(IChangeSet<KeyValuePair<string, IEnumerable<TradeResult>>, string> changeSet)
         {
             foreach (var change in changeSet)
             {
-                switch (change.Reason)
+                var baseAsset = change.Key;
+                var tradeResults = change.Current.Value;
+                var keys = new List<string>();
+
+                foreach (var result in tradeResults)
                 {
-                    case ChangeReason.Add:
-                    case ChangeReason.Update:
-                    case ChangeReason.Refresh:
-                        var linkRow = linkTable.Rows.Find(change.Key);
-                        if (linkRow is { })
-                        {
-                            var dataRow = linkRow.GetChildRows(FkIdAsset).FirstOrDefault();
-                            if (dataRow is { })
+                    var key = result.Trade.AssetName;
+                    keys.Add(key);
+
+                    switch (change.Reason)
+                    {
+                        case ChangeReason.Add:
+                        case ChangeReason.Update:
+                        case ChangeReason.Refresh:
+                            var row = dataTable.Rows.Find(key);
+                            var itemArray = result.ToArray();
+                            if (SetRow(row, itemArray))
                             {
-                                var itemArray = change.Current.ToArray();
-                                for (var i = 0; i < itemArray.Length; i++)
-                                {
-                                    dataRow.ItemArray[i] = itemArray[i];
-                                }
+                                break;
                             }
-                        }
-                        else
-                        {
-                            linkTable.Rows.Add(change.Key, change.Current.Trade.AssetName);
-                            dataTable.Rows.Add(change.Current.ToArray());
-                        }
 
-                        break;
-                    case ChangeReason.Moved:
-                        break;
-                    case ChangeReason.Remove:
-                        var linkRow2Delete = linkTable.Rows.Find(change.Key);
-                        if (linkRow2Delete is { })
-                        {
-                            foreach (var dataRow2Delete in linkRow2Delete.GetChildRows(FkIdAsset))
-                                dataTable.Rows.Remove(dataRow2Delete);
+                            var row2 = dataTable.Select($"{Token} = '{baseAsset}'").FirstOrDefault();
+                            if (SetRow(row2, itemArray))
+                            {
+                                break;
+                            }
 
-                            linkTable.Rows.Remove(linkRow2Delete);
-                        }
+                            dataTable.Rows.Add(itemArray);
 
-                        break;
-                    default:
-                        throw new ArgumentOutOfRangeException(
-                            nameof(change.Reason),
-                            $"Reason not handled: {change.Reason}");
+                            break;
+                        case ChangeReason.Moved:
+                            break;
+                        case ChangeReason.Remove:
+                            var row2Delete = dataTable.Rows.Find(key);
+                            if (row2Delete is { })
+                            {
+                                dataTable.Rows.Remove(row2Delete);
+                            }
+
+                            break;
+                        default:
+                            throw new ArgumentOutOfRangeException(
+                                nameof(change.Reason),
+                                $"Reason not handled: {change.Reason}");
+                    }
+                }
+
+                var rowFilter = $"{Token} = '{baseAsset}' AND {Instrument} NOT IN ({keys.Quoted().ToCsv()})";
+
+                foreach (var row in dataTable.Select(rowFilter))
+                {
+                    dataTable.Rows.Remove(row);
                 }
             }
         }
@@ -112,25 +132,16 @@ public static class DataTableExtensions
     {
         return new object?[]
         {
+            tradeResult.Trade.BaseAsset,
             tradeResult.Trade.AssetName,
-            // tradeResult.Trade.AssetType,
-            // tradeResult.Trade.BaseAsset,
             tradeResult.Trade.Side,
             Math.Abs(tradeResult.Trade.Amount),
             tradeResult.Trade.LimitPrice,
             tradeResult.Trade.Value.Round(2),
             tradeResult.Trade.PostPrice,
-            // tradeResult.Trade.Expiry,
-            // tradeResult.Order?.Id,
             tradeResult.Order?.Created,
-            // tradeResult.Order?.OrderSide,
             tradeResult.Order?.OrderStatus,
-            tradeResult.Order?.AmountRemaining,
-            // tradeResult.Order?.LimitPrice,
-            // tradeResult.Order?.ClientId,
-            // tradeResult.Success,
-            // tradeResult.Error,
-            // tradeResult.ErrorCode
+            tradeResult.Order?.AmountRemaining
         };
     }
 

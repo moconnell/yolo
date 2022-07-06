@@ -41,27 +41,29 @@ public class TradeFactoryTests
         var (weights, positions, markets, expectedTrades) =
             DeserializeCsv(path, baseCurrency, stepSize);
 
-        var trades = tradeFactory
+        var groupings = tradeFactory
             .CalculateTrades(weights, positions, markets)
             .ToArray();
 
-        Assert.NotNull(trades);
+        Assert.NotNull(groupings);
 
         var filename = path[(path.LastIndexOf("/", StringComparison.Ordinal) + 1)..]
             .Replace(" ", string.Empty);
+        var trades = groupings.SelectMany(g => g.ToArray());
         trades.MatchSnapshot($"ShouldCalculateTradesFromCsv_{filename}", options => options.IgnoreFields("[*].Id"));
 
-        Assert.Equal(expectedTrades.Count, trades.Length);
+        Assert.Equal(expectedTrades.Count, groupings.Length);
 
-        var tradesWithDeviatingQuantity = trades
+        var tradesWithDeviatingQuantity = groupings
             .Select(
-                t =>
+                g =>
                 {
-                    var baseAsset = t.AssetName.Split('-', '/')[0];
+                    var baseAsset = g.Key;
                     var expectedTradeQuantity = expectedTrades[baseAsset];
+                    var amount = g.Sum(t => t.Amount);
 
-                    return (baseAsset, expectedTradeQuantity, t.Amount,
-                        deviation: t.Amount - expectedTradeQuantity);
+                    return (baseAsset, expectedTradeQuantity, amount,
+                        deviation: amount - expectedTradeQuantity);
                 })
             .Where(tuple => Math.Abs(tuple.deviation) > stepSize)
             .ToArray();
@@ -95,11 +97,12 @@ public class TradeFactoryTests
 
         var (weights, positions, markets) = await DeserializeInputsAsync(path);
 
-        var trades = tradeFactory.CalculateTrades(weights, positions, markets);
+        var groupings = tradeFactory.CalculateTrades(weights, positions, markets);
 
-        Assert.NotNull(trades);
+        Assert.NotNull(groupings);
 
         var directory = path[(path.LastIndexOf("/", StringComparison.InvariantCulture) + 1)..];
+        var trades = groupings.SelectMany(g => g.ToArray());
         trades.MatchSnapshot($"ShouldCalculateTrades_{directory}", options => options.IgnoreFields("[*].Id"));
     }
 

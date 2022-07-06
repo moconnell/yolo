@@ -30,7 +30,7 @@ public class TradeFactory : ITradeFactory
     private decimal TradeBuffer { get; }
     private decimal SpreadSplit { get; }
 
-    public IEnumerable<Trade> CalculateTrades(
+    public IEnumerable<IGrouping<string, Trade>> CalculateTrades(
         IDictionary<string, Weight> weights,
         IDictionary<string, IEnumerable<Position>> positions,
         IDictionary<string, IEnumerable<MarketInfo>> markets)
@@ -155,10 +155,11 @@ public class TradeFactory : ITradeFactory
             .SelectMany(CombineOrders);
     }
 
-    private static IEnumerable<Trade> CombineOrders(IEnumerable<Trade> trades)
+    private static IEnumerable<IGrouping<string, Trade>> CombineOrders(IEnumerable<Trade> trades)
     {
         return trades.GroupBy(t => t.AssetName)
-            .Select(g => g.Sum());
+            .Select(g => g.Sum())
+            .GroupBy(t => t.BaseAsset);
     }
 
     private IEnumerable<(Trade trade, decimal remainingDelta)> CalcTrades(
