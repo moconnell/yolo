@@ -1,3 +1,5 @@
+using System;
+
 namespace YoloAbstractions.Config;
 
 public class YoloConfig
@@ -10,4 +12,5 @@ public class YoloConfig
     public AssetPermissions AssetPermissions { get; init; } = AssetPermissions.SpotAndPerp;
     public string BaseAsset { get; init; }
     public decimal SpreadSplit { get; init; } = 0.5m;
+    public TimeSpan? UnfilledOrderTimeout  { get; init; } 
 }

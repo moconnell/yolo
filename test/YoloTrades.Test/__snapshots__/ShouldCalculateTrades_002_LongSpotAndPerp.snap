@@ -2,73 +2,105 @@
   {
     "AssetName": "FTT-PERP",
     "AssetType": "Future",
+    "BaseAsset": "FTT",
     "Amount": -10.4,
     "LimitPrice": 47.6755,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "9c43ec0f-e4fa-49ce-9dcf-eb7c182a1fe0",
+    "IsTradable": true,
+    "Side": "Sell",
+    "Value": 495.82520
   },
   {
     "AssetName": "ETH-PERP",
     "AssetType": "Future",
+    "BaseAsset": "ETH",
     "Amount": 0.004,
     "LimitPrice": 4054.0,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "c7051840-5529-44da-a1da-c4f168d4056a",
+    "IsTradable": true,
+    "Side": "Buy",
+    "Value": 16.2160
   },
   {
     "AssetName": "LTC-PERP",
     "AssetType": "Future",
+    "BaseAsset": "LTC",
     "Amount": 0.29,
     "LimitPrice": 192.42,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "c32580db-2025-45eb-8531-a3c336e36152",
+    "IsTradable": true,
+    "Side": "Buy",
+    "Value": 55.8018
   },
   {
     "AssetName": "DOGE-PERP",
     "AssetType": "Future",
+    "BaseAsset": "DOGE",
     "Amount": -3195.0,
     "LimitPrice": 0.2032005,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "814970c1-938c-4f5f-8642-28dba6d13c6c",
+    "IsTradable": true,
+    "Side": "Sell",
+    "Value": 649.22559750
   },
   {
     "AssetName": "CRO/USD",
     "AssetType": "Spot",
+    "BaseAsset": "CRO",
     "Amount": 1390.0,
     "LimitPrice": 0.787100,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "0206bb87-5149-42d0-94cd-4cea707083b7",
+    "IsTradable": true,
+    "Side": "Buy",
+    "Value": 1094.0690000
   },
   {
     "AssetName": "BCH/USD",
     "AssetType": "Spot",
+    "BaseAsset": "BCH",
     "Amount": 0.218,
     "LimitPrice": 558.700,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "5856b5b3-b92a-4741-83d8-8a41472d2efd",
+    "IsTradable": true,
+    "Side": "Buy",
+    "Value": 121.796600
   },
   {
     "AssetName": "UNI-PERP",
     "AssetType": "Future",
+    "BaseAsset": "UNI",
     "Amount": -29.4,
     "LimitPrice": 19.283,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "aca14e1d-3015-4b49-8007-5fcfe63f8c14",
+    "IsTradable": true,
+    "Side": "Sell",
+    "Value": 566.9202
   },
   {
     "AssetName": "LINK-PERP",
     "AssetType": "Future",
+    "BaseAsset": "LINK",
     "Amount": -20.2,
     "LimitPrice": 23.9525,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "d05506eb-a744-4966-993a-6f3703799e30",
+    "IsTradable": true,
+    "Side": "Sell",
+    "Value": 483.84050
   }
 ]

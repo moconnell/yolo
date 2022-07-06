@@ -1,3 +1,7 @@
 namespace YoloAbstractions;
 
-public enum OrderSide { Buy, Sell }
+public enum OrderSide
+{
+    Buy,
+    Sell
+}

@@ -5,12 +5,24 @@ namespace YoloAbstractions;
 public record Trade(
     string AssetName,
     AssetType AssetType,
+    string BaseAsset,
     decimal Amount,
     decimal? LimitPrice = null,
     bool? PostPrice = null,
     DateTime? Expiry = null)
 {
+    public Guid Id { get; } = Guid.NewGuid();
     public bool IsTradable => Amount != 0;
+    public OrderSide Side => Amount >= 0 ? OrderSide.Buy : OrderSide.Sell;
+
+    public decimal? Value
+    {
+        get
+        {
+            var value = Amount * LimitPrice;
+            return value.HasValue ? Math.Abs(value.Value) : null;
+        }
+    }
 
     public static Trade operator +(Trade one, Trade two)
     {
@@ -25,11 +37,12 @@ public record Trade(
 
         var totalAmount = one.Amount + two.Amount;
         var postPrice = one.PostPrice == true && Math.Abs(totalAmount) >= Math.Abs(one.Amount) ||
-                       two.PostPrice == true && Math.Abs(totalAmount) >= Math.Abs(two.Amount);
+                        two.PostPrice == true && Math.Abs(totalAmount) >= Math.Abs(two.Amount);
 
         return new Trade(
             one.AssetName,
             one.AssetType,
+            one.BaseAsset,
             totalAmount,
             one.LimitPrice,
             postPrice,

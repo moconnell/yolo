@@ -269,3 +269,5 @@ appsettings.*.json
 # macOS folder settings
 .DS_Store
 
+# snapshot mismatch files
+__mismatch__/

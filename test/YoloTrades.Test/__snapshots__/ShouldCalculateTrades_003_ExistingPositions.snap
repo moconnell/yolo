@@ -2,64 +2,92 @@
   {
     "AssetName": "LINK/USD",
     "AssetType": "Spot",
+    "BaseAsset": "LINK",
     "Amount": -20.6,
     "LimitPrice": 19.3660,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "f9c80d65-e098-4868-b873-3e1c852d41e7",
+    "IsTradable": true,
+    "Side": "Sell",
+    "Value": 398.93960
   },
   {
     "AssetName": "UNI/USD",
     "AssetType": "Spot",
+    "BaseAsset": "UNI",
     "Amount": -18.6,
     "LimitPrice": 15.813,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "c4094536-a26a-4b2b-9b18-340bd53ebe5c",
+    "IsTradable": true,
+    "Side": "Sell",
+    "Value": 294.1218
   },
   {
     "AssetName": "FTT-PERP",
     "AssetType": "Future",
+    "BaseAsset": "FTT",
     "Amount": -12.5,
     "LimitPrice": 39.8090,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "0f4ec4b5-06e8-4b9a-afb9-81e937e2b6de",
+    "IsTradable": true,
+    "Side": "Sell",
+    "Value": 497.61250
   },
   {
     "AssetName": "LTC/USD",
     "AssetType": "Spot",
+    "BaseAsset": "LTC",
     "Amount": -5.50,
     "LimitPrice": 148.800,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "f2a86534-18a4-40ea-bb95-0c53d98492f3",
+    "IsTradable": true,
+    "Side": "Sell",
+    "Value": 818.40000
   },
   {
     "AssetName": "BTC/USD",
     "AssetType": "Spot",
+    "BaseAsset": "BTC",
     "Amount": -0.0181,
     "LimitPrice": 46735.0,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "122044f5-19a5-4379-b99f-fc5c54bc79d4",
+    "IsTradable": true,
+    "Side": "Sell",
+    "Value": 845.90350
   },
   {
     "AssetName": "BCH/USD",
     "AssetType": "Spot",
+    "BaseAsset": "BCH",
     "Amount": -0.508,
     "LimitPrice": 434.325,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "b86c64f7-f811-4987-ac5a-1ea291dda87e",
+    "IsTradable": true,
+    "Side": "Sell",
+    "Value": 220.637100
   },
   {
     "AssetName": "ETH-PERP",
     "AssetType": "Future",
+    "BaseAsset": "ETH",
     "Amount": 0.096,
     "LimitPrice": 3942.8,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "915755b6-190a-46d3-ade8-e4baa87c9a44",
+    "IsTradable": true,
+    "Side": "Buy",
+    "Value": 378.5088
   }
 ]

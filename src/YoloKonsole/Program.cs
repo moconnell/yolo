@@ -1,17 +1,17 @@
 ﻿using System;
-using System.Linq;
+using System.Reactive.Concurrency;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using ReactiveUI;
+using Terminal.Gui;
 using Utility.CommandLine;
 using YoloAbstractions.Config;
-using YoloBroker;
+using YoloRuntime;
 using YoloTrades;
 using YoloWeights;
-using static System.Environment;
-using static YoloKonsole.WellKnown.TradeEventIds;
 
 namespace YoloKonsole;
 
@@ -31,10 +31,11 @@ internal class Program
 #else
         var env = "prod";
 #endif
-        
+
         Arguments.Populate();
 
-        ConsoleWrite(@"
+        ConsoleWrite(
+            @"
 __  ______  __    ____  __
 \ \/ / __ \/ /   / __ \/ /
  \  / / / / /   / / / / / 
@@ -43,8 +44,7 @@ __  ______  __    ____  __
                           
 ");
 
-        CancellationTokenSource source = new();
-        var cancellationToken = source.Token;
+        CancellationTokenSource cancellationTokenSource = new();
 
         try
         {
@@ -54,108 +54,39 @@ __  ______  __    ____  __
                 .AddEnvironmentVariables();
 
             var config = builder.Build();
+            var yoloConfig = config.GetYoloConfig();
 
             var serviceProvider = new ServiceCollection()
-                .AddLogging(loggingBuilder => loggingBuilder
-                    .AddFile(config.GetSection("Logging")))
+                .AddLogging(
+                    loggingBuilder => loggingBuilder
+                        .AddFile(config.GetSection("Logging")))
                 .AddBroker(config)
+                .AddSingleton(config.GetYoloConfig())
+                .AddSingleton<IYoloWeightsService, YoloWeightsService>()
                 .AddSingleton<ITradeFactory, TradeFactory>()
+                .AddSingleton<IYoloRuntime, Runtime>()
                 .AddSingleton<IConfiguration>(config)
+                .AddSingleton(yoloConfig)
                 .BuildServiceProvider();
 
             _logger = serviceProvider.GetService<ILoggerFactory>()!
                 .CreateLogger<Program>();
             _logger.LogInformation("************ YOLO started ************");
 
-            var yoloConfig = config.GetYoloConfig();
 
-            var weights = (await yoloConfig.GetWeights()).ToArray();
+            using var runtime = serviceProvider.GetService<IYoloRuntime>()!;
 
-            using var broker = serviceProvider.GetService<IYoloBroker>()!;
+            Application.Init();
+            RxApp.MainThreadScheduler = TerminalScheduler.Default;
+            RxApp.TaskpoolScheduler = TaskPoolScheduler.Default;
+            Application.Run(new YoloView(new YoloViewModel(runtime, cancellationTokenSource)));
+            Application.Shutdown();
 
-            var orders = await broker.GetOrdersAsync(cancellationToken);
-
-            if (orders.Any())
-            {
-                _logger.OpenOrders(orders.Values);
-
-                if (!Silent)
-                {
-                    Console.WriteLine("Open orders!");
-                    Console.WriteLine();
-                    foreach (var order in orders.Values)
-                        Console.WriteLine(
-                            $"{order.AssetName}:\t{ToSide(order.Amount)} {Math.Abs(order.Amount)} at {order.LimitPrice}");
-                }
-
-                return OpenOrders;
-            }
-
-            var positions = await broker.GetPositionsAsync(cancellationToken);
-
-            var baseAssetFilter = positions
-                .Keys
-                .ToHashSet();
-
-            var markets = await broker.GetMarketsAsync(
-                baseAssetFilter,
-                yoloConfig.BaseAsset,
-                yoloConfig.AssetPermissions,
-                cancellationToken);
-
-            var tradeFactory = serviceProvider.GetService<ITradeFactory>()!;
-
-            var trades = tradeFactory
-                .CalculateTrades(weights, positions, markets)
-                .OrderBy(trade => trade.AssetName)
-                .ToArray();
-
-            if (!trades.Any())
-            {
-                ConsoleWriteLine("Nothing to do.");
-
-                return Success;
-            }
-
-            if (!Silent)
-            {
-                Console.WriteLine("Generated trades:");
-                Console.WriteLine();
-                foreach (var trade in trades)
-                    Console.WriteLine(
-                        $"{trade.AssetName}:\t{ToSide(trade.Amount)} {Math.Abs(trade.Amount)} at {trade.LimitPrice}");
-                Console.WriteLine();
-                Console.Write("Proceed? (y/n): ");
-
-                if (Console.Read() != 'y') return Success;
-            }
-
-            var returnCode = Success;
-
-            ConsoleWrite($"{NewLine}Placing orders...");
-
-            await foreach (var result in broker.PlaceTradesAsync(trades, cancellationToken))
-                if (result.Success)
-                {
-                    var order = result.Order!;
-                    _logger.PlacedOrder(order.AssetName, order);
-                    ConsoleWrite(".");
-                }
-                else
-                {
-                    _logger.OrderError(result.Trade.AssetName, result.Error, result.ErrorCode);
-                    ConsoleWriteLine($"{result.Trade.AssetName}:\t{result.Error}");
-                    returnCode = new [] {result.ErrorCode.GetValueOrDefault(), Error, returnCode}.Max();
-                }
-            
-            if (returnCode == Success)
-                ConsoleWrite(" done.");
-
-            return returnCode;
+            return Success;
         }
         catch (Exception e)
         {
-            source.Cancel();
+            cancellationTokenSource.Cancel();
 
             _logger?.LogError("Error occurred: {Error}", e);
 
@@ -174,12 +105,4 @@ __  ______  __    ____  __
         if (!Silent)
             Console.Write(s);
     }
-
-    private static void ConsoleWriteLine(string s)
-    {
-        if (!Silent)
-            Console.WriteLine(s);
-    }
-
-    private static string ToSide(decimal amount) => amount >= 0 ? "Buy" : "Sell";
 }

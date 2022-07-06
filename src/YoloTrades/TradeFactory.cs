@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using YoloAbstractions;
 using YoloAbstractions.Config;
@@ -12,11 +11,6 @@ namespace YoloTrades;
 public class TradeFactory : ITradeFactory
 {
     private readonly ILogger<TradeFactory> _logger;
-
-    public TradeFactory(ILogger<TradeFactory> logger, IConfiguration configuration)
-        : this(logger, configuration.GetYoloConfig())
-    {
-    }
 
     public TradeFactory(ILogger<TradeFactory> logger, YoloConfig yoloConfig)
     {
@@ -36,18 +30,18 @@ public class TradeFactory : ITradeFactory
     private decimal TradeBuffer { get; }
     private decimal SpreadSplit { get; }
 
-    public IEnumerable<Trade> CalculateTrades(
-        IEnumerable<Weight> weights,
+    public IEnumerable<IGrouping<string, Trade>> CalculateTrades(
+        IDictionary<string, Weight> weights,
         IDictionary<string, IEnumerable<Position>> positions,
         IDictionary<string, IEnumerable<MarketInfo>> markets)
     {
         var nominal = NominalCash ??
                       positions.GetTotalValue(markets, BaseCurrencyToken);
         var weightsDict = weights.ToDictionary(
-            weight => weight.Ticker.SplitConstituents().Item1,
-            weight => (weight, isInUniverse: true));
+            kvp => kvp.Key,
+            kvp => (weight: kvp.Value, isInUniverse: true));
 
-        _logger.CalculateTrades(weightsDict, positions, markets);
+        _logger.CalculateTrades(weightsDict);
 
         var unconstrainedTargetLeverage = weightsDict
             .Values
@@ -80,12 +74,13 @@ public class TradeFactory : ITradeFactory
                             _logger.NoAsk(token, market.Key);
 
                         var position = tokenPositions
-                                           .FirstOrDefault(p =>
-                                               p.AssetType == market.AssetType &&
-                                               (p.AssetName == market.Name &&
-                                                market.AssetType == AssetType.Future ||
-                                                p.BaseAsset == market.BaseAsset &&
-                                                market.AssetType == AssetType.Spot)) ??
+                                           .FirstOrDefault(
+                                               p =>
+                                                   p.AssetType == market.AssetType &&
+                                                   (p.AssetName == market.Name &&
+                                                    market.AssetType == AssetType.Future ||
+                                                    p.BaseAsset == market.BaseAsset &&
+                                                    market.AssetType == AssetType.Spot)) ??
                                        Position.Null;
 
                         return new ProjectedPosition(market, position.Amount, nominal);
@@ -148,7 +143,7 @@ public class TradeFactory : ITradeFactory
             }
         }
 
-        var droppedTokens = positions.Keys.Except(weightsDict.Keys.Union(new[] {BaseCurrencyToken}));
+        var droppedTokens = positions.Keys.Except(weightsDict.Keys.Union(new[] { BaseCurrencyToken }));
         foreach (var token in droppedTokens)
         {
             var weight = new Weight(0, 0, DateTime.UtcNow, 0, $"{token}/{BaseCurrencyToken}", 0);
@@ -160,13 +155,15 @@ public class TradeFactory : ITradeFactory
             .SelectMany(CombineOrders);
     }
 
-    private static IEnumerable<Trade> CombineOrders(IEnumerable<Trade> trades)
+    private static IEnumerable<IGrouping<string, Trade>> CombineOrders(IEnumerable<Trade> trades)
     {
         return trades.GroupBy(t => t.AssetName)
-            .Select(g => g.Sum());
+            .Select(g => g.Sum())
+            .GroupBy(t => t.BaseAsset);
     }
 
-    private IEnumerable<(Trade trade, decimal remainingDelta)> CalcTrades(string token,
+    private IEnumerable<(Trade trade, decimal remainingDelta)> CalcTrades(
+        string token,
         IReadOnlyList<ProjectedPosition> projectedPositions,
         decimal bufferedTargetWeight,
         decimal remainingDelta)
@@ -218,7 +215,7 @@ public class TradeFactory : ITradeFactory
 
             if (delta == 0)
                 continue;
-            
+
             decimal CalcLimitPrice()
             {
                 var factor = isBuy ? SpreadSplit : 1 - SpreadSplit;
@@ -231,11 +228,23 @@ public class TradeFactory : ITradeFactory
 
             var rawSize = delta * nominal / price.Value;
             var size = Math.Floor(rawSize / market.QuantityStep) * market.QuantityStep;
-            
+
             var trade = market.MinProvideSize switch
             {
-                _ when Math.Abs(size) >= market.MinProvideSize => new Trade(market.Name, market.AssetType, size, CalcLimitPrice(), true),
-                _ => new Trade(market.Name, market.AssetType, size, isBuy ? market.Ask!.Value : market.Bid!.Value, false)
+                _ when Math.Abs(size) >= market.MinProvideSize => new Trade(
+                    market.Name,
+                    market.AssetType,
+                    market.BaseAsset,
+                    size,
+                    CalcLimitPrice(),
+                    true),
+                _ => new Trade(
+                    market.Name,
+                    market.AssetType,
+                    market.BaseAsset,
+                    size,
+                    isBuy ? market.Ask!.Value : market.Bid!.Value,
+                    false)
             };
 
             if (trade.IsTradable)
@@ -245,7 +254,8 @@ public class TradeFactory : ITradeFactory
 
             yield return (trade, remainingDelta);
 
-            if (restart || remainingDelta == 0) break;
+            if (restart || remainingDelta == 0)
+                break;
         }
     }
 

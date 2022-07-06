@@ -6,12 +6,10 @@ namespace YoloBroker.Ftx.Config;
 
 public static class FtxConfigExtensions
 {
-    public static bool HasFtxConfig(this IConfiguration configuration)
-    {
-        return configuration
+    public static bool HasFtxConfig(this IConfiguration configuration) =>
+        configuration
             .GetSection(ConfigSections.Ftx)
             .Get<FtxConfig>() is { };
-    }
 
     public static FtxConfig GetFtxConfig(this IConfiguration configuration)
     {
@@ -19,7 +17,8 @@ public static class FtxConfigExtensions
             .GetSection(ConfigSections.Ftx)
             .Get<FtxConfig>()
             .Ensure(c => c.ApiKey)
-            .Ensure(c => c.BaseAddress)
+            .Ensure(c => c.RestApi)
+            .Ensure(c => c.WebSocketApi)
             .Ensure(c => c.Secret);
     }
 }

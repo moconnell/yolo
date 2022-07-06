@@ -10,7 +10,8 @@ public static partial class FtxExtensions
         {
             FTX.Net.Enums.OrderSide.Buy => OrderSide.Buy,
             FTX.Net.Enums.OrderSide.Sell => OrderSide.Sell,
-            _ => throw new ArgumentOutOfRangeException(nameof(orderSide),
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(orderSide),
                 orderSide,
                 "OrderSide not recognised")
         };

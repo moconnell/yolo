@@ -2,82 +2,118 @@
   {
     "AssetName": "LINK/USD",
     "AssetType": "Spot",
+    "BaseAsset": "LINK",
     "Amount": -20.6,
     "LimitPrice": 19.3660,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "34295b09-c776-4dbd-82da-0a5262c74394",
+    "IsTradable": true,
+    "Side": "Sell",
+    "Value": 398.93960
   },
   {
     "AssetName": "UNI/USD",
     "AssetType": "Spot",
+    "BaseAsset": "UNI",
     "Amount": -18.6,
     "LimitPrice": 15.813,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "f7a18b2f-0c9f-4c9f-b4f1-172c5002b19a",
+    "IsTradable": true,
+    "Side": "Sell",
+    "Value": 294.1218
   },
   {
     "AssetName": "FTX-PERP",
     "AssetType": "Future",
+    "BaseAsset": "FTX",
     "Amount": -12.5,
     "LimitPrice": 39.8090,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "710704db-e761-434b-9b82-dccba308ddff",
+    "IsTradable": true,
+    "Side": "Sell",
+    "Value": 497.61250
   },
   {
     "AssetName": "LTC/USD",
     "AssetType": "Spot",
+    "BaseAsset": "LTC",
     "Amount": -5.50,
     "LimitPrice": 148.800,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "f228c353-6a84-4d6d-931e-f5c25d41e6ff",
+    "IsTradable": true,
+    "Side": "Sell",
+    "Value": 818.40000
   },
   {
     "AssetName": "BCH/USD",
     "AssetType": "Spot",
+    "BaseAsset": "BCH",
     "Amount": -0.508,
     "LimitPrice": 434.325,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "264dcb55-55c8-4a33-938d-0ed841023f0c",
+    "IsTradable": true,
+    "Side": "Sell",
+    "Value": 220.637100
   },
   {
     "AssetName": "ETH-PERP",
     "AssetType": "Future",
+    "BaseAsset": "ETH",
     "Amount": 0.096,
     "LimitPrice": 3942.8,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "7dbb8746-b7d1-46ae-9311-16ce7a481f32",
+    "IsTradable": true,
+    "Side": "Buy",
+    "Value": 378.5088
   },
   {
     "AssetName": "BTC/USD",
     "AssetType": "Spot",
+    "BaseAsset": "BTC",
     "Amount": -0.0200,
     "LimitPrice": 46735.0,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "dd6f0a77-f96f-4fa8-8792-5d3a777c5284",
+    "IsTradable": true,
+    "Side": "Sell",
+    "Value": 934.70000
   },
   {
     "AssetName": "FTT-PERP",
     "AssetType": "Future",
+    "BaseAsset": "FTT",
     "Amount": -300.0,
     "LimitPrice": 39.8090,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "2f158021-3fa7-498c-8c21-ef5defe501c6",
+    "IsTradable": true,
+    "Side": "Sell",
+    "Value": 11942.70000
   },
   {
     "AssetName": "CRO-PERP",
     "AssetType": "Future",
+    "BaseAsset": "CRO",
     "Amount": -50.0,
     "LimitPrice": 0.526425,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "Id": "682ca107-27ca-453f-a9ee-4a1c2b8dea7c",
+    "IsTradable": true,
+    "Side": "Sell",
+    "Value": 26.3212500
   }
 ]

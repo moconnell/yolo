@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 
 namespace YoloAbstractions;
 
@@ -8,4 +9,7 @@ public record Weight(
     DateTime Date,
     decimal MomentumFactor,
     string Ticker,
-    decimal TrendFactor);
+    decimal TrendFactor)
+{
+    public string BaseAsset => Ticker.Split('/').First();
+}

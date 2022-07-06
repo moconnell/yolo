@@ -8,11 +8,11 @@ using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Newtonsoft.Json;
 using Snapshooter.Xunit;
 using Xunit;
 using YoloAbstractions;
 using YoloAbstractions.Config;
+using YoloTestUtils;
 using YoloTrades.Test.Data.Types;
 
 namespace YoloTrades.Test;
@@ -41,27 +41,30 @@ public class TradeFactoryTests
         var (weights, positions, markets, expectedTrades) =
             DeserializeCsv(path, baseCurrency, stepSize);
 
-        var trades = tradeFactory
+        var groupings = tradeFactory
             .CalculateTrades(weights, positions, markets)
             .ToArray();
 
-        Assert.NotNull(trades);
+        Assert.NotNull(groupings);
 
         var filename = path[(path.LastIndexOf("/", StringComparison.Ordinal) + 1)..]
             .Replace(" ", string.Empty);
-        trades.MatchSnapshot($"ShouldCalculateTradesFromCsv_{filename}");
+        var trades = groupings.SelectMany(g => g.ToArray());
+        trades.MatchSnapshot($"ShouldCalculateTradesFromCsv_{filename}", options => options.IgnoreFields("[*].Id"));
 
-        Assert.Equal(expectedTrades.Count, trades.Length);
+        Assert.Equal(expectedTrades.Count, groupings.Length);
 
-        var tradesWithDeviatingQuantity = trades
-            .Select(t =>
-            {
-                var baseAsset = t.AssetName.Split('-', '/')[0];
-                var expectedTradeQuantity = expectedTrades[baseAsset];
+        var tradesWithDeviatingQuantity = groupings
+            .Select(
+                g =>
+                {
+                    var baseAsset = g.Key;
+                    var expectedTradeQuantity = expectedTrades[baseAsset];
+                    var amount = g.Sum(t => t.Amount);
 
-                return (baseAsset, expectedTradeQuantity, t.Amount,
-                    deviation: t.Amount - expectedTradeQuantity);
-            })
+                    return (baseAsset, expectedTradeQuantity, amount,
+                        deviation: amount - expectedTradeQuantity);
+                })
             .Where(tuple => Math.Abs(tuple.deviation) > stepSize)
             .ToArray();
 
@@ -94,18 +97,20 @@ public class TradeFactoryTests
 
         var (weights, positions, markets) = await DeserializeInputsAsync(path);
 
-        var trades = tradeFactory.CalculateTrades(weights, positions, markets);
+        var groupings = tradeFactory.CalculateTrades(weights, positions, markets);
 
-        Assert.NotNull(trades);
+        Assert.NotNull(groupings);
 
         var directory = path[(path.LastIndexOf("/", StringComparison.InvariantCulture) + 1)..];
-        trades.MatchSnapshot($"ShouldCalculateTrades_{directory}");
+        var trades = groupings.SelectMany(g => g.ToArray());
+        trades.MatchSnapshot($"ShouldCalculateTrades_{directory}", options => options.IgnoreFields("[*].Id"));
     }
 
     private static
-        (Weight[] weights, Dictionary<string, IEnumerable<Position>> positions,
-        Dictionary<string, IEnumerable<MarketInfo>> markets, Dictionary<string, decimal>
-        expectedTrades)
+        (Dictionary<string, Weight> weights,
+        Dictionary<string, IEnumerable<Position>> positions,
+        Dictionary<string, IEnumerable<MarketInfo>> markets,
+        Dictionary<string, decimal> expectedTrades)
         DeserializeCsv(string path, string baseCurrency, decimal stepSize)
     {
         var config = new CsvConfiguration(CultureInfo.InvariantCulture)
@@ -120,15 +125,16 @@ public class TradeFactoryTests
             .GetRecords<YoloCsvRow>()
             .ToArray();
 
-        var weights = records.Select(x =>
+        var weights = records.ToDictionary(
+            x => x.Ticker,
+            x =>
                 new Weight(
                     x.Price,
                     (x.Momentum + x.Trend) / 2,
                     DateTime.Today,
                     x.Momentum,
                     $"{x.Ticker}/{baseCurrency}",
-                    x.Trend))
-            .ToArray();
+                    x.Trend));
 
         var positions = records.ToDictionary(
             x => x.Ticker,
@@ -172,35 +178,23 @@ public class TradeFactoryTests
     }
 
     private static async
-        Task<(Weight[], Dictionary<string, IEnumerable<Position>>, Dictionary<string, IEnumerable<MarketInfo>>)>
+        Task<(Dictionary<string, Weight>,
+            Dictionary<string, IEnumerable<Position>>,
+            Dictionary<string, IEnumerable<MarketInfo>>)>
         DeserializeInputsAsync(
             string path)
     {
-        var weights = await DeserializeAsync<Weight[]>($"{path}/weights.json");
+        var weights = (await $"{path}/weights.json".DeserializeAsync<Weight[]>())
+            .ToDictionary(x => x.BaseAsset);
 
         var positions =
-            ToEnumerableDictionary(await DeserializeAsync<Dictionary<string, Position[]>>($"{path}/positions.json"));
+            (await $"{path}/positions.json".DeserializeAsync<Dictionary<string, Position[]>>())
+            .ToEnumerableDictionary();
 
         var markets =
-            ToEnumerableDictionary(await DeserializeAsync<Dictionary<string, MarketInfo[]>>($"{path}/markets.json"));
+            (await $"{path}/markets.json".DeserializeAsync<Dictionary<string, MarketInfo[]>>())
+            .ToEnumerableDictionary();
 
         return (weights, positions, markets);
-    }
-
-    private static Dictionary<TKey, IEnumerable<TValue>> ToEnumerableDictionary<TKey, TValue>(
-        IDictionary<TKey, TValue[]> dictionary) where TKey : notnull
-    {
-        return dictionary.ToDictionary(
-            kvp => kvp.Key,
-            kvp => kvp.Value.Cast<TValue>());
-    }
-
-    private static async Task<T> DeserializeAsync<T>(string path)
-    {
-        await using var stream = File.OpenRead(path);
-        using var streamReader = new StreamReader(stream);
-        var json = await streamReader.ReadToEndAsync();
-
-        return JsonConvert.DeserializeObject<T>(json);
     }
 }
