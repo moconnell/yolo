@@ -15,8 +15,8 @@ namespace YoloRuntime;
 public class Runtime : IYoloRuntime
 {
     private readonly IYoloBroker _broker;
-    private readonly ConcurrentDictionary<string, IEnumerable<MarketInfo>> _cachedMarkets;
-    private readonly ConcurrentDictionary<string, IEnumerable<Position>> _cachedPositions;
+    private readonly ConcurrentDictionary<string, IDictionary<string, MarketInfo>> _cachedMarkets;
+    private readonly ConcurrentDictionary<string, IDictionary<string, Position>> _cachedPositions;
     private readonly ConcurrentDictionary<string, IDictionary<string, TradeResult>> _cachedTradeResults;
     private readonly ConcurrentDictionary<string, Weight> _cachedWeights;
     private readonly ILogger<Runtime> _logger;
@@ -24,9 +24,12 @@ public class Runtime : IYoloRuntime
     private readonly IDisposable _orderUpdatesSubscription;
     private readonly IDisposable _positionUpdatesSubscription;
     private readonly ITradeFactory _tradeFactory;
-    private readonly Subject<(string baseAsset, IEnumerable<TradeResult> results)> _tradeResultsSubject;
+
+    private readonly
+        Subject<(string token, IReadOnlyDictionary<string, TradeResult> results, IReadOnlyDictionary<string, Position>
+            positions)> _tokenSubject;
+
     private readonly IYoloWeightsService _weightsService;
-    private readonly IDisposable _tradeResultsSubscription;
     private CancellationToken _cancellationToken;
     private bool _disposed;
 
@@ -37,7 +40,9 @@ public class Runtime : IYoloRuntime
         YoloConfig config,
         ILogger<Runtime> logger)
     {
-        _tradeResultsSubject = new Subject<(string baseAsset, IEnumerable<TradeResult> results)>();
+        _tokenSubject =
+            new Subject<(string baseAsset, IReadOnlyDictionary<string, TradeResult> results,
+                IReadOnlyDictionary<string, Position> positions)>();
         _weightsService = weightsService;
         _broker = broker;
         _marketUpdatesSubscription = _broker.MarketUpdates.Subscribe(OnUpdate);
@@ -45,12 +50,10 @@ public class Runtime : IYoloRuntime
         _positionUpdatesSubscription = _broker.PositionUpdates.Subscribe(OnUpdate);
         _tradeFactory = tradeFactory;
         _logger = logger;
-        _cachedMarkets = new ConcurrentDictionary<string, IEnumerable<MarketInfo>>();
-        _cachedPositions = new ConcurrentDictionary<string, IEnumerable<Position>>();
-        _cachedWeights = new ConcurrentDictionary<string, Weight>();
+        _cachedMarkets = new ConcurrentDictionary<string, IDictionary<string, MarketInfo>>();
+        _cachedPositions = new ConcurrentDictionary<string, IDictionary<string, Position>>();
         _cachedTradeResults = new ConcurrentDictionary<string, IDictionary<string, TradeResult>>();
-        _tradeResultsSubscription = _tradeResultsSubject
-            .Subscribe(OnUpdate);
+        _cachedWeights = new ConcurrentDictionary<string, Weight>();
 
         UnfilledOrderTimeout = config.UnfilledOrderTimeout;
     }
@@ -58,8 +61,8 @@ public class Runtime : IYoloRuntime
 
     public TimeSpan? UnfilledOrderTimeout { get; set; }
 
-    public IObservable<(string baseAsset, IEnumerable<TradeResult> results)> TradeUpdates =>
-        _tradeResultsSubject;
+    public IObservable<(string token, IReadOnlyDictionary<string, TradeResult> results,
+        IReadOnlyDictionary<string, Position> positions )> TokenUpdates => _tokenSubject;
 
     public async Task<IEnumerable<IGrouping<string, Trade>>> RebalanceAsync(CancellationToken cancellationToken)
     {
@@ -73,8 +76,7 @@ public class Runtime : IYoloRuntime
         }
 
         var positions = await _broker.GetPositionsAsync(cancellationToken);
-
-        positions.CopyTo(_cachedPositions);
+        positions.CopyDictOfDictTo(_cachedPositions);
 
         var weights = await UpdateWeights(cancellationToken);
 
@@ -86,7 +88,7 @@ public class Runtime : IYoloRuntime
             baseAssetFilter,
             cancellationToken);
 
-        markets.CopyTo(_cachedMarkets);
+        markets.CopyDictOfDictTo(_cachedMarkets);
 
         return CalculateTrades(_cachedWeights);
     }
@@ -140,15 +142,15 @@ public class Runtime : IYoloRuntime
         }
     }
 
-    private async Task<IDictionary<string, Weight>> UpdateWeights(CancellationToken cancellationToken)
+    private async Task<IReadOnlyDictionary<string, Weight>> UpdateWeights(CancellationToken cancellationToken)
     {
         var weights = await _weightsService.GetWeightsAsync(cancellationToken);
         _cachedWeights.Clear();
-        weights.CopyTo(_cachedWeights);
+        weights.CopyDictTo(_cachedWeights);
         return weights;
     }
 
-    private IGrouping<string, Trade>[] CalculateTrades(IDictionary<string, Weight> weights)
+    private IEnumerable<IGrouping<string, Trade>> CalculateTrades(IDictionary<string, Weight> weights)
     {
         var groups = _tradeFactory
             .CalculateTrades(weights, _cachedPositions, _cachedMarkets)
@@ -157,7 +159,14 @@ public class Runtime : IYoloRuntime
 
         foreach (var g in groups)
         {
-            OnNext(g.Key, g.Select(t => new TradeResult(t)));
+            var tokenTradeResults = new ConcurrentDictionary<string, TradeResult>();
+
+            foreach (var trade in g)
+            {
+                tokenTradeResults[trade.AssetName] = new TradeResult(trade);
+            }
+
+            _cachedTradeResults[g.Key] = tokenTradeResults;
         }
 
         return groups;
@@ -169,17 +178,6 @@ public class Runtime : IYoloRuntime
         {
             OnNext(result);
         }
-    }
-
-    private void OnNext(TradeResult result)
-    {
-        if (!_cachedTradeResults.TryGetValue(result.Trade.BaseAsset, out var tradeResults))
-        {
-            return;
-        }
-
-        tradeResults[result.Trade.AssetName] = result;
-        OnNext(result.Trade.BaseAsset, tradeResults.Values);
     }
 
     protected virtual void Dispose(bool disposing)
@@ -195,33 +193,29 @@ public class Runtime : IYoloRuntime
             _marketUpdatesSubscription.Dispose();
             _orderUpdatesSubscription.Dispose();
             _positionUpdatesSubscription.Dispose();
-            _tradeResultsSubject.Dispose();
-            _tradeResultsSubscription.Dispose();
+            _tokenSubject.Dispose();
         }
 
         _disposed = true;
     }
 
-    private void OnNext(string baseAsset, IEnumerable<TradeResult> results) =>
-        _tradeResultsSubject.OnNext((baseAsset, results));
-
     private void OnUpdate(MarketInfo marketInfo)
     {
-        var baseAsset = marketInfo.BaseAsset;
+        var token = marketInfo.BaseAsset;
 
-        if (!_cachedMarkets.TryGetValue(baseAsset, out var markets))
+        if (!_cachedMarkets.ContainsKey(token))
         {
             return;
         }
 
-        var baseAssetMarkets = markets.ToDictionary(mkt => mkt.Name, mkt => mkt);
+        var baseAssetMarkets = _cachedMarkets[token];
         baseAssetMarkets[marketInfo.Name] = marketInfo;
-        _cachedMarkets[baseAsset] = baseAssetMarkets.Values;
+        _cachedMarkets[token] = baseAssetMarkets;
 
-        if (_cachedTradeResults.TryGetValue(baseAsset, out var results) &&
+        if (_cachedTradeResults.TryGetValue(token, out var results) &&
             results.Values.All(tr => tr.Order?.OrderStatus is not OrderStatus.New or OrderStatus.Open))
         {
-            RecalculateTrades(baseAsset);
+            RecalculateTrades(token);
         }
     }
 
@@ -242,17 +236,35 @@ public class Runtime : IYoloRuntime
 
     private void OnUpdate(Position position)
     {
-        var baseAsset = position.BaseAsset;
-        var baseAssetPositions = _cachedPositions[baseAsset]
-            .ToDictionary(pos => pos.AssetName, pos => pos);
-        baseAssetPositions[position.AssetName] = position;
-        _cachedPositions[baseAsset] = baseAssetPositions.Values;
+        var token = position.BaseAsset;
+        if (!_cachedPositions.ContainsKey(token))
+            _cachedPositions[token] = new ConcurrentDictionary<string, Position>();
+        var tokenPositions = _cachedPositions[token];
+        tokenPositions[position.AssetName] = position;
+        _cachedPositions[position.AssetName] = tokenPositions;
+        OnUpdated(position.BaseAsset, positions: tokenPositions);
     }
 
-    private void OnUpdate((string baseAsset, IEnumerable<TradeResult> results) update)
+    private void OnNext(TradeResult result)
     {
-        var (baseAsset, results) = update;
-        _cachedTradeResults[baseAsset] = results.ToDictionary(tr => tr.Trade.AssetName);
+        var token = result.Trade.BaseAsset;
+        var tokenTradeResults = _cachedTradeResults[token];
+        tokenTradeResults[result.Trade.AssetName] = result;
+        _cachedTradeResults[token] = tokenTradeResults;
+        OnUpdated(token, tokenTradeResults);
+    }
+
+    private void OnUpdated(
+        string baseAsset,
+        IDictionary<string, TradeResult>? tradeResults = null,
+        IDictionary<string, Position>? positions = null)
+    {
+        tradeResults ??= _cachedTradeResults[baseAsset];
+        positions ??= _cachedPositions[baseAsset];
+        
+        _tokenSubject.OnNext((baseAsset,
+            (IReadOnlyDictionary<string, TradeResult>) tradeResults,
+            (IReadOnlyDictionary<string, Position>) positions));
     }
 
     private async Task Resubmit(Trade trade)
@@ -265,7 +277,7 @@ public class Runtime : IYoloRuntime
     {
         var weight = _cachedWeights[baseAsset];
         var groupings = CalculateTrades(new Dictionary<string, Weight> { { baseAsset, weight } });
-        
+
         return groupings.First();
     }
 }

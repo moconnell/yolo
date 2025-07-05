@@ -33,12 +33,12 @@ public class YoloViewModel : ReactiveObject, IDisposable, IActivatableViewModel
         _completedSubject = new Subject<decimal?>();
 
         var tradeUpdates = _yoloRuntime
-            .TradeUpdates
+            .TokenUpdates
             .Throttle(
                 TimeSpan.FromMilliseconds(500),
-                tuple => tuple.baseAsset,
-                tuple => tuple.results,
-                new TradeResultsComparer(),
+                tuple => tuple.token,
+                tuple => (tuple.results, tuple.positions),
+                new TokenUpdateTupleComparer(),
                 cancellationTokenSource.Token)
             .ToObservableChangeSet(x => x.Key)
             .AsObservableCache();
@@ -52,7 +52,7 @@ public class YoloViewModel : ReactiveObject, IDisposable, IActivatableViewModel
                 _ =>
                 {
                     var tradeUpdatesItems = tradeUpdates.Items
-                        .SelectMany(x => x.Value)
+                        .SelectMany(kvp => kvp.Value.Item1.Values)
                         .ToArray();
                     _canSubmitSubject.OnNext(tradeUpdatesItems.Any(y => y.Order is null));
 
@@ -75,7 +75,7 @@ public class YoloViewModel : ReactiveObject, IDisposable, IActivatableViewModel
                 _canSubmitSubject.OnNext(false);
 
                 var trades = tradeUpdates.Items
-                    .SelectMany(x => x.Value)
+                    .SelectMany(kvp => kvp.Value.Item1.Values)
                     .Select(x => x.Trade);
 
                 return _yoloRuntime.PlaceTradesAsync(trades, cancellationTokenSource.Token);

@@ -14,6 +14,15 @@ public static class TestExtensions
             kvp => kvp.Value.Cast<TValue>());
     }
 
+    public static Dictionary<TKey, IDictionary<TKey, TValue>> ToDictionaryOfDictionary<TKey, TValue>(
+        this IDictionary<TKey, TValue[]> dictionary,
+        Func<TValue, TKey> keySelector) where TKey : notnull
+    {
+        return dictionary.ToDictionary(
+            kvp => kvp.Key,
+            kvp => kvp.Value.ToDictionary(keySelector) as IDictionary<TKey, TValue>);
+    }
+
     public static async Task<T?> DeserializeAsync<T>(this string path)
     {
         await using var stream = File.OpenRead(path);

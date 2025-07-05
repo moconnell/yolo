@@ -10,6 +10,8 @@ namespace YoloTrades;
 
 public class TradeFactory : ITradeFactory
 {
+    private static readonly IDictionary<string, MarketInfo> NoMarkets = new Dictionary<string, MarketInfo>();
+    private static readonly IDictionary<string, Position> NoPositions = new Dictionary<string, Position>();
     private readonly ILogger<TradeFactory> _logger;
 
     public TradeFactory(ILogger<TradeFactory> logger, YoloConfig yoloConfig)
@@ -32,8 +34,8 @@ public class TradeFactory : ITradeFactory
 
     public IEnumerable<IGrouping<string, Trade>> CalculateTrades(
         IDictionary<string, Weight> weights,
-        IDictionary<string, IEnumerable<Position>> positions,
-        IDictionary<string, IEnumerable<MarketInfo>> markets)
+        IDictionary<string, IDictionary<string, Position>> positions,
+        IDictionary<string, IDictionary<string, MarketInfo>> markets)
     {
         var nominal = NominalCash ??
                       positions.GetTotalValue(markets, BaseCurrencyToken);
@@ -59,21 +61,23 @@ public class TradeFactory : ITradeFactory
             _logger.Weight(token, w);
 
             var tokenPositions = positions.TryGetValue(token, out var pos)
-                ? pos.ToArray()
-                : Array.Empty<Position>();
+                ? pos
+                : NoPositions;
             var constrainedTargetWeight = weightConstraint * w.ComboWeight;
 
-            var projectedPositions = markets.GetMarkets(token)
+            var projectedPositions = markets.GetValueOrDefault(token, NoMarkets)
                 .ToDictionary(
-                    market => market.Name,
-                    market =>
+                    kvpMarketInfo => kvpMarketInfo.Key,
+                    kvpMarketInfo =>
                     {
+                        var market = kvpMarketInfo.Value;
                         if (market.Bid is null)
                             _logger.NoBid(token, market.Key);
                         if (market.Ask is null)
                             _logger.NoAsk(token, market.Key);
 
                         var position = tokenPositions
+                                           .Values
                                            .FirstOrDefault(
                                                p =>
                                                    p.AssetType == market.AssetType &&

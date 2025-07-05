@@ -29,15 +29,15 @@ namespace YoloRuntime.Test;
 public class IntegrationTests
 {
     [Theory]
-    [InlineData("Data/json/001", 10000, 0.5, 0.02)]
+    [InlineData("Data/json/001", 10000, 0.5, 0.02, false)]
     [InlineData("Data/json/002-PostOnly", 10000, 0.5, 0.02)]
     public async Task ShouldRebalance(
         string path,
         decimal nominalCash,
         decimal spreadSplit,
         decimal tradeBuffer,
-        AssetPermissions assetPermissions = AssetPermissions.All,
         bool postOnly = true,
+        AssetPermissions assetPermissions = AssetPermissions.All,
         string quoteCurrency = "USD")
     {
         // arrange
@@ -152,8 +152,8 @@ public class IntegrationTests
 
         var runtimeLogger = new Mock<ILogger<Runtime>>();
         var runtime = new Runtime(weightsService.Object, broker, tradeFactory, yoloConfig, runtimeLogger.Object);
-        var tradeResults = new List<(string, IEnumerable<TradeResult>)>();
-        runtime.TradeUpdates.Subscribe(tradeResults.Add);
+        var tradeResults = new List<(string token, IReadOnlyDictionary<string,TradeResult> results, IReadOnlyDictionary<string,Position> positions)>();
+        runtime.TokenUpdates.Subscribe(tradeResults.Add);
 
         (DateTime timestamp, Action action) ToTimeStampedAction<T>(TestDataEvent<T> e, Action<DataEvent<T>> action) =>
             (e.Timestamp, () => action(e.ToDataEvent()));
@@ -189,7 +189,7 @@ public class IntegrationTests
         // assert
         tradeResults.MatchSnapshot(
             $"ShouldCalculateTrades_{path.Replace("/", "_")}",
-            options => options.IgnoreFields("[*].Item2.[*].Trade.Id")
+            options => options.IgnoreFields("[*].Item2.*.Trade.Id")
         );
     }
 }

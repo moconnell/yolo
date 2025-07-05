@@ -22,12 +22,12 @@ public class YoloView : Window, IViewFor<YoloViewModel>
         RebalanceProgressLabel(cancelButton);
     }
 
-    public YoloViewModel ViewModel { get; set; }
+    public YoloViewModel? ViewModel { get; set; }
 
-    object IViewFor.ViewModel
+    object? IViewFor.ViewModel
     {
         get => ViewModel;
-        set => ViewModel = (YoloViewModel) value;
+        set => ViewModel = (YoloViewModel?) value;
     }
 
     protected override void Dispose(bool disposing)
@@ -45,7 +45,7 @@ public class YoloView : Window, IViewFor<YoloViewModel>
 
     private TableView TradesTable(View previous)
     {
-        var tableView = new TableView(ViewModel.Trades)
+        var tableView = new TableView(ViewModel!.Trades)
         {
             X = Pos.Left(previous),
             Y = Pos.Top(previous) + 1,
@@ -94,9 +94,9 @@ public class YoloView : Window, IViewFor<YoloViewModel>
             Width = 40
         };
 
-        ViewModel
+        ViewModel!
             .WhenAnyObservable(x => x.Completed)
-            .Select(completed => completed.HasValue ? ustring.Make($"Rebalancing... {ViewModel.Completed:0%}") : idle)
+            .Select(completed => completed.HasValue ? ustring.Make($"Rebalancing... {ViewModel!.Completed:0%}") : idle)
             .ObserveOn(RxApp.MainThreadScheduler)
             .BindTo(rebalanceProgressLabel, x => x.Text)
             .DisposeWith(_disposable);

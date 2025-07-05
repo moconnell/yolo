@@ -8,13 +8,13 @@ namespace YoloBroker;
 
 public interface IYoloBroker : IDisposable
 {
-    Task<Dictionary<long, Order>> GetOrdersAsync(CancellationToken ct);
+    Task<IReadOnlyDictionary<long, Order>> GetOrdersAsync(CancellationToken ct);
     
-    Task<IDictionary<string, IEnumerable<Position>>> GetPositionsAsync(CancellationToken ct);
+    Task<IReadOnlyDictionary<string, IReadOnlyDictionary<string, Position>>> GetPositionsAsync(CancellationToken ct);
 
     IAsyncEnumerable<TradeResult> PlaceTradesAsync(IEnumerable<Trade> trades, CancellationToken ct);
 
-    Task<IDictionary<string, IEnumerable<MarketInfo>>> GetMarketsAsync(
+    Task<IReadOnlyDictionary<string, IReadOnlyDictionary<string, MarketInfo>>> GetMarketsAsync(
         ISet<string>? baseAssetFilter = null,
         CancellationToken ct = default);
 

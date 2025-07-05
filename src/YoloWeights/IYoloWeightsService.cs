@@ -6,5 +6,5 @@ namespace YoloWeights;
 
 public interface IYoloWeightsService
 {
-    Task<IDictionary<string, YoloAbstractions.Weight>> GetWeightsAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyDictionary<string, YoloAbstractions.Weight>> GetWeightsAsync(CancellationToken cancellationToken);
 }

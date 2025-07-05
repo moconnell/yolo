@@ -8,6 +8,6 @@ public interface ITradeFactory
 {
     IEnumerable<IGrouping<string, Trade>> CalculateTrades(
         IDictionary<string, Weight> weights,
-        IDictionary<string, IEnumerable<Position>> positions,
-        IDictionary<string, IEnumerable<MarketInfo>> markets);
+        IDictionary<string, IDictionary<string, Position>> positions,
+        IDictionary<string, IDictionary<string, MarketInfo>> markets);
 }

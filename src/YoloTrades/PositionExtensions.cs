@@ -6,18 +6,17 @@ namespace YoloTrades;
 
 public static class PositionExtensions
 {
+    private static readonly Dictionary<string, MarketInfo> NoMarkets = new();
+    
     public static decimal GetTotalValue(
-        this IDictionary<string, IEnumerable<Position>> positions,
-        IDictionary<string, IEnumerable<MarketInfo>> markets,
+        this IDictionary<string, IDictionary<string, Position>> positions,
+        IDictionary<string, IDictionary<string, MarketInfo>> markets,
         string baseCurrencyToken)
     {
-        decimal PositionValue(KeyValuePair<string, IEnumerable<Position>> kvp)
+        decimal PositionValue(KeyValuePair<string, IDictionary<string, Position>> kvp)
         {
-            var (symbol, position) = kvp;
-
-            return baseCurrencyToken == symbol
-                ? position.Sum(p => p.Amount)
-                : position.Sum(p => p.GetValue(markets, baseCurrencyToken));
+            var (_, tokenPositions) = kvp;
+            return tokenPositions.Values.Sum(p => p.GetValue(markets, baseCurrencyToken));
         }
 
         return positions.Sum(PositionValue);
@@ -25,14 +24,19 @@ public static class PositionExtensions
 
     private static decimal GetValue(
         this Position position,
-        IDictionary<string, IEnumerable<MarketInfo>> markets,
+        IDictionary<string, IDictionary<string, MarketInfo>> markets,
         string baseCurrencyToken)
     {
-        var (_, assetUnderlying, _, amount) = position;
+        var (assetName, baseAsset, _, amount) = position;
+        if (baseAsset == baseCurrencyToken)
+            return position.Amount;
+        
+        var tokenMarkets = markets.GetValueOrDefault(baseAsset, NoMarkets);
+        if (tokenMarkets.TryGetValue(assetName, out var positionMarket))
+        {
+            return amount * positionMarket.Bid.GetValueOrDefault();
+        }
 
-        return markets
-            .GetMarkets(assetUnderlying)
-            .Select(market => amount * market.Bid.GetValueOrDefault())
-            .FirstOrDefault();
+        return 0;
     }
 }

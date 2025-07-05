@@ -143,22 +143,22 @@ public class FtxBroker : IYoloBroker
             LogData(result);
 
             var order = result.Data.ToOrder();
-            
-            if (order is {})
+
+            if (order is { })
                 _orderUpdates[order.Id] = new OrderUpdate(trade, order);
-            
+
             var tradeResult = new TradeResult(
                 trade,
                 result.Success,
                 order,
                 result.Error?.Message,
                 result.Error?.Code);
-            
+
             yield return tradeResult;
         }
     }
 
-    public async Task<Dictionary<long, Order>> GetOrdersAsync(CancellationToken ct)
+    public async Task<IReadOnlyDictionary<long, Order>> GetOrdersAsync(CancellationToken ct)
     {
         var orders =
             await GetDataAsync(
@@ -168,15 +168,15 @@ public class FtxBroker : IYoloBroker
         return orders.ToDictionary(x => x.Id, x => x.ToOrder()!);
     }
 
-    public async Task<IDictionary<string, IEnumerable<Position>>> GetPositionsAsync(
-        CancellationToken ct = default)
+    public async Task<IReadOnlyDictionary<string, IReadOnlyDictionary<string, Position>>> GetPositionsAsync(
+        CancellationToken ct)
     {
         var positions =
             await GetDataAsync(
                 () => _ftxClient.TradeApi.Account.GetPositionsAsync(ct: ct),
                 "Could not get account info");
 
-        var result = new Dictionary<string, IEnumerable<Position>>();
+        var result = new Dictionary<string, Dictionary<string, Position>>();
 
         foreach (var position in positions)
         {
@@ -184,13 +184,16 @@ public class FtxBroker : IYoloBroker
                 .Split("-")
                 .First();
 
-            result[baseAsset] = new List<Position>
+            result[baseAsset] = new Dictionary<string, Position>
             {
-                new(
+                {
                     position.Future,
-                    baseAsset,
-                    AssetType.Future,
-                    position.Quantity * (position.Side == OrderSide.Buy ? 1 : -1))
+                    new(
+                        position.Future,
+                        baseAsset,
+                        AssetType.Future,
+                        position.Quantity * (position.Side == OrderSide.Buy ? 1 : -1))
+                }
             };
         }
 
@@ -206,19 +209,19 @@ public class FtxBroker : IYoloBroker
                 AssetType.Spot,
                 holding.Total);
 
-            if (result.TryGetValue(holding.Asset, out var positionsList))
-                (positionsList as List<Position>)?.Add(position);
+            if (result.TryGetValue(holding.Asset, out var positionsDictionary))
+                positionsDictionary[position.AssetName] = position;
             else
-                result[holding.Asset] = new List<Position>
+                result[holding.Asset] = new Dictionary<string, Position>
                 {
-                    position
+                    { position.AssetName, position }
                 };
         }
 
-        return result;
+        return result.ToDictionary(kvp => kvp.Key, kvp => kvp.Value as IReadOnlyDictionary<string, Position>);
     }
 
-    public async Task<IDictionary<string, IEnumerable<MarketInfo>>> GetMarketsAsync(
+    public async Task<IReadOnlyDictionary<string, IReadOnlyDictionary<string, MarketInfo>>> GetMarketsAsync(
         ISet<string>? baseAssetFilter = null,
         CancellationToken ct = default)
     {
@@ -263,7 +266,9 @@ public class FtxBroker : IYoloBroker
 
         return filteredSymbols
             .GroupBy(s => s.BaseAsset ?? s.Underlying)
-            .ToDictionary(g => g.Key, g => g.Select(s => ToMarketInfo(s)));
+            .ToDictionary(
+                g => g.Key,
+                g => g.ToDictionary(s => s.Name, s => ToMarketInfo(s)) as IReadOnlyDictionary<string, MarketInfo>);
     }
 
     public async Task CancelOrderAsync(long orderId, CancellationToken ct)

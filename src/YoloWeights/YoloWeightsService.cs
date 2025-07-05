@@ -16,11 +16,10 @@ public class YoloWeightsService : IYoloWeightsService
 
     public YoloWeightsService(YoloConfig config) => _config = config;
 
-    public async Task<IDictionary<string, YoloAbstractions.Weight>>
-        GetWeightsAsync(CancellationToken cancellationToken) =>
+    public async Task<IReadOnlyDictionary<string, YoloAbstractions.Weight>> GetWeightsAsync(CancellationToken cancellationToken) =>
         await GetWeights(_config.WeightsUrl, _config.DateFormat, cancellationToken);
 
-    private static async Task<IDictionary<string, YoloAbstractions.Weight>> GetWeights(
+    private static async Task<IReadOnlyDictionary<string, YoloAbstractions.Weight>> GetWeights(
         string weightsUrl,
         string dateFormat = "yyyy-MM-dd",
         CancellationToken cancellationToken = default)

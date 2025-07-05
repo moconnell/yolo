@@ -21,14 +21,18 @@ public static class DataTableExtensions
     private const string Created = nameof(Created);
     private const string Status = nameof(Status);
     private const string Remaining = nameof(Remaining);
+    private const string Position = nameof(Position);
 
     public static DataTable AsDataTable(
-        this IObservable<IChangeSet<KeyValuePair<string, IEnumerable<TradeResult>>, string>> observable,
+        this IObservable<IChangeSet<
+            KeyValuePair<string, (IReadOnlyDictionary<string, TradeResult>, IReadOnlyDictionary<string, Position>)>,
+            string>> observable,
         CancellationToken cancellationToken)
     {
         var dataTable = new DataTable();
         dataTable.Columns.Add(Token, typeof(string));
         dataTable.Columns.Add(Instrument, typeof(string));
+        dataTable.Columns.Add(Position, typeof(decimal));
         dataTable.Columns.Add(Side, typeof(string));
         dataTable.Columns.Add(Amount, typeof(decimal));
         dataTable.Columns.Add(Limit, typeof(decimal));
@@ -50,39 +54,43 @@ public static class DataTableExtensions
             dataRow.BeginEdit();
             dataRow[Token] = objects[0];
             dataRow[Instrument] = objects[1];
-            dataRow[Side] = objects[2];
-            dataRow[Amount] = objects[3];
-            dataRow[Limit] = objects[4];
-            dataRow[Value] = objects[5];
-            dataRow[PostOnly] = objects[6];
-            dataRow[Created] = objects[7] ?? DBNull.Value;
-            dataRow[Status] = objects[8] ?? DBNull.Value;
-            dataRow[Remaining] = objects[9] ?? DBNull.Value;
+            dataRow[Position] = objects[2];
+            dataRow[Side] = objects[3];
+            dataRow[Amount] = objects[4];
+            dataRow[Limit] = objects[5];
+            dataRow[Value] = objects[6];
+            dataRow[PostOnly] = objects[7];
+            dataRow[Created] = objects[8] ?? DBNull.Value;
+            dataRow[Status] = objects[9] ?? DBNull.Value;
+            dataRow[Remaining] = objects[10] ?? DBNull.Value;
             dataRow.EndEdit();
 
             return true;
         }
 
-        void OnNext(IChangeSet<KeyValuePair<string, IEnumerable<TradeResult>>, string> changeSet)
+        void OnNext(IChangeSet<KeyValuePair<string, (IReadOnlyDictionary<string, TradeResult> tradeResults, IReadOnlyDictionary<string, Position> positions)>, string> changeSet)
         {
             foreach (var change in changeSet)
             {
                 var baseAsset = change.Key;
-                var tradeResults = change.Current.Value;
+                var positions = change.Current.Value.positions;
+                var tradeResults = change.Current.Value.tradeResults;
                 var keys = new List<string>();
 
-                foreach (var result in tradeResults)
+                foreach (var kvp in tradeResults)
                 {
-                    var key = result.Trade.AssetName;
-                    keys.Add(key);
+                    var tradeResult = kvp.Value;
+                    var assetName = tradeResult.Trade.AssetName;
+                    keys.Add(assetName);
+                    var position = positions[assetName];
 
                     switch (change.Reason)
                     {
                         case ChangeReason.Add:
                         case ChangeReason.Update:
                         case ChangeReason.Refresh:
-                            var row = dataTable.Rows.Find(key);
-                            var itemArray = result.ToArray();
+                            var row = dataTable.Rows.Find(assetName);
+                            var itemArray = tradeResult.ToArray(position);
                             if (SetRow(row, itemArray))
                             {
                                 break;
@@ -100,7 +108,7 @@ public static class DataTableExtensions
                         case ChangeReason.Moved:
                             break;
                         case ChangeReason.Remove:
-                            var row2Delete = dataTable.Rows.Find(key);
+                            var row2Delete = dataTable.Rows.Find(assetName);
                             if (row2Delete is { })
                             {
                                 dataTable.Rows.Remove(row2Delete);
@@ -128,19 +136,20 @@ public static class DataTableExtensions
         return dataTable;
     }
 
-    private static object?[] ToArray(this TradeResult tradeResult)
+    private static object?[] ToArray(this TradeResult tradeResult, Position? position)
     {
         return new object?[]
         {
             tradeResult.Trade.BaseAsset,
             tradeResult.Trade.AssetName,
+            position?.Amount ?? 0,
             tradeResult.Trade.Side,
             Math.Abs(tradeResult.Trade.Amount),
             tradeResult.Trade.LimitPrice,
             tradeResult.Trade.Value.Round(2),
             tradeResult.Trade.PostPrice,
             tradeResult.Order?.Created,
-            tradeResult.Order?.OrderStatus,
+            tradeResult.Order?.OrderStatus.ToString(),
             tradeResult.Order?.AmountRemaining
         };
     }

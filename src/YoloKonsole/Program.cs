@@ -24,7 +24,7 @@ internal class Program
     [Argument('s', "silent", "Silent running: no challenge will be issued before placing trades")]
     internal static bool Silent { get; set; }
 
-    private static async Task<int> Main(string[] args)
+    private static Task<int> Main(string[] args)
     {
 #if DEBUG
         var env = "development"; //Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
@@ -82,7 +82,7 @@ __  ______  __    ____  __
             Application.Run(new YoloView(new YoloViewModel(runtime, cancellationTokenSource)));
             Application.Shutdown();
 
-            return Success;
+            return Task.FromResult(Success);
         }
         catch (Exception e)
         {
@@ -92,7 +92,7 @@ __  ______  __    ____  __
 
             Console.WriteLine(e.Message);
 
-            return Error;
+            return Task.FromResult(Error);
         }
         finally
         {

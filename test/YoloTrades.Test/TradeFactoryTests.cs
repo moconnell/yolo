@@ -108,8 +108,8 @@ public class TradeFactoryTests
 
     private static
         (Dictionary<string, Weight> weights,
-        Dictionary<string, IEnumerable<Position>> positions,
-        Dictionary<string, IEnumerable<MarketInfo>> markets,
+        Dictionary<string, IDictionary<string, Position>> positions,
+        Dictionary<string, IDictionary<string, MarketInfo>> markets,
         Dictionary<string, decimal> expectedTrades)
         DeserializeCsv(string path, string baseCurrency, decimal stepSize)
     {
@@ -139,34 +139,40 @@ public class TradeFactoryTests
         var positions = records.ToDictionary(
             x => x.Ticker,
             x =>
-                new[]
-                {
-                    new Position(
-                        $"{x.Ticker}/{baseCurrency}",
-                        x.Ticker,
-                        AssetType.Spot,
-                        x.CurrentPosition)
-                }.Cast<Position>());
+            {
+                var assetName = $"{x.Ticker}/{baseCurrency}";
+                return new Dictionary<string, Position>
+                        { { assetName, new Position(assetName, x.Ticker, AssetType.Spot, x.CurrentPosition) } } as
+                    IDictionary<string, Position>;
+            });
 
         var markets = records.ToDictionary(
             x => x.Ticker,
             x =>
-                new[]
+            {
+                var assetName = $"{x.Ticker}/{baseCurrency}";
+                return new Dictionary<string, MarketInfo>
                 {
-                    new MarketInfo(
-                        $"{x.Ticker}/{baseCurrency}",
-                        x.Ticker,
-                        baseCurrency,
-                        AssetType.Spot,
-                        stepSize,
-                        stepSize,
-                        0,
-                        x.Price,
-                        x.Price,
-                        x.Price,
-                        null,
-                        DateTime.UtcNow)
-                } as IEnumerable<MarketInfo>);
+                    {
+                        assetName,
+                        new MarketInfo(
+                            $"{x.Ticker}/{baseCurrency}",
+                            x.Ticker,
+                            baseCurrency,
+                            AssetType.Spot,
+                            stepSize,
+                            stepSize,
+                            0,
+                            x.Price,
+                            x.Price,
+                            x.Price,
+                            null,
+                            DateTime.UtcNow)
+
+                    }
+                } as IDictionary<string, MarketInfo>;
+            }
+        );
 
         var expectedTrades = records
             .Where(x => x.TradeQuantity != 0)
@@ -179,8 +185,8 @@ public class TradeFactoryTests
 
     private static async
         Task<(Dictionary<string, Weight>,
-            Dictionary<string, IEnumerable<Position>>,
-            Dictionary<string, IEnumerable<MarketInfo>>)>
+            Dictionary<string, IDictionary<string, Position>>,
+            Dictionary<string, IDictionary<string, MarketInfo>>)>
         DeserializeInputsAsync(
             string path)
     {
@@ -189,11 +195,11 @@ public class TradeFactoryTests
 
         var positions =
             (await $"{path}/positions.json".DeserializeAsync<Dictionary<string, Position[]>>())
-            .ToEnumerableDictionary();
+            .ToDictionaryOfDictionary(position => position.AssetName);
 
         var markets =
             (await $"{path}/markets.json".DeserializeAsync<Dictionary<string, MarketInfo[]>>())
-            .ToEnumerableDictionary();
+            .ToDictionaryOfDictionary(marketInfo => marketInfo.Name);
 
         return (weights, positions, markets);
     }
