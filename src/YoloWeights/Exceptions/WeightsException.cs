@@ -1,6 +1,6 @@
 using System;
 
-namespace YoloWeights;
+namespace YoloWeights.Exceptions;
 
 public class WeightsException : ApplicationException
 {

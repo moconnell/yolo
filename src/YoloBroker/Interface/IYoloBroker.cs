@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using YoloAbstractions;
 
-namespace YoloBroker;
+namespace YoloBroker.Interface;
 
 public interface IYoloBroker : IDisposable
 {

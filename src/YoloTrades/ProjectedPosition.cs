@@ -13,22 +13,14 @@ public record ProjectedPosition(MarketInfo Market, decimal Position, decimal Nom
 
     private decimal? CurrentWeight => CalcWeight(Position);
 
-    public static ProjectedPosition operator +(ProjectedPosition position, Trade trade)
-    {
-        return new(
+    public static ProjectedPosition operator +(ProjectedPosition position, Trade trade) =>
+        new(
             position.Market, 
             position.Position, 
             position.Nominal,
-            new List<Trade>(position.Trades ?? Array.Empty<Trade>()) {trade});
-    }
+            new List<Trade>(position.Trades ?? []) {trade});
 
-    private decimal? CalcWeight(Trade t)
-    {
-        return CalcWeight(t.Amount);
-    }
+    private decimal? CalcWeight(Trade t) => CalcWeight(t.Amount);
 
-    private decimal? CalcWeight(decimal amount)
-    {
-        return amount * (amount >= 0 ? Market.Bid : Market.Ask) / Nominal;
-    }
+    private decimal? CalcWeight(decimal amount) => amount * (amount >= 0 ? Market.Bid : Market.Ask) / Nominal;
 }

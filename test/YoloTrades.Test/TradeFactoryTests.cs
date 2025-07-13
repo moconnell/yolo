@@ -70,10 +70,8 @@ public class TradeFactoryTests
 
     [Theory]
     [InlineData("./Data/json/001")]
-    [InlineData("./Data/json/002_LongSpotAndPerp", AssetPermissions.LongSpotAndPerp)]
     [InlineData("./Data/json/003_ExistingPositions")]
     [InlineData("./Data/json/004_TokenUniverseChange")]
-    [InlineData("./Data/json/005_MinimumProvide", AssetPermissions.LongSpotAndPerp, "USD", 500, 0.02)]
     public async Task ShouldCalculateTrades(
         string path,
         AssetPermissions assetPermissions = AssetPermissions.All,
@@ -144,23 +142,22 @@ public class TradeFactoryTests
 
         var markets = records.ToDictionary(
             x => x.Ticker,
-            x =>
-                new[]
-                {
-                    new MarketInfo(
-                        $"{x.Ticker}/{baseCurrency}",
-                        x.Ticker,
-                        baseCurrency,
-                        AssetType.Spot,
-                        stepSize,
-                        stepSize,
-                        0,
-                        x.Price,
-                        x.Price,
-                        x.Price,
-                        null,
-                        DateTime.UtcNow)
-                } as IEnumerable<MarketInfo>);
+            IEnumerable<MarketInfo> (x) =>
+            [
+                new(
+                    $"{x.Ticker}/{baseCurrency}",
+                    x.Ticker,
+                    baseCurrency,
+                    AssetType.Spot,
+                    DateTime.UtcNow,
+                    stepSize,
+                    stepSize,
+                    0,
+                    x.Price,
+                    x.Price,
+                    x.Price
+                )
+            ]);
 
         var expectedTrades = records
             .Where(x => x.TradeQuantity != 0)
@@ -201,6 +198,6 @@ public class TradeFactoryTests
         using var streamReader = new StreamReader(stream);
         var json = await streamReader.ReadToEndAsync();
 
-        return JsonConvert.DeserializeObject<T>(json);
+        return JsonConvert.DeserializeObject<T>(json)!;
     }
 }

@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Utility.CommandLine;
 using YoloAbstractions.Config;
-using YoloBroker;
+using YoloBroker.Interface;
 using YoloTrades;
 using YoloWeights;
 using static System.Environment;

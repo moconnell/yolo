@@ -1,6 +1,6 @@
 using System;
 
-namespace YoloBroker;
+namespace YoloBroker.Exceptions;
 
 public abstract class BrokerException : ApplicationException
 {

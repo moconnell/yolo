@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace YoloWeights;
+namespace YoloWeights.Data;
 
 public class WeightsResponse
 {

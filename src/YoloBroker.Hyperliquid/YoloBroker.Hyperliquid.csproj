@@ -6,8 +6,11 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.6" />
-      <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.6" />
+        <ProjectReference Include="..\YoloBroker\YoloBroker.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="HyperLiquid.Net" Version="2.1.1" />
     </ItemGroup>
 
 </Project>

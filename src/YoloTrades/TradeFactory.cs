@@ -66,7 +66,7 @@ public class TradeFactory : ITradeFactory
 
             var tokenPositions = positions.TryGetValue(token, out var pos)
                 ? pos.ToArray()
-                : Array.Empty<Position>();
+                : [];
             var constrainedTargetWeight = weightConstraint * w.ComboWeight;
 
             var projectedPositions = markets.GetMarkets(token)
@@ -148,7 +148,7 @@ public class TradeFactory : ITradeFactory
             }
         }
 
-        var droppedTokens = positions.Keys.Except(weightsDict.Keys.Union(new[] {BaseCurrencyToken}));
+        var droppedTokens = positions.Keys.Except(weightsDict.Keys.Union([BaseCurrencyToken]));
         foreach (var token in droppedTokens)
         {
             var weight = new Weight(0, 0, DateTime.UtcNow, 0, $"{token}/{BaseCurrencyToken}", 0);
@@ -218,19 +218,11 @@ public class TradeFactory : ITradeFactory
 
             if (delta == 0)
                 continue;
-            
-            decimal CalcLimitPrice()
-            {
-                var factor = isBuy ? SpreadSplit : 1 - SpreadSplit;
-                var spread = market.Ask!.Value - market.Bid!.Value;
-                var rawLimitPrice = market.Bid!.Value + spread * factor;
-                var limitPriceSteps = rawLimitPrice / market.PriceStep;
-                return (isBuy ? Math.Floor(limitPriceSteps) : Math.Ceiling(limitPriceSteps)) *
-                       market.PriceStep;
-            }
 
             var rawSize = delta * nominal / price.Value;
-            var size = Math.Floor(rawSize / market.QuantityStep) * market.QuantityStep;
+            var size = market.QuantityStep is null
+                ? rawSize
+                : Math.Floor(rawSize / market.QuantityStep.Value) * market.QuantityStep.Value;
             
             var trade = market.MinProvideSize switch
             {
@@ -246,6 +238,21 @@ public class TradeFactory : ITradeFactory
             yield return (trade, remainingDelta);
 
             if (restart || remainingDelta == 0) break;
+            continue;
+
+            decimal? CalcLimitPrice()
+            {
+                var factor = isBuy ? SpreadSplit : 1 - SpreadSplit;
+                var spread = market.Ask!.Value - market.Bid!.Value;
+                var rawLimitPrice = market.Bid!.Value + spread * factor;
+                var limitPriceSteps = rawLimitPrice / market.PriceStep;
+                return limitPriceSteps is null
+                    ? null
+                    : (isBuy
+                          ? Math.Floor(limitPriceSteps.Value)
+                          : Math.Ceiling(limitPriceSteps.Value)) *
+                      market.PriceStep;
+            }
         }
     }
 

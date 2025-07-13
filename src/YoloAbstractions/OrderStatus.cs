@@ -1,3 +1,14 @@
 namespace YoloAbstractions;
 
-public enum OrderStatus { New, Open, Closed }
+public enum OrderStatus
+{
+    New,
+    Open,
+    Filled,
+    Canceled,
+    Triggered,
+    Rejected,
+    MarginCanceled,
+    WaitingFill,
+    WaitingTrigger
+}

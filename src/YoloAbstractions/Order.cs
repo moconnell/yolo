@@ -9,6 +9,6 @@ public record Order(
     OrderSide OrderSide,
     OrderStatus OrderStatus,
     decimal Amount,
-    decimal AmountRemaining,
-    decimal? LimitPrice,
-    string? ClientId);
+    decimal? Filled = null,
+    decimal? LimitPrice = null,
+    string? ClientId = null);
