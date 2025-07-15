@@ -17,7 +17,7 @@ public static class HyperliquidConfigExtensions
             .GetSection(ConfigSections.Hyperliquid)
             .Get<HyperliquidConfig>()
             .Ensure(c => c != null)
-            .Ensure(c => c!.ApiKey)
-            .Ensure(c => c!.Secret);
+            .Ensure(c => c!.Address)
+            .Ensure(c => c!.PrivateKey);
     }
 }

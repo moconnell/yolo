@@ -2,6 +2,6 @@ namespace YoloBroker.Hyperliquid.Config;
 
 public class HyperliquidConfig
 {
-    public required string ApiKey { get; init; }
-    public required string Secret { get; init; }
+    public required string Address { get; init; }
+    public required string PrivateKey { get; init; }
 }

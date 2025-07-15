@@ -1,17 +1,15 @@
-using CryptoExchange.Net.Authentication;
 using CryptoExchange.Net.Objects;
 using HyperLiquid.Net.Clients;
 using HyperLiquid.Net.Enums;
 using HyperLiquid.Net.Objects.Models;
-using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using YoloAbstractions;
-using YoloBroker.Hyperliquid.Config;
 using YoloBroker.Hyperliquid.Exceptions;
 using YoloBroker.Hyperliquid.Extensions;
 using YoloBroker.Interface;
@@ -24,27 +22,17 @@ public class HyperliquidBroker : IYoloBroker
 {
     private readonly HyperLiquidRestClient _hyperliquidClient;
     private readonly HyperLiquidSocketClient _hyperliquidSocketClient;
+    private readonly ILogger<HyperliquidBroker> _logger;
     private bool _disposed;
 
-    public HyperliquidBroker(IConfiguration configuration) : this(configuration.GetHyperliquidConfig()!)
+    public HyperliquidBroker(
+        HyperLiquidRestClient hyperliquidClient,
+        HyperLiquidSocketClient hyperliquidSocketClient,
+        ILogger<HyperliquidBroker> logger) 
     {
-    }
-
-    public HyperliquidBroker(HyperliquidConfig config)
-    {
-        var credentials = new ApiCredentials(config.ApiKey, config.Secret);
-
-        _hyperliquidClient = new HyperLiquidRestClient(
-            options =>
-            {
-                options.ApiCredentials = credentials;
-            });
-
-        _hyperliquidSocketClient = new HyperLiquidSocketClient(
-            options =>
-            {
-                options.ApiCredentials = credentials;
-            });
+        _hyperliquidClient = hyperliquidClient;
+        _hyperliquidSocketClient = hyperliquidSocketClient;
+        _logger = logger;
     }
 
     public void Dispose()
