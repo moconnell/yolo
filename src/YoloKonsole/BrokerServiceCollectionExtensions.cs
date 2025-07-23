@@ -1,3 +1,5 @@
+using CryptoExchange.Net.Authentication;
+using HyperLiquid.Net;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using YoloAbstractions.Config;
@@ -15,6 +17,19 @@ public static class BrokerServiceCollectionExtensions
     {
         if (config.HasHyperliquidConfig())
         {
+            var hyperliquidConfig = config.GetHyperliquidConfig()!;
+            services.AddHyperLiquid(options =>
+            {
+                options.ApiCredentials = new ApiCredentials(hyperliquidConfig.Address, hyperliquidConfig.PrivateKey);
+
+                if (hyperliquidConfig.UseTestnet)
+                {
+                    options.Environment = HyperLiquidEnvironment.Testnet;
+                    options.Rest.OutputOriginalData = true;
+                    options.Socket.OutputOriginalData = true;
+                }
+            });
+
             return services.AddSingleton<IYoloBroker, HyperliquidBroker>();
         }
 

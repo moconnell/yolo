@@ -15,9 +15,11 @@ public static class WeightsExtensions
 {
     public static async Task<IEnumerable<YoloAbstractions.Weight>> GetWeights(
         this YoloConfig config) =>
-        await GetWeights(config.WeightsUrl, config.DateFormat);
+        await GetWeights(config.GetWeightsUrl(), config.DateFormat);
 
-    public static async Task<IEnumerable<YoloAbstractions.Weight>> GetWeights(
+    private static string GetWeightsUrl(this YoloConfig config) => $"{config.ApiBaseUrl}/{config.WeightsUrlPath}?api_key={config.ApiKey}";
+
+    private static async Task<IEnumerable<YoloAbstractions.Weight>> GetWeights(
         this string weightsUrl,
         string dateFormat = "yyyy-MM-dd")
     {
@@ -36,7 +38,7 @@ public static class WeightsExtensions
         if (!response.IsSuccessStatusCode)
         {
             throw new WeightsException(
-                $"Could not fetch weights: {response.ReasonPhrase} ({response.StatusCode})");
+                $"Could not fetch weights from {weightsUrl}: {await response.Content.ReadAsStringAsync()} ({response.StatusCode}: {response.ReasonPhrase})");
         }
 
         var weightsResponse = await response.Content.ReadFromJsonAsync<WeightsResponse>();

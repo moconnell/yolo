@@ -14,7 +14,7 @@ public class TradeFactory : ITradeFactory
     private readonly ILogger<TradeFactory> _logger;
 
     public TradeFactory(ILogger<TradeFactory> logger, IConfiguration configuration)
-        : this(logger, configuration.GetYoloConfig())
+        : this(logger, configuration.GetYoloConfig()!)
     {
     }
 
@@ -25,7 +25,7 @@ public class TradeFactory : ITradeFactory
         TradeBuffer = yoloConfig.TradeBuffer;
         MaxLeverage = yoloConfig.MaxLeverage;
         NominalCash = yoloConfig.NominalCash;
-        BaseCurrencyToken = yoloConfig.BaseAsset;
+        BaseCurrencyToken = yoloConfig.BaseCurrencyToken;
         SpreadSplit = Math.Max(0, Math.Min(1, yoloConfig.SpreadSplit));
     }
 
@@ -38,13 +38,13 @@ public class TradeFactory : ITradeFactory
 
     public IEnumerable<Trade> CalculateTrades(
         IEnumerable<Weight> weights,
-        IDictionary<string, IEnumerable<Position>> positions,
-        IDictionary<string, IEnumerable<MarketInfo>> markets)
+        IDictionary<string, IReadOnlyList<Position>> positions,
+        IDictionary<string, IReadOnlyList<MarketInfo>> markets)
     {
         var nominal = NominalCash ??
                       positions.GetTotalValue(markets, BaseCurrencyToken);
         var weightsDict = weights.ToDictionary(
-            weight => weight.Ticker.SplitConstituents().Item1,
+            weight => weight.Ticker.GetBaseAndQuoteAssets().BaseAsset,
             weight => (weight, isInUniverse: true));
 
         _logger.CalculateTrades(weightsDict, positions, markets);
@@ -57,6 +57,17 @@ public class TradeFactory : ITradeFactory
         var weightConstraint = unconstrainedTargetLeverage < MaxLeverage
             ? 1
             : MaxLeverage / unconstrainedTargetLeverage;
+
+        var droppedTokens = positions.Keys.Except(weightsDict.Keys.Union([BaseCurrencyToken]));
+        foreach (var token in droppedTokens)
+        {
+            var weight = new Weight(0, 0, DateTime.UtcNow, 0, $"{token}/{BaseCurrencyToken}", 0);
+            weightsDict[token] = (weight, false);
+        }
+
+        return weightsDict
+            .Select(RebalancePosition)
+            .SelectMany(CombineOrders);
 
         IEnumerable<Trade> RebalancePosition(KeyValuePair<string, (Weight, bool)> kvp)
         {
@@ -91,7 +102,7 @@ public class TradeFactory : ITradeFactory
                         return new ProjectedPosition(market, position.Amount, nominal);
                     });
 
-            if (!projectedPositions.Any())
+            if (projectedPositions.Count == 0)
             {
                 _logger.NoMarkets(token);
                 yield break;
@@ -130,7 +141,7 @@ public class TradeFactory : ITradeFactory
             {
                 var trades = CalcTrades(
                     token,
-                    projectedPositions.Values.ToArray(),
+                    [.. projectedPositions.Values],
                     bufferedTargetWeight,
                     remainingDelta);
 
@@ -147,17 +158,6 @@ public class TradeFactory : ITradeFactory
                 }
             }
         }
-
-        var droppedTokens = positions.Keys.Except(weightsDict.Keys.Union([BaseCurrencyToken]));
-        foreach (var token in droppedTokens)
-        {
-            var weight = new Weight(0, 0, DateTime.UtcNow, 0, $"{token}/{BaseCurrencyToken}", 0);
-            weightsDict[token] = (weight, false);
-        }
-
-        return weightsDict
-            .Select(RebalancePosition)
-            .SelectMany(CombineOrders);
     }
 
     private static IEnumerable<Trade> CombineOrders(IEnumerable<Trade> trades)
@@ -171,8 +171,6 @@ public class TradeFactory : ITradeFactory
         decimal bufferedTargetWeight,
         decimal remainingDelta)
     {
-        bool HasPosition(ProjectedPosition p) => p.HasPosition;
-
         var startingWeight = bufferedTargetWeight - remainingDelta;
         var crossingZeroWeightBoundary = startingWeight != 0 && bufferedTargetWeight / startingWeight < 0;
 
@@ -223,7 +221,7 @@ public class TradeFactory : ITradeFactory
             var size = market.QuantityStep is null
                 ? rawSize
                 : Math.Floor(rawSize / market.QuantityStep.Value) * market.QuantityStep.Value;
-            
+
             var trade = market.MinProvideSize switch
             {
                 _ when Math.Abs(size) >= market.MinProvideSize => new Trade(market.Name, market.AssetType, size, CalcLimitPrice(), true),
@@ -254,6 +252,10 @@ public class TradeFactory : ITradeFactory
                       market.PriceStep;
             }
         }
+
+        yield break;
+
+        bool HasPosition(ProjectedPosition p) => p.HasPosition;
     }
 
     private decimal? GetPrice(bool isBuy, MarketInfo market)

@@ -10,11 +10,11 @@ public interface IYoloBroker : IDisposable
 {
     Task<Dictionary<long, Order>> GetOrdersAsync(CancellationToken ct);
     
-    Task<IDictionary<string, IEnumerable<Position>>> GetPositionsAsync(CancellationToken ct);
+    Task<IDictionary<string, IReadOnlyList<Position>>> GetPositionsAsync(CancellationToken ct);
 
     IAsyncEnumerable<TradeResult> PlaceTradesAsync(IEnumerable<Trade> trades, CancellationToken ct);
 
-    Task<IDictionary<string, IEnumerable<MarketInfo>>> GetMarketsAsync(
+    Task<IDictionary<string, IReadOnlyList<MarketInfo>>> GetMarketsAsync(
         ISet<string>? baseAssetFilter = null,
         string? quoteCurrency = null,
         AssetPermissions assetPermissions = AssetPermissions.All,

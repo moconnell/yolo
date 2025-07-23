@@ -32,7 +32,7 @@ public class TradeFactoryTests
 
         var config = new YoloConfig
         {
-            BaseAsset = baseCurrency,
+            BaseCurrencyToken = baseCurrency,
             NominalCash = nominalCash,
             TradeBuffer = tradeBuffer
         };
@@ -84,7 +84,7 @@ public class TradeFactoryTests
         var config = new YoloConfig
         {
             AssetPermissions = assetPermissions,
-            BaseAsset = baseCurrency,
+            BaseCurrencyToken = baseCurrency,
             NominalCash = nominalCash,
             TradeBuffer = tradeBuffer
         };
@@ -101,9 +101,10 @@ public class TradeFactoryTests
     }
 
     private static
-        (Weight[] weights, Dictionary<string, IEnumerable<Position>> positions,
-        Dictionary<string, IEnumerable<MarketInfo>> markets, Dictionary<string, decimal>
-        expectedTrades)
+        (Weight[] weights,
+        Dictionary<string, IReadOnlyList<Position>> positions,
+        Dictionary<string, IReadOnlyList<MarketInfo>> markets,
+        Dictionary<string, decimal> expectedTrades)
         DeserializeCsv(string path, string baseCurrency, decimal stepSize)
     {
         var config = new CsvConfiguration(CultureInfo.InvariantCulture)
@@ -130,19 +131,18 @@ public class TradeFactoryTests
 
         var positions = records.ToDictionary(
             x => x.Ticker,
-            x =>
-                new[]
-                {
-                    new Position(
-                        $"{x.Ticker}/{baseCurrency}",
-                        x.Ticker,
-                        AssetType.Spot,
-                        x.CurrentPosition)
-                }.Cast<Position>());
+            IReadOnlyList<Position> (x) =>
+            [
+                new(
+                    $"{x.Ticker}/{baseCurrency}",
+                    x.Ticker,
+                    AssetType.Spot,
+                    x.CurrentPosition)
+            ]);
 
         var markets = records.ToDictionary(
             x => x.Ticker,
-            IEnumerable<MarketInfo> (x) =>
+            IReadOnlyList<MarketInfo> (x) =>
             [
                 new(
                     $"{x.Ticker}/{baseCurrency}",
@@ -169,7 +169,7 @@ public class TradeFactoryTests
     }
 
     private static async
-        Task<(Weight[], Dictionary<string, IEnumerable<Position>>, Dictionary<string, IEnumerable<MarketInfo>>)>
+        Task<(Weight[], Dictionary<string, IReadOnlyList<Position>>, Dictionary<string, IReadOnlyList<MarketInfo>>)>
         DeserializeInputsAsync(
             string path)
     {
@@ -184,12 +184,12 @@ public class TradeFactoryTests
         return (weights, positions, markets);
     }
 
-    private static Dictionary<TKey, IEnumerable<TValue>> ToEnumerableDictionary<TKey, TValue>(
+    private static Dictionary<TKey, IReadOnlyList<TValue>> ToEnumerableDictionary<TKey, TValue>(
         IDictionary<TKey, TValue[]> dictionary) where TKey : notnull
     {
         return dictionary.ToDictionary(
             kvp => kvp.Key,
-            kvp => kvp.Value.Cast<TValue>());
+            IReadOnlyList<TValue> (kvp) => kvp.Value);
     }
 
     private static async Task<T> DeserializeAsync<T>(string path)

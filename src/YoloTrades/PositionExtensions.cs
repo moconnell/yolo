@@ -7,11 +7,11 @@ namespace YoloTrades;
 public static class PositionExtensions
 {
     public static decimal GetTotalValue(
-        this IDictionary<string, IEnumerable<Position>> positions,
-        IDictionary<string, IEnumerable<MarketInfo>> markets,
+        this IDictionary<string, IReadOnlyList<Position>> positions,
+        IDictionary<string, IReadOnlyList<MarketInfo>> markets,
         string baseCurrencyToken)
     {
-        decimal PositionValue(KeyValuePair<string, IEnumerable<Position>> kvp)
+        decimal PositionValue(KeyValuePair<string, IReadOnlyList<Position>> kvp)
         {
             var (symbol, position) = kvp;
 
@@ -25,7 +25,7 @@ public static class PositionExtensions
 
     private static decimal GetValue(
         this Position position,
-        IDictionary<string, IEnumerable<MarketInfo>> markets,
+        IDictionary<string, IReadOnlyList<MarketInfo>> markets,
         string baseCurrencyToken)
     {
         var (_, assetUnderlying, _, amount) = position;

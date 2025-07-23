@@ -3,6 +3,7 @@
     <PropertyGroup>
         <TargetFramework>net9.0</TargetFramework>
         <Nullable>enable</Nullable>
+        <LanguageVersion>latest</LanguageVersion>
     </PropertyGroup>
 
     <ItemGroup>
@@ -10,7 +11,8 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="HyperLiquid.Net" Version="2.1.1" />
+        <PackageReference Include="HyperLiquid.Net" Version="2.3.0" />
+        <PackageReference Include="Nethereum.Signer.EIP712" Version="5.0.0" />
     </ItemGroup>
 
 </Project>
