@@ -7,7 +7,7 @@ public record WebCallOrderResultWrapper(
     bool Success,
     Error? Error,
     HttpStatusCode? ResponseStatusCode,
-    long OrderId,
+    long? OrderId,
     YoloAbstractions.OrderStatus OrderStatus,
     decimal? AveragePrice,
     decimal? FilledQuantity

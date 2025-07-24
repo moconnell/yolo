@@ -6,6 +6,7 @@
     "LimitPrice": 0.784975,
     "PostPrice": true,
     "Expiry": null,
+    "ClientOrderId": null,
     "IsTradable": true
   },
   {
@@ -15,6 +16,7 @@
     "LimitPrice": 19.4420,
     "PostPrice": true,
     "Expiry": null,
+    "ClientOrderId": null,
     "IsTradable": true
   },
   {
@@ -24,6 +26,7 @@
     "LimitPrice": 43.1870,
     "PostPrice": true,
     "Expiry": null,
+    "ClientOrderId": null,
     "IsTradable": true
   },
   {
@@ -33,6 +36,7 @@
     "LimitPrice": 0.548750,
     "PostPrice": true,
     "Expiry": null,
+    "ClientOrderId": null,
     "IsTradable": true
   },
   {
@@ -42,6 +46,7 @@
     "LimitPrice": 0.1636025,
     "PostPrice": true,
     "Expiry": null,
+    "ClientOrderId": null,
     "IsTradable": true
   },
   {
@@ -51,6 +56,7 @@
     "LimitPrice": 3957.5,
     "PostPrice": true,
     "Expiry": null,
+    "ClientOrderId": null,
     "IsTradable": true
   }
 ]

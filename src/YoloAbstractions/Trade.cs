@@ -8,9 +8,14 @@ public record Trade(
     decimal Amount,
     decimal? LimitPrice = null,
     bool? PostPrice = null,
-    DateTime? Expiry = null)
+    DateTime? Expiry = null,
+    string? ClientOrderId = null)
 {
     public bool IsTradable => Amount != 0;
+
+    public decimal AbsoluteAmount => Math.Abs(Amount);
+
+    public OrderSide OrderSide => Amount < 0 ? OrderSide.Sell : OrderSide.Buy;
 
     public static Trade operator +(Trade one, Trade two)
     {

@@ -18,4 +18,6 @@ public record MarketInfo(
     DateTime? Expiry = null)
 {
     public string Key => $"{Name}-{AssetType}";
+
+    public decimal? Spread => Ask.HasValue && Bid.HasValue ? Ask.Value - Bid.Value : null;
 }

@@ -1,8 +1,11 @@
 ﻿using CryptoExchange.Net.Authentication;
+using HyperLiquid.Net;
 using HyperLiquid.Net.Clients;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Shouldly;
+using YoloAbstractions;
 
 namespace YoloBroker.Hyperliquid.Test;
 
@@ -16,17 +19,8 @@ public class HyperliquidBrokerTest
         // arrange
         var baseAssetFilter = baseAssetFilterString.Split(',').Select(asset => asset.Trim()).ToHashSet();
         var expectedMarkets = expectedMarketsString.Split(',').Select(market => market.Trim()).ToHashSet();
-        var (address, privateKey) = GetConfig();
-        Assert.NotNull(address);
-        Assert.NotNull(privateKey);
-        var apiCredentials = new ApiCredentials(address, privateKey);
-        var mockLogger = new Mock<ILogger<HyperliquidBroker>>();
 
-        var broker = new HyperliquidBroker(
-            new HyperLiquidRestClient(options => options.ApiCredentials = apiCredentials),
-            new HyperLiquidSocketClient(options => options.ApiCredentials = apiCredentials),
-            mockLogger.Object
-        );
+        HyperliquidBroker broker = GetTestBroker();
 
         // act
         var results = await broker.GetMarketsAsync(baseAssetFilter);
@@ -44,23 +38,92 @@ public class HyperliquidBrokerTest
     public async Task ShouldGetOpenOrders()
     {
         // arrange
-        var (address, privateKey) = GetConfig();
-        Assert.NotNull(address);
-        Assert.NotNull(privateKey);
-        var apiCredentials = new ApiCredentials(address, privateKey);
-        var mockLogger = new Mock<ILogger<HyperliquidBroker>>();
-
-        var broker = new HyperliquidBroker(
-            new HyperLiquidRestClient(options => options.ApiCredentials = apiCredentials),
-            new HyperLiquidSocketClient(options => options.ApiCredentials = apiCredentials),
-            mockLogger.Object
-        );
+        HyperliquidBroker broker = GetTestBroker();
 
         // act
         var results = await broker.GetOrdersAsync();
 
         // assert
         Assert.NotNull(results);
+    }
+
+    [Theory]
+    [InlineData("HYPE/USDC", AssetType.Spot, 1)]
+    [InlineData("ETH", AssetType.Future, 0.01)]
+    [InlineData("BTC", AssetType.Future, 0.01, false)]
+    public async Task ShouldPlaceOrder(string symbol, AssetType assetType, double quantity, bool isLimitOrder = true)
+    {
+        // arrange
+        HyperliquidBroker broker = GetTestBroker();
+        decimal? orderPrice = isLimitOrder ? await GetMidPrice() : null;
+        var trade = CreateTrade(symbol, assetType, quantity, orderPrice);
+
+        // act
+        var tradeResults = broker.PlaceTradesAsync([trade]);
+
+        // assert
+        await foreach (var tradeResult in tradeResults)
+        {
+            tradeResult.ShouldNotBeNull();
+            tradeResult.Success.ShouldBeTrue(tradeResult.Error);
+            var order = tradeResult.Order;
+            order.ShouldNotBeNull();
+            order.Id.ShouldBeGreaterThan(0);
+            order.ClientId.ShouldBe(trade.ClientOrderId);
+            order.AssetName.ShouldBe(symbol);
+            order.Amount.ShouldBe(trade.Amount);
+
+            await broker.CancelOrderAsync(order.AssetName, order.Id);
+        }
+
+        async Task<decimal> GetMidPrice()
+        {
+            // Get current market price first
+            var assets = symbol.Split('/').Select(s => s.Trim()).ToArray();
+            var markets = assetType switch
+            {
+                AssetType.Spot => await broker.GetMarketsAsync(new HashSet<string> { assets[0] }, assets[1], assetPermissions: AssetPermissions.Spot),
+                AssetType.Future => await broker.GetMarketsAsync(new HashSet<string> { assets[0] }, assetPermissions: AssetPermissions.PerpetualFutures),
+                _ => throw new NotSupportedException($"Asset type {assetType} is not supported.")
+            };
+
+            markets.ShouldNotBeNull();
+            markets.ShouldContainKey(symbol);
+            var currentPrice = markets[symbol][0].Mid;
+            currentPrice.ShouldNotBeNull();
+            currentPrice.Value.ShouldBeGreaterThan(0);
+
+            return currentPrice.Value;
+        }
+
+        static Trade CreateTrade(string symbol, AssetType assetType, double quantity, decimal? price) =>
+            new(symbol, assetType, Convert.ToDecimal(quantity), price, ClientOrderId: Guid.NewGuid().ToString());
+    }
+
+
+    private static HyperliquidBroker GetTestBroker()
+    {
+        var (address, privateKey) = GetConfig();
+        address.ShouldNotBeNullOrEmpty();
+        privateKey.ShouldNotBeNullOrEmpty();
+
+        var apiCredentials = new ApiCredentials(address, privateKey);
+        var mockLogger = new Mock<ILogger<HyperliquidBroker>>();
+
+        var broker = new HyperliquidBroker(
+            new HyperLiquidRestClient(options =>
+            {
+                options.ApiCredentials = apiCredentials;
+                options.Environment = HyperLiquidEnvironment.Testnet;
+            }),
+            new HyperLiquidSocketClient(options =>
+            {
+                options.ApiCredentials = apiCredentials;
+                options.Environment = HyperLiquidEnvironment.Testnet;
+            }),
+            mockLogger.Object
+        );
+        return broker;
     }
 
     private static (string? Address, string? PrivateKey) GetConfig()

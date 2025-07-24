@@ -53,7 +53,7 @@ public sealed class HyperliquidBroker : IYoloBroker
     {
         Dispose(false);
     }
-          
+
 
     public async IAsyncEnumerable<TradeResult> PlaceTradesAsync(
         IEnumerable<Trade> trades,
@@ -64,50 +64,46 @@ public sealed class HyperliquidBroker : IYoloBroker
             if (ct.IsCancellationRequested)
                 yield break;
 
-            var orderSide = trade.Amount < 0 ? OrderSide.Sell : OrderSide.Buy;
-            var quantity = Math.Abs(trade.Amount);
-
             var result = trade switch
             {
-                { AssetType: AssetType.Spot } => await PlaceSpotOrderAsync(
-                    trade,
-                    orderSide,
-                    quantity,
-                    trade.LimitPrice,
-                    ct),
-                { AssetType: AssetType.Future } => await PlaceFuturesOrderAsync(
-                    trade,
-                    orderSide,
-                    quantity,
-                    trade.LimitPrice,
-                    ct),
+                { AssetType: AssetType.Spot } => await PlaceSpotOrderAsync(trade, ct),
+                { AssetType: AssetType.Future } => await PlaceFuturesOrderAsync(trade, ct),
                 _ => throw new ArgumentOutOfRangeException(
                     nameof(trade.AssetType),
                     trade.AssetType,
                     "AssetType not supported")
             };
 
-            var yaSide = orderSide switch
-            {
-                OrderSide.Buy => YoloAbstractions.OrderSide.Buy,
-                OrderSide.Sell => YoloAbstractions.OrderSide.Sell,
-                _ => throw new ArgumentOutOfRangeException()
-            };
-
             yield return new TradeResult(
                 trade,
                 result.Success,
-                new Order(
-                    result.OrderId,
-                    trade.AssetName,
-                    DateTime.UtcNow,
-                    yaSide,
-                    result.OrderStatus,
-                    quantity,
-                    result.FilledQuantity),
+                result.OrderId.HasValue ?
+                    new Order(
+                        result.OrderId.Value,
+                        trade.AssetName,
+                        DateTime.UtcNow,
+                        trade.OrderSide,
+                        result.OrderStatus,
+                        trade.AbsoluteAmount,
+                        result.FilledQuantity,
+                        trade.LimitPrice,
+                        trade.ClientOrderId) :
+                    null,
                 result.Error?.Message,
                 result.Error?.Code);
         }
+    }
+
+    public async Task CancelOrderAsync(string symbol, long orderId)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(symbol);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(orderId, 0);
+
+        _logger.LogDebug("Cancelling order {OrderId} for symbol {Symbol}", orderId, symbol);
+
+        await CallAsync(
+            () => _hyperliquidClient.FuturesApi.Trading.CancelOrderAsync(symbol, orderId),
+            "Could not cancel order");
     }
 
     public async Task<Dictionary<long, Order>> GetOrdersAsync(CancellationToken ct = default)
@@ -155,7 +151,7 @@ public sealed class HyperliquidBroker : IYoloBroker
                 .ToDictionary(
                     g => g.Key,
                     IReadOnlyList<Position> (g) =>
-                        g.Select(x => new Position(x.Asset, x.Asset, assetType, x.Total)).ToArray());
+                        [.. g.Select(x => new Position(x.Asset, x.Asset, assetType, x.Total))]);
         }
 
         Dictionary<string, IReadOnlyList<Position>> GetPositionsFromPositions(
@@ -165,19 +161,18 @@ public sealed class HyperliquidBroker : IYoloBroker
             return positions.GroupBy(x => x.Position.Symbol)
                 .ToDictionary(
                     g => g.Key,
-                    IReadOnlyList<Position> (g) => g.Select(x => new Position(
+                    IReadOnlyList<Position> (g) => [.. g.Select(x => new Position(
                             x.Position.Symbol,
                             x.Position.Symbol,
                             assetType,
-                            x.Position.PositionQuantity.GetValueOrDefault()))
-                        .ToArray());
+                            x.Position.PositionQuantity.GetValueOrDefault()))]);
         }
     }
 
     public async Task<IDictionary<string, IReadOnlyList<MarketInfo>>> GetMarketsAsync(
         ISet<string>? baseAssetFilter = null,
-        string? quoteCurrency = null,
-        AssetPermissions assetPermissions = AssetPermissions.PerpetualFutures,
+        string quoteCurrency = "USD",
+        AssetPermissions assetPermissions = AssetPermissions.SpotAndPerp,
         CancellationToken ct = default)
     {
         _logger.LogDebug(
@@ -186,6 +181,76 @@ public sealed class HyperliquidBroker : IYoloBroker
             quoteCurrency,
             assetPermissions);
 
+        var markets = new Dictionary<string, IReadOnlyList<MarketInfo>>();
+
+        if (assetPermissions.HasFlag(AssetPermissions.PerpetualFutures) || assetPermissions.HasFlag(AssetPermissions.LongSpotAndPerp) ||
+            assetPermissions.HasFlag(AssetPermissions.SpotAndPerp))
+        {
+            markets = await GetFuturesMarketsAsync(baseAssetFilter, quoteCurrency, ct);
+        }
+
+        if (assetPermissions.HasFlag(AssetPermissions.Spot) || assetPermissions.HasFlag(AssetPermissions.LongSpot) ||
+            assetPermissions.HasFlag(AssetPermissions.ShortSpot) || assetPermissions.HasFlag(AssetPermissions.SpotAndPerp))
+        {
+            markets = markets
+                .Concat(await GetSpotMarketsAsync(baseAssetFilter, quoteCurrency, ct))
+                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+        }
+
+        return markets;
+    }
+
+    private async Task<Dictionary<string, IReadOnlyList<MarketInfo>>> GetSpotMarketsAsync(
+        ISet<string>? baseAssetFilter,
+        string? quoteCurrency,
+        CancellationToken ct = default)
+    {
+        _logger.LogDebug("Getting spot markets with baseAssetFilter: {BaseAssetFilter}, quoteCurrency: {QuoteCurrency}",
+            baseAssetFilter, quoteCurrency);
+
+        var spotExchangeInfo = await GetDataAsync(
+            () => _hyperliquidClient.SpotApi.ExchangeData.GetExchangeInfoAsync(ct: ct),
+            "Could not get spot exchange info");
+
+        var tickersAndPrices = await Task.WhenAll(
+            spotExchangeInfo.Symbols
+            .Where(symbol => baseAssetFilter == null || baseAssetFilter.Contains(symbol.BaseAsset.Name) && symbol.QuoteAsset.Name == quoteCurrency)
+            .Select(async symbol => (symbol, await GetSpotOrderBookAsync(symbol.Name, ct))));
+
+        return tickersAndPrices
+                    .ToDictionary<(HyperLiquidSymbol Symbol, HyperLiquidOrderBook OrderBook), string, IReadOnlyList<MarketInfo>>(
+                        tuple => tuple.Symbol.Name,
+                        tuple =>
+                        [
+                            new MarketInfo(
+                                tuple.Symbol.Name,
+                                tuple.Symbol.BaseAsset.Name,
+                                tuple.Symbol.QuoteAsset.Name,
+                                AssetType.Spot,
+                                DateTime.UtcNow,
+                                // Convert.ToDecimal(Math.Pow(10, -tuple.Symbol.QuoteAsset.PriceDecimals)),
+                                // Convert.ToDecimal(Math.Pow(10, -tuple.Symbol.QuoteAsset.QuantityDecimals)),
+                                Ask: tuple.OrderBook.Levels.Asks[0].Price,
+                                Bid: tuple.OrderBook.Levels.Bids[0].Price,
+                                Mid: (tuple.OrderBook.Levels.Asks[0].Price + tuple.OrderBook.Levels.Bids[0].Price) / 2
+                            )
+                        ]);
+    }
+
+    private async Task<HyperLiquidOrderBook> GetSpotOrderBookAsync(string symbol, CancellationToken ct)
+    {
+        var orderBook = await GetDataAsync(
+            () => _hyperliquidClient.SpotApi.ExchangeData.GetOrderBookAsync(symbol, ct: ct),
+            $"Could not get order book for {symbol}");
+
+        return orderBook;
+    }
+
+    private async Task<Dictionary<string, IReadOnlyList<MarketInfo>>> GetFuturesMarketsAsync(
+        ISet<string>? baseAssetFilter,
+        string quoteCurrency = "USD",
+        CancellationToken ct = default)
+    {
         var futuresExchangeInfo = await GetDataAsync(
             () => _hyperliquidClient.FuturesApi.ExchangeData.GetExchangeInfoAndTickersAsync(ct: ct),
             "Could not get futures exchange info and tickers");
@@ -193,7 +258,7 @@ public sealed class HyperliquidBroker : IYoloBroker
         var tickersAndPrices = await Task.WhenAll(
             futuresExchangeInfo.Tickers
                 .Where(ticker => baseAssetFilter == null || baseAssetFilter.Contains(ticker.Symbol))
-                .Select(async ticker => (ticker, await GetOrderBookAsync(ticker.Symbol, ct))));
+                .Select(async ticker => (ticker, await GetFuturesOrderBookAsync(ticker.Symbol, ct))));
 
         _logger.LogDebug("Retrieved {Count} tickers and prices", tickersAndPrices.Length);
 
@@ -206,7 +271,7 @@ public sealed class HyperliquidBroker : IYoloBroker
                     new MarketInfo(
                         tuple.Ticker.Symbol,
                         tuple.Ticker.Symbol,
-                        "USD",
+                        quoteCurrency,
                         AssetType.Future,
                         DateTime.UtcNow,
                         Ask: tuple.OrderBook.Levels.Asks[0].Price,
@@ -215,7 +280,7 @@ public sealed class HyperliquidBroker : IYoloBroker
                 ]);
     }
 
-    private async Task<HyperLiquidOrderBook> GetOrderBookAsync(string symbol, CancellationToken ct)
+    private async Task<HyperLiquidOrderBook> GetFuturesOrderBookAsync(string symbol, CancellationToken ct)
     {
         var orderBook = await GetDataAsync(
             () => _hyperliquidClient.FuturesApi.ExchangeData.GetOrderBookAsync(symbol, ct: ct),
@@ -240,6 +305,16 @@ public sealed class HyperliquidBroker : IYoloBroker
         _disposed = true;
     }
 
+    private static async Task CallAsync(Func<Task<WebCallResult>> webCallFunc, string exceptionMessage)
+    {
+        var result = await webCallFunc();
+
+        if (!result.Success)
+        {
+            throw new HyperliquidException(exceptionMessage, result);
+        }
+    }
+
     private static async Task<T> GetDataAsync<T>(
         Func<Task<WebCallResult<T>>> webCallFunc,
         string exceptionMessage)
@@ -254,37 +329,45 @@ public sealed class HyperliquidBroker : IYoloBroker
         return result.Data;
     }
 
-    private async Task<WebCallOrderResultWrapper> PlaceFuturesOrderAsync(
-        Trade trade,
-        OrderSide orderSide,
-        decimal quantity,
-        decimal? price,
-        CancellationToken ct)
+    private async Task<WebCallOrderResultWrapper> PlaceFuturesOrderAsync(Trade trade, CancellationToken ct)
     {
+        OrderSide orderSide = trade.Amount < 0 ? OrderSide.Sell : OrderSide.Buy;
+        OrderType orderType = trade.LimitPrice.HasValue ? OrderType.Limit : OrderType.Market;
+        decimal quantity = Math.Abs(trade.Amount);
+        TimeInForce timeInForce = orderType == OrderType.Market
+            ? TimeInForce.ImmediateOrCancel  // For market orders
+            : TimeInForce.GoodTillCanceled;  // For limit orders
+
         var result = await _hyperliquidClient.FuturesApi.Trading.PlaceOrderAsync(
             trade.AssetName,
             orderSide,
-            price.HasValue ? OrderType.Limit : OrderType.Market,
+            orderType,
             quantity,
-            price.GetValueOrDefault(),
+            trade.LimitPrice.GetValueOrDefault(),
+            timeInForce,
+            clientOrderId: trade.ClientOrderId,
             ct: ct);
 
         return Wrap(result);
     }
 
-    private async Task<WebCallOrderResultWrapper> PlaceSpotOrderAsync(
-        Trade trade,
-        OrderSide orderSide,
-        decimal quantity,
-        decimal? price,
-        CancellationToken ct)
+    private async Task<WebCallOrderResultWrapper> PlaceSpotOrderAsync(Trade trade, CancellationToken ct)
     {
+        OrderSide orderSide = trade.Amount < 0 ? OrderSide.Sell : OrderSide.Buy;
+        OrderType orderType = trade.LimitPrice.HasValue ? OrderType.Limit : OrderType.Market;
+        decimal quantity = Math.Abs(trade.Amount);
+        TimeInForce timeInForce = orderType == OrderType.Market
+            ? TimeInForce.ImmediateOrCancel  // For market orders
+            : TimeInForce.GoodTillCanceled;  // For limit orders
+
         var result = await _hyperliquidClient.SpotApi.Trading.PlaceOrderAsync(
             trade.AssetName,
             orderSide,
-            price.HasValue ? OrderType.Limit : OrderType.Market,
+            orderType,
             quantity,
-            price.GetValueOrDefault(),
+            trade.LimitPrice.GetValueOrDefault(),
+            timeInForce,
+            clientOrderId: trade.ClientOrderId,
             ct: ct);
 
         return Wrap(result);
@@ -295,8 +378,8 @@ public sealed class HyperliquidBroker : IYoloBroker
             result.Success,
             result.Error,
             result.ResponseStatusCode,
-            result.Data.OrderId,
-            result.Data.Status.ToYolo(),
-            result.Data.AveragePrice,
-            result.Data.FilledQuantity);
+            result.Data?.OrderId,
+            result.Data?.Status.ToYolo() ?? OrderStatus.Rejected,
+            result.Data?.AveragePrice,
+            result.Data?.FilledQuantity);
 }

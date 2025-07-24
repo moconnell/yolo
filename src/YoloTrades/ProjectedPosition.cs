@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using YoloAbstractions;
@@ -15,10 +14,10 @@ public record ProjectedPosition(MarketInfo Market, decimal Position, decimal Nom
 
     public static ProjectedPosition operator +(ProjectedPosition position, Trade trade) =>
         new(
-            position.Market, 
-            position.Position, 
+            position.Market,
+            position.Position,
             position.Nominal,
-            new List<Trade>(position.Trades ?? []) {trade});
+            new List<Trade>(position.Trades ?? []) { trade });
 
     private decimal? CalcWeight(Trade t) => CalcWeight(t.Amount);
 

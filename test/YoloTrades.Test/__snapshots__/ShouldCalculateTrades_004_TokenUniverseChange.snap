@@ -6,6 +6,7 @@
     "LimitPrice": 19.363,
     "PostPrice": false,
     "Expiry": null,
+    "ClientOrderId": null,
     "IsTradable": true
   },
   {
@@ -15,6 +16,7 @@
     "LimitPrice": 15.809,
     "PostPrice": false,
     "Expiry": null,
+    "ClientOrderId": null,
     "IsTradable": true
   },
   {
@@ -24,6 +26,7 @@
     "LimitPrice": 39.8085,
     "PostPrice": false,
     "Expiry": null,
+    "ClientOrderId": null,
     "IsTradable": true
   },
   {
@@ -33,6 +36,7 @@
     "LimitPrice": 148.795,
     "PostPrice": false,
     "Expiry": null,
+    "ClientOrderId": null,
     "IsTradable": true
   },
   {
@@ -42,6 +46,7 @@
     "LimitPrice": 434.25,
     "PostPrice": false,
     "Expiry": null,
+    "ClientOrderId": null,
     "IsTradable": true
   },
   {
@@ -51,6 +56,7 @@
     "LimitPrice": 3942.9,
     "PostPrice": false,
     "Expiry": null,
+    "ClientOrderId": null,
     "IsTradable": true
   },
   {
@@ -60,6 +66,7 @@
     "LimitPrice": 46734.0,
     "PostPrice": false,
     "Expiry": null,
+    "ClientOrderId": null,
     "IsTradable": true
   },
   {
@@ -69,6 +76,7 @@
     "LimitPrice": 39.8085,
     "PostPrice": false,
     "Expiry": null,
+    "ClientOrderId": null,
     "IsTradable": true
   },
   {
@@ -78,6 +86,7 @@
     "LimitPrice": 0.5264,
     "PostPrice": false,
     "Expiry": null,
+    "ClientOrderId": null,
     "IsTradable": true
   }
 ]
