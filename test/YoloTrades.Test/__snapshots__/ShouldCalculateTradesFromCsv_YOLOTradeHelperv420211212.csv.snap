@@ -7,7 +7,9 @@
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true
+    "IsTradable": true,
+    "AbsoluteAmount": 0.5986,
+    "OrderSide": "Sell"
   },
   {
     "AssetName": "BTC/USD",
@@ -17,7 +19,9 @@
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true
+    "IsTradable": true,
+    "AbsoluteAmount": 0.0025,
+    "OrderSide": "Buy"
   },
   {
     "AssetName": "CRO/USD",
@@ -27,7 +31,9 @@
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true
+    "IsTradable": true,
+    "AbsoluteAmount": 947.4349,
+    "OrderSide": "Buy"
   },
   {
     "AssetName": "DOGE/USD",
@@ -37,7 +43,9 @@
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true
+    "IsTradable": true,
+    "AbsoluteAmount": 4131.0624,
+    "OrderSide": "Sell"
   },
   {
     "AssetName": "ETH/USD",
@@ -47,7 +55,9 @@
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true
+    "IsTradable": true,
+    "AbsoluteAmount": 0.0949,
+    "OrderSide": "Buy"
   },
   {
     "AssetName": "FTT/USD",
@@ -57,7 +67,9 @@
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true
+    "IsTradable": true,
+    "AbsoluteAmount": 13.1617,
+    "OrderSide": "Sell"
   },
   {
     "AssetName": "LINK/USD",
@@ -67,7 +79,9 @@
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true
+    "IsTradable": true,
+    "AbsoluteAmount": 30.3962,
+    "OrderSide": "Sell"
   },
   {
     "AssetName": "LTC/USD",
@@ -77,7 +91,9 @@
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true
+    "IsTradable": true,
+    "AbsoluteAmount": 3.3773,
+    "OrderSide": "Sell"
   },
   {
     "AssetName": "UNI/USD",
@@ -87,6 +103,8 @@
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true
+    "IsTradable": true,
+    "AbsoluteAmount": 64.4732,
+    "OrderSide": "Sell"
   }
 ]

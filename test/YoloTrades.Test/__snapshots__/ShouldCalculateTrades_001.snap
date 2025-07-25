@@ -7,7 +7,9 @@
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true
+    "IsTradable": true,
+    "AbsoluteAmount": 680.0,
+    "OrderSide": "Sell"
   },
   {
     "AssetName": "LINK/USD",
@@ -17,7 +19,9 @@
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true
+    "IsTradable": true,
+    "AbsoluteAmount": 44.6,
+    "OrderSide": "Sell"
   },
   {
     "AssetName": "FTT-PERP",
@@ -27,7 +31,9 @@
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true
+    "IsTradable": true,
+    "AbsoluteAmount": 6.6,
+    "OrderSide": "Sell"
   },
   {
     "AssetName": "CRO-PERP",
@@ -37,7 +43,9 @@
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true
+    "IsTradable": true,
+    "AbsoluteAmount": 1980.0,
+    "OrderSide": "Buy"
   },
   {
     "AssetName": "DOGE/USD",
@@ -47,7 +55,9 @@
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true
+    "IsTradable": true,
+    "AbsoluteAmount": 3774.0,
+    "OrderSide": "Sell"
   },
   {
     "AssetName": "ETH/USD",
@@ -57,6 +67,8 @@
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true
+    "IsTradable": true,
+    "AbsoluteAmount": 0.106,
+    "OrderSide": "Buy"
   }
 ]
