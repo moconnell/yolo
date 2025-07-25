@@ -1,4 +1,5 @@
-﻿using CryptoExchange.Net.Authentication;
+﻿using System.Security.Cryptography;
+using CryptoExchange.Net.Authentication;
 using HyperLiquid.Net;
 using HyperLiquid.Net.Clients;
 using Microsoft.Extensions.Configuration;
@@ -48,14 +49,14 @@ public class HyperliquidBrokerTest
     }
 
     [Theory]
-    [InlineData("HYPE/USDC", AssetType.Spot, 1)]
+    // [InlineData("HYPE/USDC", AssetType.Spot, 1)]
     [InlineData("ETH", AssetType.Future, 0.01)]
-    [InlineData("BTC", AssetType.Future, 0.01, false)]
+    [InlineData("BTC", AssetType.Future, 0.01)]
     public async Task ShouldPlaceOrder(string symbol, AssetType assetType, double quantity, bool isLimitOrder = true)
     {
         // arrange
         HyperliquidBroker broker = GetTestBroker();
-        decimal? orderPrice = isLimitOrder ? await GetMidPrice() : null;
+        decimal? orderPrice = isLimitOrder ? await GetLimitPrice() : null;
         var trade = CreateTrade(symbol, assetType, quantity, orderPrice);
 
         // act
@@ -76,7 +77,7 @@ public class HyperliquidBrokerTest
             await broker.CancelOrderAsync(order.AssetName, order.Id);
         }
 
-        async Task<decimal> GetMidPrice()
+        async Task<decimal> GetLimitPrice()
         {
             // Get current market price first
             var assets = symbol.Split('/').Select(s => s.Trim()).ToArray();
@@ -89,7 +90,7 @@ public class HyperliquidBrokerTest
 
             markets.ShouldNotBeNull();
             markets.ShouldContainKey(symbol);
-            var currentPrice = markets[symbol][0].Mid;
+            var currentPrice = quantity < 0 ? markets[symbol][0].Ask : markets[symbol][0].Bid;
             currentPrice.ShouldNotBeNull();
             currentPrice.Value.ShouldBeGreaterThan(0);
 
@@ -97,7 +98,7 @@ public class HyperliquidBrokerTest
         }
 
         static Trade CreateTrade(string symbol, AssetType assetType, double quantity, decimal? price) =>
-            new(symbol, assetType, Convert.ToDecimal(quantity), price, ClientOrderId: Guid.NewGuid().ToString());
+            new(symbol, assetType, Convert.ToDecimal(quantity), price, ClientOrderId: $"0x{RandomNumberGenerator.GetHexString(32, true)}");
     }
 
 

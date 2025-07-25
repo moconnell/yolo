@@ -220,21 +220,28 @@ public sealed class HyperliquidBroker : IYoloBroker
         return tickersAndPrices
                     .ToDictionary<(HyperLiquidSymbol Symbol, HyperLiquidOrderBook OrderBook), string, IReadOnlyList<MarketInfo>>(
                         tuple => tuple.Symbol.Name,
-                        tuple =>
-                        [
-                            new MarketInfo(
-                                tuple.Symbol.Name,
-                                tuple.Symbol.BaseAsset.Name,
-                                tuple.Symbol.QuoteAsset.Name,
-                                AssetType.Spot,
-                                DateTime.UtcNow,
-                                // Convert.ToDecimal(Math.Pow(10, -tuple.Symbol.QuoteAsset.PriceDecimals)),
-                                // Convert.ToDecimal(Math.Pow(10, -tuple.Symbol.QuoteAsset.QuantityDecimals)),
-                                Ask: tuple.OrderBook.Levels.Asks[0].Price,
-                                Bid: tuple.OrderBook.Levels.Bids[0].Price,
-                                Mid: (tuple.OrderBook.Levels.Asks[0].Price + tuple.OrderBook.Levels.Bids[0].Price) / 2
-                            )
-                        ]);
+                        tuple => [ToMarketInfo(tuple.Symbol, tuple.OrderBook)]);
+    }
+
+    private static MarketInfo ToMarketInfo(HyperLiquidSymbol symbol, HyperLiquidOrderBook orderBook)
+    {
+        var priceStep = Convert.ToDecimal(Math.Pow(10, -6 + symbol.QuoteAsset.PriceDecimals));
+        var quantityStep = Convert.ToDecimal(Math.Pow(10, -symbol.QuoteAsset.QuantityDecimals));
+        var minProvideSize = Math.Ceiling(10 / orderBook.Levels.Asks[0].Price / quantityStep) * quantityStep;
+
+        return new MarketInfo(
+                            symbol.Name,
+                            symbol.BaseAsset.Name,
+                            symbol.QuoteAsset.Name,
+                            AssetType.Spot,
+                            DateTime.UtcNow,
+                            priceStep,
+                            quantityStep,
+                            minProvideSize,
+                            Ask: orderBook.Levels.Asks[0].Price,
+                            Bid: orderBook.Levels.Bids[0].Price,
+                            Mid: (orderBook.Levels.Asks[0].Price + orderBook.Levels.Bids[0].Price) / 2
+                        );
     }
 
     private async Task<HyperLiquidOrderBook> GetSpotOrderBookAsync(string symbol, CancellationToken ct)
@@ -256,28 +263,37 @@ public sealed class HyperliquidBroker : IYoloBroker
             "Could not get futures exchange info and tickers");
 
         var tickersAndPrices = await Task.WhenAll(
-            futuresExchangeInfo.Tickers
-                .Where(ticker => baseAssetFilter == null || baseAssetFilter.Contains(ticker.Symbol))
-                .Select(async ticker => (ticker, await GetFuturesOrderBookAsync(ticker.Symbol, ct))));
+            futuresExchangeInfo.ExchangeInfo.Symbols
+                .Where(symbol => baseAssetFilter == null || baseAssetFilter.Contains(symbol.Name))
+                .Select(async symbol => (symbol, await GetFuturesOrderBookAsync(symbol.Name, ct))));
 
         _logger.LogDebug("Retrieved {Count} tickers and prices", tickersAndPrices.Length);
 
         return tickersAndPrices
-            .ToDictionary<(HyperLiquidFuturesTicker Ticker, HyperLiquidOrderBook OrderBook), string,
+            .ToDictionary<(HyperLiquidFuturesSymbol Symbol, HyperLiquidOrderBook OrderBook), string,
                 IReadOnlyList<MarketInfo>>(
-                tuple => tuple.Ticker.Symbol,
-                tuple =>
-                [
-                    new MarketInfo(
-                        tuple.Ticker.Symbol,
-                        tuple.Ticker.Symbol,
+                tuple => tuple.Symbol.Name,
+                tuple => [ToMarketInfo(tuple.Symbol, quoteCurrency, tuple.OrderBook)]);
+    }
+
+    private static MarketInfo ToMarketInfo(HyperLiquidFuturesSymbol symbol, string quoteCurrency, HyperLiquidOrderBook orderBook)
+    {
+        var priceStep = Convert.ToDecimal(Math.Pow(10, -6 + symbol.QuantityDecimals));
+        var quantityStep = Convert.ToDecimal(Math.Pow(10, -symbol.QuantityDecimals));
+        var minProvideSize = Math.Ceiling(10 / orderBook.Levels.Asks[0].Price / quantityStep) * quantityStep;
+
+        return new MarketInfo(
+                        symbol.Name,
+                        symbol.Name,
                         quoteCurrency,
                         AssetType.Future,
                         DateTime.UtcNow,
-                        Ask: tuple.OrderBook.Levels.Asks[0].Price,
-                        Bid: tuple.OrderBook.Levels.Bids[0].Price,
-                        Mid: tuple.Ticker.MidPrice)
-                ]);
+                        priceStep,
+                        quantityStep,
+                        minProvideSize,
+                        Ask: orderBook.Levels.Asks[0].Price,
+                        Bid: orderBook.Levels.Bids[0].Price,
+                        Mid: (orderBook.Levels.Asks[0].Price + orderBook.Levels.Bids[0].Price) / 2);
     }
 
     private async Task<HyperLiquidOrderBook> GetFuturesOrderBookAsync(string symbol, CancellationToken ct)
