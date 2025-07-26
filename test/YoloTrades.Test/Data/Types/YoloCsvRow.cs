@@ -5,7 +5,7 @@ namespace YoloTrades.Test.Data.Types;
 public class YoloCsvRow
 {
     [Name("Ticker")]
-    public string Ticker { get; set; }
+    public required string Ticker { get; set; }
 
     [Name("Price, $")]
     public decimal Price { get; set; }
@@ -47,10 +47,10 @@ public class YoloCsvRow
     public decimal PostTradeWeight { get; set; }
 
     [Name("Diff to Constrained Target Weight Before Trade")]
-    public string DiffToConstrainedTargetWeightPreTrade { get; set; }
+    public required string DiffToConstrainedTargetWeightPreTrade { get; set; }
 
     [Name("Diff to Constrained Target Weight After Trade")]
-    public string DiffToConstrainedTargetWeightPostTrade { get; set; }
+    public required string DiffToConstrainedTargetWeightPostTrade { get; set; }
 
     [Name("OK?")] [BooleanTrueValues("YES")] [BooleanFalseValues("NO")]
     public bool Ok { get; set; }

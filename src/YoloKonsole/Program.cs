@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Utility.CommandLine;
 using YoloAbstractions.Config;
-using YoloBroker;
+using YoloBroker.Interface;
 using YoloTrades;
 using YoloWeights;
 using static System.Environment;
@@ -27,11 +27,11 @@ internal class Program
     private static async Task<int> Main(string[] args)
     {
 #if DEBUG
-        var env = "development"; //Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+        var env = "local"; //Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
 #else
         var env = "prod";
 #endif
-        
+
         Arguments.Populate();
 
         ConsoleWrite(@"
@@ -57,7 +57,9 @@ __  ______  __    ____  __
 
             var serviceProvider = new ServiceCollection()
                 .AddLogging(loggingBuilder => loggingBuilder
-                    .AddFile(config.GetSection("Logging")))
+                    .AddFile(config.GetSection("Logging"))
+                    .AddConsole()
+                    .SetMinimumLevel(LogLevel.Debug))
                 .AddBroker(config)
                 .AddSingleton<ITradeFactory, TradeFactory>()
                 .AddSingleton<IConfiguration>(config)
@@ -67,15 +69,14 @@ __  ______  __    ____  __
                 .CreateLogger<Program>();
             _logger.LogInformation("************ YOLO started ************");
 
-            var yoloConfig = config.GetYoloConfig();
-
-            var weights = (await yoloConfig.GetWeights()).ToArray();
+            var yoloConfig = config.GetYoloConfig() ?? throw new ConfigException("YOLO configuration is missing or invalid");
+            var weights = await yoloConfig.GetWeights();
 
             using var broker = serviceProvider.GetService<IYoloBroker>()!;
 
             var orders = await broker.GetOrdersAsync(cancellationToken);
 
-            if (orders.Any())
+            if (orders.Count != 0)
             {
                 _logger.OpenOrders(orders.Values);
 
@@ -95,6 +96,7 @@ __  ______  __    ____  __
 
             var baseAssetFilter = positions
                 .Keys
+                .Union(weights.Select(w => w.Ticker.GetBaseAndQuoteAssets().BaseAsset))
                 .ToHashSet();
 
             var markets = await broker.GetMarketsAsync(
@@ -110,7 +112,7 @@ __  ______  __    ____  __
                 .OrderBy(trade => trade.AssetName)
                 .ToArray();
 
-            if (!trades.Any())
+            if (trades.Length == 0)
             {
                 ConsoleWriteLine("Nothing to do.");
 
@@ -145,9 +147,9 @@ __  ______  __    ____  __
                 {
                     _logger.OrderError(result.Trade.AssetName, result.Error, result.ErrorCode);
                     ConsoleWriteLine($"{result.Trade.AssetName}:\t{result.Error}");
-                    returnCode = new [] {result.ErrorCode.GetValueOrDefault(), Error, returnCode}.Max();
+                    returnCode = new[] { result.ErrorCode.GetValueOrDefault(), Error, returnCode }.Max();
                 }
-            
+
             if (returnCode == Success)
                 ConsoleWrite(" done.");
 
@@ -155,7 +157,7 @@ __  ______  __    ____  __
         }
         catch (Exception e)
         {
-            source.Cancel();
+            await source.CancelAsync();
 
             _logger?.LogError("Error occurred: {Error}", e);
 

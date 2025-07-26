@@ -14,8 +14,8 @@ public static partial class LoggerExtensions
     public static partial void CalculateTrades(
         this ILogger logger,
         Dictionary<string, (Weight weight, bool isInUniverse)> weights,
-        IDictionary<string, IEnumerable<Position>> positions,
-        IDictionary<string, IEnumerable<MarketInfo>> markets);
+        IDictionary<string, IReadOnlyList<Position>> positions,
+        IDictionary<string, IReadOnlyList<MarketInfo>> markets);
 
     [LoggerMessage(
         EventId = TradeEventIds.Weight,

@@ -1,0 +1,49 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": ".NET Core Launch (console)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "${workspaceFolder}/src/YoloKonsole/YoloKonsole.csproj"
+      ],
+      "cwd": "${workspaceFolder}",
+      "stopAtEntry": false,
+      "console": "internalConsole",
+      "env": {
+        "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT": "1",
+        "DOTNET_SYSTEM_NET_HTTP_USESOCKETSHTTPHANDLER": "0"
+      }
+    },
+    {
+      "name": ".NET Core Debug (console)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/src/YoloKonsole/bin/Debug/net9.0/YoloKonsole.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/src/YoloKonsole",
+      "stopAtEntry": false,
+      "console": "internalConsole",
+      "justMyCode": true,
+      "enableStepFiltering": false,
+      "env": {
+        "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT": "1",
+        "DOTNET_SYSTEM_NET_HTTP_USESOCKETSHTTPHANDLER": "0"
+      },
+      "exceptionOptions": {
+        "System.Exception": {
+          "breakMode": "always"
+        }
+      }
+    }
+  ]
+}

@@ -19,7 +19,7 @@ public class TradeTest
         true)]
     [InlineData(
         "BTC-PERP", AssetType.Future, 10, 45789, true, null,
-        "BTC-PERP", AssetType.Future, -2, 45789, true, 1640179478,
+        "BTC-PERP", AssetType.Future, -2, 45789, true, 1640179478L,
         true)]
     public void ShouldAddTrades(
         string assetName1, AssetType assetType1, decimal amount1, decimal limitPrice1, bool? postPrice1, long? expiry1,
@@ -40,5 +40,6 @@ public class TradeTest
         }
     }
 
-    private static DateTime? ToDateTime(long? ticks) => ticks.HasValue ? new DateTime(ticks.Value) : null;
+    private static DateTime? ToDateTime(long? unixSeconds) =>
+        unixSeconds.HasValue ? DateTimeOffset.FromUnixTimeSeconds(unixSeconds.Value).UtcDateTime : null;
 }

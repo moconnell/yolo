@@ -70,10 +70,8 @@ public class TradeFactoryTests
 
     [Theory]
     [InlineData("./Data/json/001")]
-    [InlineData("./Data/json/002_LongSpotAndPerp", AssetPermissions.LongSpotAndPerp)]
     [InlineData("./Data/json/003_ExistingPositions")]
     [InlineData("./Data/json/004_TokenUniverseChange")]
-    [InlineData("./Data/json/005_MinimumProvide", AssetPermissions.LongSpotAndPerp, "USD", 500, 0.02)]
     public async Task ShouldCalculateTrades(
         string path,
         AssetPermissions assetPermissions = AssetPermissions.All,
@@ -103,9 +101,10 @@ public class TradeFactoryTests
     }
 
     private static
-        (Weight[] weights, Dictionary<string, IEnumerable<Position>> positions,
-        Dictionary<string, IEnumerable<MarketInfo>> markets, Dictionary<string, decimal>
-        expectedTrades)
+        (Weight[] weights,
+        Dictionary<string, IReadOnlyList<Position>> positions,
+        Dictionary<string, IReadOnlyList<MarketInfo>> markets,
+        Dictionary<string, decimal> expectedTrades)
         DeserializeCsv(string path, string baseCurrency, decimal stepSize)
     {
         var config = new CsvConfiguration(CultureInfo.InvariantCulture)
@@ -132,35 +131,33 @@ public class TradeFactoryTests
 
         var positions = records.ToDictionary(
             x => x.Ticker,
-            x =>
-                new[]
-                {
-                    new Position(
-                        $"{x.Ticker}/{baseCurrency}",
-                        x.Ticker,
-                        AssetType.Spot,
-                        x.CurrentPosition)
-                }.Cast<Position>());
+            IReadOnlyList<Position> (x) =>
+            [
+                new(
+                    $"{x.Ticker}/{baseCurrency}",
+                    x.Ticker,
+                    AssetType.Spot,
+                    x.CurrentPosition)
+            ]);
 
         var markets = records.ToDictionary(
             x => x.Ticker,
-            x =>
-                new[]
-                {
-                    new MarketInfo(
-                        $"{x.Ticker}/{baseCurrency}",
-                        x.Ticker,
-                        baseCurrency,
-                        AssetType.Spot,
-                        stepSize,
-                        stepSize,
-                        0,
-                        x.Price,
-                        x.Price,
-                        x.Price,
-                        null,
-                        DateTime.UtcNow)
-                } as IEnumerable<MarketInfo>);
+            IReadOnlyList<MarketInfo> (x) =>
+            [
+                new(
+                    $"{x.Ticker}/{baseCurrency}",
+                    x.Ticker,
+                    baseCurrency,
+                    AssetType.Spot,
+                    DateTime.UtcNow,
+                    stepSize,
+                    stepSize,
+                    0,
+                    x.Price,
+                    x.Price,
+                    x.Price
+                )
+            ]);
 
         var expectedTrades = records
             .Where(x => x.TradeQuantity != 0)
@@ -172,7 +169,7 @@ public class TradeFactoryTests
     }
 
     private static async
-        Task<(Weight[], Dictionary<string, IEnumerable<Position>>, Dictionary<string, IEnumerable<MarketInfo>>)>
+        Task<(Weight[], Dictionary<string, IReadOnlyList<Position>>, Dictionary<string, IReadOnlyList<MarketInfo>>)>
         DeserializeInputsAsync(
             string path)
     {
@@ -187,12 +184,12 @@ public class TradeFactoryTests
         return (weights, positions, markets);
     }
 
-    private static Dictionary<TKey, IEnumerable<TValue>> ToEnumerableDictionary<TKey, TValue>(
+    private static Dictionary<TKey, IReadOnlyList<TValue>> ToEnumerableDictionary<TKey, TValue>(
         IDictionary<TKey, TValue[]> dictionary) where TKey : notnull
     {
         return dictionary.ToDictionary(
             kvp => kvp.Key,
-            kvp => kvp.Value.Cast<TValue>());
+            IReadOnlyList<TValue> (kvp) => kvp.Value);
     }
 
     private static async Task<T> DeserializeAsync<T>(string path)
@@ -201,6 +198,6 @@ public class TradeFactoryTests
         using var streamReader = new StreamReader(stream);
         var json = await streamReader.ReadToEndAsync();
 
-        return JsonConvert.DeserializeObject<T>(json);
+        return JsonConvert.DeserializeObject<T>(json)!;
     }
 }

@@ -1,16 +1,14 @@
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using YoloAbstractions;
+
+namespace YoloTrades;
 
 public static class PriceExtensions
 {
-    public static IEnumerable<MarketInfo> GetMarkets(
-        this IDictionary<string, IEnumerable<MarketInfo>> markets,
-        string token)
-    {
-        return markets.TryGetValue(token, out var tokenMarkets)
-                    ? tokenMarkets
-                    : Array.Empty<MarketInfo>();
-    }
+    public static IReadOnlyList<MarketInfo> GetMarkets(
+        this IDictionary<string, IReadOnlyList<MarketInfo>> markets,
+        string token) =>
+        markets.TryGetValue(token, out var tokenMarkets)
+            ? tokenMarkets
+            : [];
 }

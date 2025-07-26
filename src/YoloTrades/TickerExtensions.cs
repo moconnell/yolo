@@ -1,12 +1,25 @@
+using System;
+using System.Text.RegularExpressions;
+
 namespace YoloTrades;
 
 public static class TickerExtensions
 {
-    public static (string, string) SplitConstituents(
+    private static readonly Regex TickerRegex = new(
+        @"^(?<base>[\w\d]{3,5})([/-]?(?<quote>USD(\w)?))?$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    public static (string BaseAsset, string QuoteAsset) GetBaseAndQuoteAssets(
         this string ticker,
         string separator = "/")
     {
-        var sides = ticker.Split(separator);
-        return (sides[0], sides[1]);
+        var match = TickerRegex.Match(ticker);
+        if (!match.Success)
+            throw new ArgumentException($"Invalid ticker format: {ticker}", nameof(ticker));
+
+        var baseAsset = match.Groups["base"].Value.ToUpperInvariant();
+        var quoteAsset = match.Groups["quote"].Success ? match.Groups["quote"].Value.ToUpperInvariant() : string.Empty;
+
+        return (baseAsset, quoteAsset);
     }
 }

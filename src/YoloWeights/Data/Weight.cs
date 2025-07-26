@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace YoloWeights;
+namespace YoloWeights.Data;
 
 public class Weight
 {
@@ -11,13 +11,13 @@ public class Weight
     public double ComboWeight { get; set; }
 
     [JsonPropertyName("date")]
-    public string Date { get; set; }
+    public required string Date { get; set; }
 
     [JsonPropertyName("momentum_megafactor")]
     public double MomentumMegafactor { get; set; }
 
     [JsonPropertyName("ticker")]
-    public string Ticker { get; set; }
+    public required string Ticker { get; set; }
 
     [JsonPropertyName("trend_megafactor")]
     public double TrendMegafactor { get; set; }

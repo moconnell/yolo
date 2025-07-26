@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <LanguageVersion>latest</LanguageVersion>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\YoloBroker\YoloBroker.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="HyperLiquid.Net" Version="2.4.0" />
+        <PackageReference Include="Nethereum.Signer.EIP712" Version="5.0.0" />
+    </ItemGroup>
+
+</Project>

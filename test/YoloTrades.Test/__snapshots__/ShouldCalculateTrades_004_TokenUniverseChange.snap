@@ -3,81 +3,108 @@
     "AssetName": "LINK/USD",
     "AssetType": "Spot",
     "Amount": -20.6,
-    "LimitPrice": 19.3660,
-    "PostPrice": true,
+    "LimitPrice": 19.363,
+    "PostPrice": false,
     "Expiry": null,
-    "IsTradable": true
+    "ClientOrderId": null,
+    "IsTradable": true,
+    "AbsoluteAmount": 20.6,
+    "OrderSide": "Sell"
   },
   {
     "AssetName": "UNI/USD",
     "AssetType": "Spot",
     "Amount": -18.6,
-    "LimitPrice": 15.813,
-    "PostPrice": true,
+    "LimitPrice": 15.809,
+    "PostPrice": false,
     "Expiry": null,
-    "IsTradable": true
+    "ClientOrderId": null,
+    "IsTradable": true,
+    "AbsoluteAmount": 18.6,
+    "OrderSide": "Sell"
   },
   {
     "AssetName": "FTX-PERP",
     "AssetType": "Future",
     "Amount": -12.5,
-    "LimitPrice": 39.8090,
-    "PostPrice": true,
+    "LimitPrice": 39.8085,
+    "PostPrice": false,
     "Expiry": null,
-    "IsTradable": true
+    "ClientOrderId": null,
+    "IsTradable": true,
+    "AbsoluteAmount": 12.5,
+    "OrderSide": "Sell"
   },
   {
     "AssetName": "LTC/USD",
     "AssetType": "Spot",
     "Amount": -5.50,
-    "LimitPrice": 148.800,
-    "PostPrice": true,
+    "LimitPrice": 148.795,
+    "PostPrice": false,
     "Expiry": null,
-    "IsTradable": true
+    "ClientOrderId": null,
+    "IsTradable": true,
+    "AbsoluteAmount": 5.50,
+    "OrderSide": "Sell"
   },
   {
     "AssetName": "BCH/USD",
     "AssetType": "Spot",
     "Amount": -0.508,
-    "LimitPrice": 434.325,
-    "PostPrice": true,
+    "LimitPrice": 434.25,
+    "PostPrice": false,
     "Expiry": null,
-    "IsTradable": true
+    "ClientOrderId": null,
+    "IsTradable": true,
+    "AbsoluteAmount": 0.508,
+    "OrderSide": "Sell"
   },
   {
     "AssetName": "ETH-PERP",
     "AssetType": "Future",
     "Amount": 0.096,
-    "LimitPrice": 3942.8,
-    "PostPrice": true,
+    "LimitPrice": 3942.9,
+    "PostPrice": false,
     "Expiry": null,
-    "IsTradable": true
+    "ClientOrderId": null,
+    "IsTradable": true,
+    "AbsoluteAmount": 0.096,
+    "OrderSide": "Buy"
   },
   {
     "AssetName": "BTC/USD",
     "AssetType": "Spot",
     "Amount": -0.0200,
-    "LimitPrice": 46735.0,
-    "PostPrice": true,
+    "LimitPrice": 46734.0,
+    "PostPrice": false,
     "Expiry": null,
-    "IsTradable": true
+    "ClientOrderId": null,
+    "IsTradable": true,
+    "AbsoluteAmount": 0.0200,
+    "OrderSide": "Sell"
   },
   {
     "AssetName": "FTT-PERP",
     "AssetType": "Future",
     "Amount": -300.0,
-    "LimitPrice": 39.8090,
-    "PostPrice": true,
+    "LimitPrice": 39.8085,
+    "PostPrice": false,
     "Expiry": null,
-    "IsTradable": true
+    "ClientOrderId": null,
+    "IsTradable": true,
+    "AbsoluteAmount": 300.0,
+    "OrderSide": "Sell"
   },
   {
     "AssetName": "CRO-PERP",
     "AssetType": "Future",
     "Amount": -50.0,
-    "LimitPrice": 0.526425,
-    "PostPrice": true,
+    "LimitPrice": 0.5264,
+    "PostPrice": false,
     "Expiry": null,
-    "IsTradable": true
+    "ClientOrderId": null,
+    "IsTradable": true,
+    "AbsoluteAmount": 50.0,
+    "OrderSide": "Sell"
   }
 ]

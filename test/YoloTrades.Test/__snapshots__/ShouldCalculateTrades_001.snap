@@ -6,7 +6,10 @@
     "LimitPrice": 0.784975,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "ClientOrderId": null,
+    "IsTradable": true,
+    "AbsoluteAmount": 680.0,
+    "OrderSide": "Sell"
   },
   {
     "AssetName": "LINK/USD",
@@ -15,7 +18,10 @@
     "LimitPrice": 19.4420,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "ClientOrderId": null,
+    "IsTradable": true,
+    "AbsoluteAmount": 44.6,
+    "OrderSide": "Sell"
   },
   {
     "AssetName": "FTT-PERP",
@@ -24,7 +30,10 @@
     "LimitPrice": 43.1870,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "ClientOrderId": null,
+    "IsTradable": true,
+    "AbsoluteAmount": 6.6,
+    "OrderSide": "Sell"
   },
   {
     "AssetName": "CRO-PERP",
@@ -33,7 +42,10 @@
     "LimitPrice": 0.548750,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "ClientOrderId": null,
+    "IsTradable": true,
+    "AbsoluteAmount": 1980.0,
+    "OrderSide": "Buy"
   },
   {
     "AssetName": "DOGE/USD",
@@ -42,7 +54,10 @@
     "LimitPrice": 0.1636025,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "ClientOrderId": null,
+    "IsTradable": true,
+    "AbsoluteAmount": 3774.0,
+    "OrderSide": "Sell"
   },
   {
     "AssetName": "ETH/USD",
@@ -51,6 +66,9 @@
     "LimitPrice": 3957.5,
     "PostPrice": true,
     "Expiry": null,
-    "IsTradable": true
+    "ClientOrderId": null,
+    "IsTradable": true,
+    "AbsoluteAmount": 0.106,
+    "OrderSide": "Buy"
   }
 ]
