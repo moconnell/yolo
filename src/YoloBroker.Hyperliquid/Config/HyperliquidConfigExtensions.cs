@@ -6,10 +6,17 @@ namespace YoloBroker.Hyperliquid.Config;
 
 public static class HyperliquidConfigExtensions
 {
-    public static bool HasHyperliquidConfig(this IConfiguration configuration) =>
-        configuration
-            .GetSection(ConfigSections.Hyperliquid)
-            .Get<HyperliquidConfig>() is { };
+    public static bool HasHyperliquidConfig(this IConfiguration configuration)
+    {
+        try
+        {
+            return configuration.GetHyperliquidConfig() is not null;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
     public static HyperliquidConfig? GetHyperliquidConfig(this IConfiguration configuration)
     {
@@ -17,7 +24,7 @@ public static class HyperliquidConfigExtensions
             .GetSection(ConfigSections.Hyperliquid)
             .Get<HyperliquidConfig>()
             .Ensure(c => c != null)
-            .Ensure(c => c!.Address)
-            .Ensure(c => c!.PrivateKey);
+            ?.Ensure(c => !string.IsNullOrEmpty(c.Address))
+            ?.Ensure(c => !string.IsNullOrEmpty(c.PrivateKey));
     }
 }

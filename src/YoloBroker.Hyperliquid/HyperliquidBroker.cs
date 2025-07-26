@@ -24,6 +24,14 @@ namespace YoloBroker.Hyperliquid;
 
 public sealed class HyperliquidBroker : IYoloBroker
 {
+    static HyperliquidBroker()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            HyperLiquidExchange.SignRequestDelegate = NethereumSigningExtensions.SignMessage;
+        }
+    }
+
     private bool _disposed;
     private readonly IHyperLiquidRestClient _hyperliquidClient;
     private readonly IHyperLiquidSocketClient _hyperliquidSocketClient;
@@ -36,11 +44,6 @@ public sealed class HyperliquidBroker : IYoloBroker
         _hyperliquidClient = hyperliquidClient;
         _hyperliquidSocketClient = hyperliquidSocketClient;
         _logger = logger;
-
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
-            HyperLiquidExchange.SignRequestDelegate = NethereumSigningExtensions.SignMessage;
-        }
     }
 
     public void Dispose()
@@ -53,7 +56,6 @@ public sealed class HyperliquidBroker : IYoloBroker
     {
         Dispose(false);
     }
-
 
     public async IAsyncEnumerable<TradeResult> PlaceTradesAsync(
         IEnumerable<Trade> trades,
@@ -137,11 +139,23 @@ public sealed class HyperliquidBroker : IYoloBroker
             () => _hyperliquidClient.SpotApi.Account.GetBalancesAsync(ct: ct),
             "Could not get spot balances");
 
-        var pos1 = GetPositionsFromPositions(futuresAccount.Positions);
-        var pos2 = GetPositionsFromBalances(spotBalances);
-        var posResult = pos1.Concat(pos2).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-        Debug.Assert(posResult.Count == pos1.Count + pos2.Count);
-        return posResult;
+        var futuresPositions = GetPositionsFromPositions(futuresAccount.Positions);
+        var spotPositions = GetPositionsFromBalances(spotBalances);
+
+        var result = new Dictionary<string, IReadOnlyList<Position>>(futuresPositions);
+        foreach (var (key, value) in spotPositions)
+        {
+            if (result.TryGetValue(key, out var existingPositions))
+            {
+                result[key] = [.. existingPositions, .. value];
+            }
+            else
+            {
+                result[key] = value;
+            }
+        }
+
+        return result;
 
         Dictionary<string, IReadOnlyList<Position>> GetPositionsFromBalances(
             IEnumerable<HyperLiquidBalance> balances,
@@ -171,30 +185,44 @@ public sealed class HyperliquidBroker : IYoloBroker
 
     public async Task<IDictionary<string, IReadOnlyList<MarketInfo>>> GetMarketsAsync(
         ISet<string>? baseAssetFilter = null,
-        string quoteCurrency = "USD",
-        AssetPermissions assetPermissions = AssetPermissions.SpotAndPerp,
+        string? quoteCurrency = null,
+        AssetPermissions assetPermissions = AssetPermissions.All,
         CancellationToken ct = default)
     {
+        var effectiveQuoteCurrency = string.IsNullOrEmpty(quoteCurrency) ? "USDC" : quoteCurrency;
+
         _logger.LogDebug(
             "Getting markets with baseAssetFilter: {BaseAssetFilter}, quoteCurrency: {QuoteCurrency}, assetPermissions: {AssetPermissions}",
             baseAssetFilter,
-            quoteCurrency,
+            effectiveQuoteCurrency,
             assetPermissions);
 
         var markets = new Dictionary<string, IReadOnlyList<MarketInfo>>();
 
-        if (assetPermissions.HasFlag(AssetPermissions.PerpetualFutures) || assetPermissions.HasFlag(AssetPermissions.LongSpotAndPerp) ||
+        if (assetPermissions.HasFlag(AssetPermissions.PerpetualFutures) ||
+            assetPermissions.HasFlag(AssetPermissions.LongSpotAndPerp) ||
             assetPermissions.HasFlag(AssetPermissions.SpotAndPerp))
         {
-            markets = await GetFuturesMarketsAsync(baseAssetFilter, quoteCurrency, ct);
+            markets = await GetFuturesMarketsAsync(baseAssetFilter, effectiveQuoteCurrency, ct);
         }
 
-        if (assetPermissions.HasFlag(AssetPermissions.Spot) || assetPermissions.HasFlag(AssetPermissions.LongSpot) ||
-            assetPermissions.HasFlag(AssetPermissions.ShortSpot) || assetPermissions.HasFlag(AssetPermissions.SpotAndPerp))
+        if (assetPermissions.HasFlag(AssetPermissions.Spot) ||
+            assetPermissions.HasFlag(AssetPermissions.LongSpot) ||
+            assetPermissions.HasFlag(AssetPermissions.ShortSpot) ||
+            assetPermissions.HasFlag(AssetPermissions.SpotAndPerp))
         {
-            markets = markets
-                .Concat(await GetSpotMarketsAsync(baseAssetFilter, quoteCurrency, ct))
-                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            var spotMarkets = await GetSpotMarketsAsync(baseAssetFilter, effectiveQuoteCurrency, ct);
+            foreach (var kvp in spotMarkets)
+            {
+                if (markets.TryGetValue(kvp.Key, out IReadOnlyList<MarketInfo>? value))
+                {
+                    markets[kvp.Key] = [.. value, .. kvp.Value];
+                }
+                else
+                {
+                    markets[kvp.Key] = kvp.Value;
+                }
+            }
         }
 
         return markets;
@@ -202,7 +230,7 @@ public sealed class HyperliquidBroker : IYoloBroker
 
     private async Task<Dictionary<string, IReadOnlyList<MarketInfo>>> GetSpotMarketsAsync(
         ISet<string>? baseAssetFilter,
-        string? quoteCurrency,
+        string quoteCurrency,
         CancellationToken ct = default)
     {
         _logger.LogDebug("Getting spot markets with baseAssetFilter: {BaseAssetFilter}, quoteCurrency: {QuoteCurrency}",
@@ -214,7 +242,7 @@ public sealed class HyperliquidBroker : IYoloBroker
 
         var tickersAndPrices = await Task.WhenAll(
             spotExchangeInfo.Symbols
-            .Where(symbol => baseAssetFilter == null || baseAssetFilter.Contains(symbol.BaseAsset.Name) && symbol.QuoteAsset.Name == quoteCurrency)
+            .Where(symbol => baseAssetFilter == null || baseAssetFilter.Contains(symbol.BaseAsset.Name) && (string.IsNullOrEmpty(quoteCurrency) || symbol.QuoteAsset.Name == quoteCurrency))
             .Select(async symbol => (symbol, await GetSpotOrderBookAsync(symbol.Name, ct))));
 
         return tickersAndPrices
@@ -230,14 +258,14 @@ public sealed class HyperliquidBroker : IYoloBroker
         var minProvideSize = Math.Ceiling(10 / orderBook.Levels.Asks[0].Price / quantityStep) * quantityStep;
 
         return new MarketInfo(
-                            symbol.Name,
-                            symbol.BaseAsset.Name,
-                            symbol.QuoteAsset.Name,
-                            AssetType.Spot,
-                            DateTime.UtcNow,
-                            priceStep,
-                            quantityStep,
-                            minProvideSize,
+                            Name: symbol.Name,
+                            BaseAsset: symbol.BaseAsset.Name,
+                            QuoteAsset: symbol.QuoteAsset.Name,
+                            AssetType: AssetType.Spot,
+                            TimeStamp: DateTime.UtcNow,
+                            PriceStep: priceStep,
+                            QuantityStep: quantityStep,
+                            MinProvideSize: minProvideSize,
                             Ask: orderBook.Levels.Asks[0].Price,
                             Bid: orderBook.Levels.Bids[0].Price,
                             Mid: (orderBook.Levels.Asks[0].Price + orderBook.Levels.Bids[0].Price) / 2
@@ -255,7 +283,7 @@ public sealed class HyperliquidBroker : IYoloBroker
 
     private async Task<Dictionary<string, IReadOnlyList<MarketInfo>>> GetFuturesMarketsAsync(
         ISet<string>? baseAssetFilter,
-        string quoteCurrency = "USD",
+        string quoteCurrency,
         CancellationToken ct = default)
     {
         var futuresExchangeInfo = await GetDataAsync(

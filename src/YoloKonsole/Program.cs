@@ -69,9 +69,8 @@ __  ______  __    ____  __
                 .CreateLogger<Program>();
             _logger.LogInformation("************ YOLO started ************");
 
-            var yoloConfig = config.GetYoloConfig()!;
-
-            var weights = (await yoloConfig.GetWeights()).ToArray();
+            var yoloConfig = config.GetYoloConfig() ?? throw new ConfigException("YOLO configuration is missing or invalid");
+            var weights = await yoloConfig.GetWeights();
 
             using var broker = serviceProvider.GetService<IYoloBroker>()!;
 
@@ -102,7 +101,7 @@ __  ______  __    ____  __
 
             var markets = await broker.GetMarketsAsync(
                 baseAssetFilter,
-                yoloConfig.BaseCurrencyToken,
+                yoloConfig.BaseAsset,
                 yoloConfig.AssetPermissions,
                 cancellationToken);
 

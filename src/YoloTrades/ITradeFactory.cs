@@ -6,7 +6,7 @@ namespace YoloTrades;
 public interface ITradeFactory
 {
     IEnumerable<Trade> CalculateTrades(
-        IEnumerable<Weight> weights,
+        IReadOnlyList<Weight> weights,
         IDictionary<string, IReadOnlyList<Position>> positions,
         IDictionary<string, IReadOnlyList<MarketInfo>> markets);
 }

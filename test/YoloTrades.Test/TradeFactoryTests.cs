@@ -32,7 +32,7 @@ public class TradeFactoryTests
 
         var config = new YoloConfig
         {
-            BaseCurrencyToken = baseCurrency,
+            BaseAsset = baseCurrency,
             NominalCash = nominalCash,
             TradeBuffer = tradeBuffer
         };
@@ -84,7 +84,7 @@ public class TradeFactoryTests
         var config = new YoloConfig
         {
             AssetPermissions = assetPermissions,
-            BaseCurrencyToken = baseCurrency,
+            BaseAsset = baseCurrency,
             NominalCash = nominalCash,
             TradeBuffer = tradeBuffer
         };

@@ -11,6 +11,6 @@ public class YoloConfig
     public decimal TradeBuffer { get; init; }
     public decimal? NominalCash { get; init; }
     public AssetPermissions AssetPermissions { get; init; } = AssetPermissions.SpotAndPerp;
-    public required string BaseCurrencyToken { get; init; }
+    public required string BaseAsset { get; init; }
     public decimal SpreadSplit { get; init; } = 0.5m;
 }

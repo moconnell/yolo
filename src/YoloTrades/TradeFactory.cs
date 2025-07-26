@@ -14,7 +14,11 @@ public class TradeFactory : ITradeFactory
     private readonly ILogger<TradeFactory> _logger;
 
     public TradeFactory(ILogger<TradeFactory> logger, IConfiguration configuration)
-        : this(logger, configuration.GetYoloConfig()!)
+        : this(
+            logger,
+            configuration.GetYoloConfig()
+                ?? throw new InvalidOperationException("YoloConfig is required but was not found in configuration")
+        )
     {
     }
 
@@ -25,7 +29,7 @@ public class TradeFactory : ITradeFactory
         TradeBuffer = yoloConfig.TradeBuffer;
         MaxLeverage = yoloConfig.MaxLeverage;
         NominalCash = yoloConfig.NominalCash;
-        BaseCurrencyToken = yoloConfig.BaseCurrencyToken;
+        BaseCurrencyToken = yoloConfig.BaseAsset;
         SpreadSplit = Math.Max(0, Math.Min(1, yoloConfig.SpreadSplit));
     }
 
@@ -37,7 +41,7 @@ public class TradeFactory : ITradeFactory
     private decimal SpreadSplit { get; }
 
     public IEnumerable<Trade> CalculateTrades(
-        IEnumerable<Weight> weights,
+        IReadOnlyList<Weight> weights,
         IDictionary<string, IReadOnlyList<Position>> positions,
         IDictionary<string, IReadOnlyList<MarketInfo>> markets)
     {

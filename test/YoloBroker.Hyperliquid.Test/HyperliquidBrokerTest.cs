@@ -14,9 +14,9 @@ public class HyperliquidBrokerTest
 {
     [Theory]
     [Trait("Category", "Integration")]
-    [InlineData("ETH", "ETH")]
-    [InlineData("BTC,ETH", "BTC,ETH")]
-    public async Task GivenBaseAsset_ShouldGetMarkets(string baseAssetFilterString, string expectedMarketsString)
+    [InlineData("ETH", AssetPermissions.PerpetualFutures, "ETH")]
+    [InlineData("BTC,ETH", AssetPermissions.PerpetualFutures, "BTC,ETH")]
+    public async Task GivenBaseAsset_ShouldGetMarkets(string baseAssetFilterString, AssetPermissions assetPermissions, string expectedMarketsString)
     {
         // arrange
         var baseAssetFilter = baseAssetFilterString.Split(',').Select(asset => asset.Trim()).ToHashSet();
@@ -25,7 +25,7 @@ public class HyperliquidBrokerTest
         HyperliquidBroker broker = GetTestBroker();
 
         // act
-        var results = await broker.GetMarketsAsync(baseAssetFilter);
+        var results = await broker.GetMarketsAsync(baseAssetFilter, assetPermissions: assetPermissions);
 
         // assert
         Assert.NotNull(results);
@@ -133,7 +133,7 @@ public class HyperliquidBrokerTest
     {
         var config = new ConfigurationBuilder()
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-            .AddJsonFile("appsettings.local.json", optional: false, reloadOnChange: true)
+            .AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true)
             .Build();
 
         return (config["Hyperliquid:Address"], config["Hyperliquid:PrivateKey"]);
