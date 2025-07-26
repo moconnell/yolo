@@ -267,9 +267,9 @@ public sealed class HyperliquidBroker : IYoloBroker
                             PriceStep: priceStep,
                             QuantityStep: quantityStep,
                             MinProvideSize: minProvideSize,
-                            Ask: orderBook.Levels.Asks[0].Price,
-                            Bid: orderBook.Levels.Bids[0].Price,
-                            Mid: (orderBook.Levels.Asks[0].Price + orderBook.Levels.Bids[0].Price) / 2
+                            Ask: orderBook.Levels.Asks.ElementAtOrDefault(0)?.Price,
+                            Bid: orderBook.Levels.Bids.ElementAtOrDefault(0)?.Price,
+                            Mid: (orderBook.Levels.Asks.ElementAtOrDefault(0)?.Price + orderBook.Levels.Bids.ElementAtOrDefault(0)?.Price) / 2
                         );
     }
 
@@ -320,9 +320,9 @@ public sealed class HyperliquidBroker : IYoloBroker
                         priceStep,
                         quantityStep,
                         minProvideSize,
-                        Ask: orderBook.Levels.Asks[0].Price,
-                        Bid: orderBook.Levels.Bids[0].Price,
-                        Mid: (orderBook.Levels.Asks[0].Price + orderBook.Levels.Bids[0].Price) / 2);
+                        Ask: orderBook.Levels.Asks.ElementAtOrDefault(0)?.Price,
+                        Bid: orderBook.Levels.Bids.ElementAtOrDefault(0)?.Price,
+                        Mid: (orderBook.Levels.Asks.ElementAtOrDefault(0)?.Price + orderBook.Levels.Bids.ElementAtOrDefault(0)?.Price) / 2);
     }
 
     private async Task<HyperLiquidOrderBook> GetFuturesOrderBookAsync(string symbol, CancellationToken ct)
