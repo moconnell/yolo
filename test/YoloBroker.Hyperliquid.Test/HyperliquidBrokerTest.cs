@@ -13,6 +13,7 @@ namespace YoloBroker.Hyperliquid.Test;
 public class HyperliquidBrokerTest
 {
     [Theory]
+    [Trait("Category", "Integration")]
     [InlineData("ETH", "ETH")]
     [InlineData("BTC,ETH", "BTC,ETH")]
     public async Task GivenBaseAsset_ShouldGetMarkets(string baseAssetFilterString, string expectedMarketsString)
@@ -36,6 +37,7 @@ public class HyperliquidBrokerTest
     }
 
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task ShouldGetOpenOrders()
     {
         // arrange
@@ -49,6 +51,7 @@ public class HyperliquidBrokerTest
     }
 
     [Theory]
+    [Trait("Category", "Integration")]
     // [InlineData("HYPE/USDC", AssetType.Spot, 1)]
     [InlineData("ETH", AssetType.Future, 0.01)]
     [InlineData("BTC", AssetType.Future, 0.01)]
@@ -100,7 +103,6 @@ public class HyperliquidBrokerTest
         static Trade CreateTrade(string symbol, AssetType assetType, double quantity, decimal? price) =>
             new(symbol, assetType, Convert.ToDecimal(quantity), price, ClientOrderId: $"0x{RandomNumberGenerator.GetHexString(32, true)}");
     }
-
 
     private static HyperliquidBroker GetTestBroker()
     {
