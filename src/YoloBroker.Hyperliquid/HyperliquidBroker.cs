@@ -242,7 +242,8 @@ public sealed class HyperliquidBroker : IYoloBroker
 
         var tickersAndPrices = await Task.WhenAll(
             spotExchangeInfo.Symbols
-            .Where(symbol => baseAssetFilter == null || baseAssetFilter.Contains(symbol.BaseAsset.Name) && (string.IsNullOrEmpty(quoteCurrency) || symbol.QuoteAsset.Name == quoteCurrency))
+            .Where(symbol => (baseAssetFilter == null || baseAssetFilter.Contains(symbol.BaseAsset.Name)) &&
+                (string.IsNullOrEmpty(quoteCurrency) || symbol.QuoteAsset.Name == quoteCurrency))
             .Select(async symbol => (symbol, await GetSpotOrderBookAsync(symbol.Name, ct))));
 
         return tickersAndPrices
