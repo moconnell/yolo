@@ -40,5 +40,6 @@ public class TradeTest
         }
     }
 
-    private static DateTime? ToDateTime(long? ticks) => ticks.HasValue ? new DateTime(ticks.Value) : null;
+    private static DateTime? ToDateTime(long? unixSeconds) =>
+        unixSeconds.HasValue ? DateTimeOffset.FromUnixTimeSeconds(unixSeconds.Value).UtcDateTime : null;
 }
