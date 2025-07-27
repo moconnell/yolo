@@ -7,14 +7,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Spectre.Console;
-using Spectre.Console.Rendering;
 using Utility.CommandLine;
 using YoloAbstractions;
 using YoloAbstractions.Config;
 using YoloBroker.Interface;
 using YoloTrades;
 using YoloWeights;
-using static System.Environment;
 using static YoloKonsole.WellKnown.TradeEventIds;
 
 namespace YoloKonsole;
@@ -139,17 +137,19 @@ __  ______  __    ____  __
 
             var returnCode = Success;
 
-            // ConsoleWriteLine($"{NewLine}Placing orders...\n\n");
-
-            var settings = OrderManagementSettings.Default with
-            { UnfilledOrderTimeout = TimeSpan.Parse(yoloConfig.UnfilledOrderTimeout) };
-
             var (table, index) = CreateOrderTable(trades);
 
             await AnsiConsole.Live(table)
                 .StartAsync(async ctx =>
                 {
                     ctx.UpdateTarget(table);
+
+                    var settings = OrderManagementSettings.Default with
+                    {
+                        UnfilledOrderTimeout = TimeSpan.TryParse(yoloConfig.UnfilledOrderTimeout, out var timeout)
+                                        ? timeout
+                                        : OrderManagementSettings.Default.UnfilledOrderTimeout
+                    };
 
                     await foreach (var update in broker.ManageOrdersAsync(trades, settings, cancellationToken))
                     {
@@ -165,9 +165,6 @@ __  ______  __    ____  __
                         ctx.Refresh();
                     }
                 });
-
-            // if (returnCode == Success)
-            //     ConsoleWriteLine("\n\n done.");
 
             return returnCode;
         }

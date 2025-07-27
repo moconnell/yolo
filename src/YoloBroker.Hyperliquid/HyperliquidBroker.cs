@@ -155,7 +155,7 @@ public sealed class HyperliquidBroker : IYoloBroker
                     new Order(
                         or.OrderId.GetValueOrDefault(),
                         t.AssetName,
-                        AssetType.Spot,
+                        AssetType.Future,
                         DateTime.UtcNow,
                         t.OrderSide,
                         or.OrderStatus,
@@ -167,8 +167,8 @@ public sealed class HyperliquidBroker : IYoloBroker
                     t,
                     false,
                     null,
-                    spotResult.Error?.Message,
-                    spotResult.Error?.Code);
+                    futuresResult.Error?.Message,
+                    futuresResult.Error?.Code);
         }
     }
 
