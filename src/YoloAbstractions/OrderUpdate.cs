@@ -4,7 +4,7 @@ namespace YoloAbstractions;
 
 public record OrderUpdate(
     string AssetName,
-    OrderUpdateType Type, // Created, PartiallyFilled, Filled, Cancelled, TimedOut
+    OrderUpdateType Type,
     Order? Order = null,
     string? Message = null,
     Exception? Error = null);

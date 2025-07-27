@@ -198,7 +198,6 @@ __  ______  __    ____  __
             .AddColumn("Filled", c => c.RightAligned().NoWrap())
             .AddColumn("Price", c => c.RightAligned().NoWrap())
             .AddColumn("Status", c => c.Centered().NoWrap())
-            // .AddColumn("Created", c => c.RightAligned())
             .AddColumn("Updated", c => c.RightAligned().NoWrap());
 
         var index = new ConcurrentDictionary<string, int>();
@@ -208,10 +207,9 @@ __  ______  __    ____  __
             var assetType = trade.AssetType.ToString();
             var side = trade.OrderSide.ToString();
             var amount = trade.AbsoluteAmount.ToString("F4");
-            var filled = "0.0000"; // Placeholder for filled amount
+            var filled = string.Empty;
             var price = trade.LimitPrice?.ToString("F2") ?? "Market";
             var status = "[yellow]Pending[/]";
-            // var created = DateTime.Now.ToString("HH:mm:ss");
             var time = DateTime.Now.ToString("HH:mm:ss");
 
             table.AddRow(
@@ -222,7 +220,6 @@ __  ______  __    ____  __
                 filled,
                 price,
                 status,
-                // created,
                 time);
 
             index[trade.AssetName] = table.Rows.Count - 1;
@@ -244,7 +241,6 @@ __  ______  __    ____  __
             var filled = update.Order?.Filled?.ToString("F4") ?? " ";
             var price = update.Order?.LimitPrice?.ToString("F2") ?? "Market";
             var status = GetStatusMarkup(update.Type);
-            // var created = update.Order?.Created.ToString("HH:mm:ss") ?? " ";
             var time = DateTime.Now.ToString("HH:mm:ss");
 
             // Update existing row
@@ -255,7 +251,6 @@ __  ______  __    ____  __
             table.UpdateCell(existingRowIndex, 4, filled);
             table.UpdateCell(existingRowIndex, 5, price);
             table.UpdateCell(existingRowIndex, 6, status);
-            // table.UpdateCell(existingRowIndex, 7, created);
             table.UpdateCell(existingRowIndex, 7, time);
         }
     }
@@ -274,7 +269,7 @@ __  ______  __    ____  __
     {
         return type switch
         {
-            OrderUpdateType.Created => "[yellow]Pending[/]",
+            OrderUpdateType.Created => "[yellow]Creatd[/]",
             OrderUpdateType.PartiallyFilled => "[orange1]Partial[/]",
             OrderUpdateType.Filled => "[green]Filled[/]",
             OrderUpdateType.Cancelled => "[gray]Cancelled[/]",

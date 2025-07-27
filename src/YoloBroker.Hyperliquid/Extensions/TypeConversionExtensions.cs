@@ -19,7 +19,7 @@ public static class TypeConversionExtensions
         _ => throw new ArgumentOutOfRangeException(nameof(orderSide), orderSide, null)
     };
 
-    public static YoloAbstractions.OrderStatus ToYolo(this OrderStatus orderStatus) => orderStatus switch
+    public static YoloAbstractions.OrderStatus ToYoloOrderStatus(this OrderStatus orderStatus) => orderStatus switch
     {
         OrderStatus.Filled => YoloAbstractions.OrderStatus.Filled,
         OrderStatus.Open => YoloAbstractions.OrderStatus.Open,
@@ -29,6 +29,19 @@ public static class TypeConversionExtensions
         OrderStatus.MarginCanceled => YoloAbstractions.OrderStatus.MarginCanceled,
         OrderStatus.WaitingFill => YoloAbstractions.OrderStatus.WaitingFill,
         OrderStatus.WaitingTrigger => YoloAbstractions.OrderStatus.WaitingTrigger,
+        _ => throw new ArgumentOutOfRangeException(nameof(orderStatus), orderStatus, null)
+    };
+
+    public static YoloAbstractions.OrderUpdateType ToYoloOrderUpdateType(this OrderStatus orderStatus) => orderStatus switch
+    {
+        OrderStatus.Filled => YoloAbstractions.OrderUpdateType.Filled,
+        OrderStatus.Open => YoloAbstractions.OrderUpdateType.Created,
+        OrderStatus.Canceled => YoloAbstractions.OrderUpdateType.Cancelled,
+        OrderStatus.Triggered => YoloAbstractions.OrderUpdateType.Created,
+        OrderStatus.Rejected => YoloAbstractions.OrderUpdateType.Error,
+        OrderStatus.MarginCanceled => YoloAbstractions.OrderUpdateType.Cancelled,
+        OrderStatus.WaitingFill => YoloAbstractions.OrderUpdateType.PartiallyFilled,
+        OrderStatus.WaitingTrigger => YoloAbstractions.OrderUpdateType.Created,
         _ => throw new ArgumentOutOfRangeException(nameof(orderStatus), orderStatus, null)
     };
 

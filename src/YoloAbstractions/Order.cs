@@ -12,4 +12,7 @@ public record Order(
     decimal Amount,
     decimal? Filled = null,
     decimal? LimitPrice = null,
-    string? ClientId = null);
+    string? ClientId = null)
+{
+    public OrderType OrderType => LimitPrice.HasValue ? OrderType.Limit : OrderType.Market;
+}

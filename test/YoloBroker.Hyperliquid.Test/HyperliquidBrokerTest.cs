@@ -108,6 +108,56 @@ public class HyperliquidBrokerTest
             await broker.CancelOrderAsync(order.AssetName, order.Id);
         }
     }
+
+    [Theory]
+    [Trait("Category", "Integration")]
+    // [InlineData("HYPE/USDC", AssetType.Spot, 1)]
+    // [InlineData("ETH", AssetType.Future, 0.01)]
+    [InlineData("BTC", AssetType.Future, 0.0005)]
+    public async Task ShouldManageOrders(string symbol, AssetType assetType, double quantity, bool isLimitOrder = true)
+    {
+        // arrange
+        HyperliquidBroker broker = GetTestBroker();
+        decimal? orderPrice = isLimitOrder ? await GetLimitPrice(broker, symbol, assetType, quantity) : null;
+        var trade = CreateTrade(symbol, assetType, quantity, orderPrice);
+        var settings = OrderManagementSettings.Default;
+        var cts = new CancellationTokenSource();
+
+        // act
+        var orderUpdates = broker.ManageOrdersAsync([trade], settings, cts.Token);
+
+        // assert
+        long orderId = 0;
+        try
+        {
+            await foreach (var orderUpdate in orderUpdates)
+            {
+                orderUpdate.ShouldNotBeNull();
+                var order = orderUpdate.Order;
+                order.ShouldNotBeNull();
+                orderId = order.Id;
+                order.Id.ShouldBeGreaterThan(0);
+                order.ClientId.ShouldBe(trade.ClientOrderId);
+                order.AssetName.ShouldBe(symbol);
+                order.Amount.ShouldBe(trade.Amount);
+                order.OrderStatus.ShouldBe(OrderStatus.Open);
+                cts.Cancel(); // Cancel the order management process after the first update
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected cancellation, we can ignore this
+        }
+        finally
+        {
+            // Ensure we clean up the order
+            if (orderId > 0)
+            {
+                await broker.CancelOrderAsync(trade.AssetName, orderId);
+            }
+        }
+    }
+
     private static async Task<decimal> GetLimitPrice(HyperliquidBroker broker, string symbol, AssetType assetType, double quantity)
     {
         // Get current market price first
