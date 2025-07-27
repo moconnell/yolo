@@ -40,6 +40,25 @@ public class TradeTest
         }
     }
 
+    [Theory]
+    [InlineData("BTC", 10, 4.5789, 10.0, true)]
+    [InlineData("BTC", 10, 4.5789, null, true)]
+    [InlineData("BTC", 1, 4.5789, 10.0, false)]
+    [InlineData("BTC", 1, null, 10.0, true)]
+#pragma warning disable xUnit1012 // Null should only be used for nullable parameters
+    [InlineData(null, 1, null, 10.0, false)]
+    public void ShouldCheckIfTradeIsTradable(string symbol, decimal amount, double? limitPrice, double? minOrderValue, bool expectedResult)
+    {
+        var trade = new Trade(symbol, AssetType.Future, amount, ToDecimal(limitPrice));
+        var result = trade.IsTradable(ToDecimal(minOrderValue));
+        Assert.Equal(expectedResult, result);
+    }
+
+    private static decimal? ToDecimal(double? limitPrice)
+    {
+        return limitPrice.HasValue ? Convert.ToDecimal(limitPrice) : null;
+    }
+
     private static DateTime? ToDateTime(long? unixSeconds) =>
         unixSeconds.HasValue ? DateTimeOffset.FromUnixTimeSeconds(unixSeconds.Value).UtcDateTime : null;
 }

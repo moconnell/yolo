@@ -13,4 +13,6 @@ public class YoloConfig
     public AssetPermissions AssetPermissions { get; init; } = AssetPermissions.SpotAndPerp;
     public required string BaseAsset { get; init; }
     public decimal SpreadSplit { get; init; } = 0.5m;
+    public decimal? MinOrderValue { get; init; }
+    public string UnfilledOrderTimeout { get; init; } = "00:05:00"; // Default 5 minutes
 }

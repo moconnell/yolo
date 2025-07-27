@@ -2,7 +2,7 @@ namespace YoloAbstractions;
 
 public enum OrderStatus
 {
-    New,
+    NotSet = 0,
     Open,
     Filled,
     Canceled,

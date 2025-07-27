@@ -7,9 +7,9 @@
     "PostPrice": false,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true,
     "AbsoluteAmount": 20.6,
-    "OrderSide": "Sell"
+    "OrderSide": "Sell",
+    "OrderType": "Limit"
   },
   {
     "AssetName": "UNI/USD",
@@ -19,9 +19,9 @@
     "PostPrice": false,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true,
     "AbsoluteAmount": 18.6,
-    "OrderSide": "Sell"
+    "OrderSide": "Sell",
+    "OrderType": "Limit"
   },
   {
     "AssetName": "FTT-PERP",
@@ -31,9 +31,9 @@
     "PostPrice": false,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true,
     "AbsoluteAmount": 12.5,
-    "OrderSide": "Sell"
+    "OrderSide": "Sell",
+    "OrderType": "Limit"
   },
   {
     "AssetName": "LTC/USD",
@@ -43,9 +43,9 @@
     "PostPrice": false,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true,
     "AbsoluteAmount": 5.50,
-    "OrderSide": "Sell"
+    "OrderSide": "Sell",
+    "OrderType": "Limit"
   },
   {
     "AssetName": "BTC/USD",
@@ -55,9 +55,9 @@
     "PostPrice": false,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true,
     "AbsoluteAmount": 0.0181,
-    "OrderSide": "Sell"
+    "OrderSide": "Sell",
+    "OrderType": "Limit"
   },
   {
     "AssetName": "BCH/USD",
@@ -67,9 +67,9 @@
     "PostPrice": false,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true,
     "AbsoluteAmount": 0.508,
-    "OrderSide": "Sell"
+    "OrderSide": "Sell",
+    "OrderType": "Limit"
   },
   {
     "AssetName": "ETH-PERP",
@@ -79,8 +79,8 @@
     "PostPrice": false,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true,
     "AbsoluteAmount": 0.096,
-    "OrderSide": "Buy"
+    "OrderSide": "Buy",
+    "OrderType": "Limit"
   }
 ]
