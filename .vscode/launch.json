@@ -38,11 +38,6 @@
       "env": {
         "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT": "1",
         "DOTNET_SYSTEM_NET_HTTP_USESOCKETSHTTPHANDLER": "0"
-      },
-      "exceptionOptions": {
-        "System.Exception": {
-          "breakMode": "always"
-        }
       }
     }
   ]
