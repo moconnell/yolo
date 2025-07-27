@@ -10,12 +10,12 @@ public static partial class LoggerExtensions
     [LoggerMessage(
         EventId = TradeEventIds.CalculateTrades,
         Level = LogLevel.Debug,
-        Message = "*** CalculateTrades ***\nWeights: {Weights}\nPositions: {Positions}\nMarkets: {Markets}")]
+            Message = "*** CalculateTrades ***\nWeights: {Weights}\nPositions: {Positions}\nMarkets: {Markets}")]
     public static partial void CalculateTrades(
         this ILogger logger,
-        Dictionary<string, (Weight weight, bool isInUniverse)> weights,
-        IDictionary<string, IReadOnlyList<Position>> positions,
-        IDictionary<string, IReadOnlyList<MarketInfo>> markets);
+        IReadOnlyDictionary<string, (Weight weight, bool isInUniverse)> weights,
+        IReadOnlyDictionary<string, IReadOnlyList<Position>> positions,
+        IReadOnlyDictionary<string, IReadOnlyList<MarketInfo>> markets);
 
     [LoggerMessage(
         EventId = TradeEventIds.Weight,

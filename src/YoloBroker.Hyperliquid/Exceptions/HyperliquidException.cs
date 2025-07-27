@@ -5,6 +5,11 @@ namespace YoloBroker.Hyperliquid.Exceptions;
 
 public class HyperliquidException : BrokerException
 {
+    public HyperliquidException(string message, int errorCode)
+        : base($"{message} ({errorCode})")
+    {   
+    }
+
     public HyperliquidException(string message, CallResult result)
         : base($"{message} - {result.Error}")
     {

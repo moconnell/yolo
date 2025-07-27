@@ -7,6 +7,6 @@ public interface ITradeFactory
 {
     IEnumerable<Trade> CalculateTrades(
         IReadOnlyList<Weight> weights,
-        IDictionary<string, IReadOnlyList<Position>> positions,
-        IDictionary<string, IReadOnlyList<MarketInfo>> markets);
+        IReadOnlyDictionary<string, IReadOnlyList<Position>> positions,
+        IReadOnlyDictionary<string, IReadOnlyList<MarketInfo>> markets);
 }

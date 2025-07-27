@@ -7,9 +7,9 @@
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true,
     "AbsoluteAmount": 0.5986,
-    "OrderSide": "Sell"
+    "OrderSide": "Sell",
+    "OrderType": "Limit"
   },
   {
     "AssetName": "BTC/USD",
@@ -19,9 +19,9 @@
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true,
     "AbsoluteAmount": 0.0025,
-    "OrderSide": "Buy"
+    "OrderSide": "Buy",
+    "OrderType": "Limit"
   },
   {
     "AssetName": "CRO/USD",
@@ -31,9 +31,9 @@
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true,
     "AbsoluteAmount": 947.4349,
-    "OrderSide": "Buy"
+    "OrderSide": "Buy",
+    "OrderType": "Limit"
   },
   {
     "AssetName": "DOGE/USD",
@@ -43,9 +43,9 @@
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true,
     "AbsoluteAmount": 4131.0624,
-    "OrderSide": "Sell"
+    "OrderSide": "Sell",
+    "OrderType": "Limit"
   },
   {
     "AssetName": "ETH/USD",
@@ -55,9 +55,9 @@
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true,
     "AbsoluteAmount": 0.0949,
-    "OrderSide": "Buy"
+    "OrderSide": "Buy",
+    "OrderType": "Limit"
   },
   {
     "AssetName": "FTT/USD",
@@ -67,9 +67,9 @@
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true,
     "AbsoluteAmount": 13.1617,
-    "OrderSide": "Sell"
+    "OrderSide": "Sell",
+    "OrderType": "Limit"
   },
   {
     "AssetName": "LINK/USD",
@@ -79,9 +79,9 @@
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true,
     "AbsoluteAmount": 30.3962,
-    "OrderSide": "Sell"
+    "OrderSide": "Sell",
+    "OrderType": "Limit"
   },
   {
     "AssetName": "LTC/USD",
@@ -91,9 +91,9 @@
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true,
     "AbsoluteAmount": 3.3773,
-    "OrderSide": "Sell"
+    "OrderSide": "Sell",
+    "OrderType": "Limit"
   },
   {
     "AssetName": "UNI/USD",
@@ -103,8 +103,8 @@
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true,
     "AbsoluteAmount": 64.4732,
-    "OrderSide": "Sell"
+    "OrderSide": "Sell",
+    "OrderType": "Limit"
   }
 ]

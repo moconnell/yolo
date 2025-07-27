@@ -28,13 +28,15 @@ public class TradeFactory : ITradeFactory
         AssetPermissions = yoloConfig.AssetPermissions;
         TradeBuffer = yoloConfig.TradeBuffer;
         MaxLeverage = yoloConfig.MaxLeverage;
+        MinOrderValue = yoloConfig.MinOrderValue;
         NominalCash = yoloConfig.NominalCash;
-        BaseCurrencyToken = yoloConfig.BaseAsset;
+        BaseAsset = yoloConfig.BaseAsset;
         SpreadSplit = Math.Max(0, Math.Min(1, yoloConfig.SpreadSplit));
     }
 
     private AssetPermissions AssetPermissions { get; }
-    private string BaseCurrencyToken { get; }
+    private string BaseAsset { get; }
+    private decimal? MinOrderValue { get; }
     private decimal? NominalCash { get; }
     private decimal MaxLeverage { get; }
     private decimal TradeBuffer { get; }
@@ -42,11 +44,11 @@ public class TradeFactory : ITradeFactory
 
     public IEnumerable<Trade> CalculateTrades(
         IReadOnlyList<Weight> weights,
-        IDictionary<string, IReadOnlyList<Position>> positions,
-        IDictionary<string, IReadOnlyList<MarketInfo>> markets)
+        IReadOnlyDictionary<string, IReadOnlyList<Position>> positions,
+        IReadOnlyDictionary<string, IReadOnlyList<MarketInfo>> markets)
     {
         var nominal = NominalCash ??
-                      positions.GetTotalValue(markets, BaseCurrencyToken);
+                      positions.GetTotalValue(markets, BaseAsset);
         var weightsDict = weights.ToDictionary(
             weight => weight.Ticker.GetBaseAndQuoteAssets().BaseAsset,
             weight => (weight, isInUniverse: true));
@@ -62,10 +64,10 @@ public class TradeFactory : ITradeFactory
             ? 1
             : MaxLeverage / unconstrainedTargetLeverage;
 
-        var droppedTokens = positions.Keys.Except(weightsDict.Keys.Union([BaseCurrencyToken]));
+        var droppedTokens = positions.Keys.Except(weightsDict.Keys.Union([BaseAsset]));
         foreach (var token in droppedTokens)
         {
-            var weight = new Weight(0, 0, DateTime.UtcNow, 0, $"{token}/{BaseCurrencyToken}", 0);
+            var weight = new Weight(0, 0, DateTime.UtcNow, 0, $"{token}/{BaseAsset}", 0);
             weightsDict[token] = (weight, false);
         }
 
@@ -154,7 +156,7 @@ public class TradeFactory : ITradeFactory
                     var currentProjectedPosition = projectedPositions[trade.AssetName];
                     var newProjectedPosition = currentProjectedPosition + trade;
                     projectedPositions[trade.AssetName] = newProjectedPosition;
-                    if (trade.IsTradable)
+                    if (trade.IsTradable(MinOrderValue))
                         yield return trade;
                     else
                         _logger.DeltaTooSmall(token, remainingDelta);
@@ -232,7 +234,7 @@ public class TradeFactory : ITradeFactory
                 _ => new Trade(market.Name, market.AssetType, size, isBuy ? market.Ask!.Value : market.Bid!.Value, false)
             };
 
-            if (trade.IsTradable)
+            if (trade.IsTradable())
                 _logger.GeneratedTrade(token, delta, trade);
 
             remainingDelta -= delta;

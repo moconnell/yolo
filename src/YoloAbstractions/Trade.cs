@@ -11,11 +11,27 @@ public record Trade(
     DateTime? Expiry = null,
     string? ClientOrderId = null)
 {
-    public bool IsTradable => Amount != 0;
+    public bool IsTradable(decimal? minOrderValue = null)
+    {
+        if (Amount == 0)
+            return false;
+
+        if (string.IsNullOrWhiteSpace(AssetName))
+            return false;
+
+        // Check valid limit price
+        if (LimitPrice.HasValue && LimitPrice.Value < 0)
+            return false;
+
+        // Ensure the order value meets the minimum requirement
+        return !minOrderValue.HasValue || !LimitPrice.HasValue || !(AbsoluteAmount * LimitPrice.Value < minOrderValue);
+    }
 
     public decimal AbsoluteAmount => Math.Abs(Amount);
 
     public OrderSide OrderSide => Amount < 0 ? OrderSide.Sell : OrderSide.Buy;
+
+    public OrderType OrderType => LimitPrice.HasValue ? OrderType.Limit : OrderType.Market;
 
     public static Trade operator +(Trade one, Trade two)
     {

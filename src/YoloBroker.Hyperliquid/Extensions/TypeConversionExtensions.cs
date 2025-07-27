@@ -5,13 +5,20 @@ namespace YoloBroker.Hyperliquid.Extensions;
 
 public static class TypeConversionExtensions
 {
+    public static YoloAbstractions.AssetType ToYolo(this SymbolType symbolType) => symbolType switch
+    {
+        SymbolType.Spot => YoloAbstractions.AssetType.Spot,
+        SymbolType.Futures => YoloAbstractions.AssetType.Future,
+        _ => throw new ArgumentOutOfRangeException(nameof(symbolType), symbolType, null)
+    };
+
     public static YoloAbstractions.OrderSide ToYolo(this OrderSide orderSide) => orderSide switch
     {
         OrderSide.Buy => YoloAbstractions.OrderSide.Buy,
         OrderSide.Sell => YoloAbstractions.OrderSide.Sell,
         _ => throw new ArgumentOutOfRangeException(nameof(orderSide), orderSide, null)
     };
-    
+
     public static YoloAbstractions.OrderStatus ToYolo(this OrderStatus orderStatus) => orderStatus switch
     {
         OrderStatus.Filled => YoloAbstractions.OrderStatus.Filled,
@@ -23,5 +30,19 @@ public static class TypeConversionExtensions
         OrderStatus.WaitingFill => YoloAbstractions.OrderStatus.WaitingFill,
         OrderStatus.WaitingTrigger => YoloAbstractions.OrderStatus.WaitingTrigger,
         _ => throw new ArgumentOutOfRangeException(nameof(orderStatus), orderStatus, null)
+    };
+
+    internal static OrderSide ToHyperLiquid(this YoloAbstractions.OrderSide orderSide) => orderSide switch
+    {
+        YoloAbstractions.OrderSide.Buy => OrderSide.Buy,
+        YoloAbstractions.OrderSide.Sell => OrderSide.Sell,
+        _ => throw new ArgumentOutOfRangeException(nameof(orderSide), orderSide, null)
+    };
+
+    internal static OrderType ToHyperLiquid(this YoloAbstractions.OrderType orderType) => orderType switch
+    {
+        YoloAbstractions.OrderType.Market => OrderType.Market,
+        YoloAbstractions.OrderType.Limit => OrderType.Limit,
+        _ => throw new ArgumentOutOfRangeException(nameof(orderType), orderType, null)
     };
 }

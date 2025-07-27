@@ -7,9 +7,9 @@
     "PostPrice": false,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true,
     "AbsoluteAmount": 20.6,
-    "OrderSide": "Sell"
+    "OrderSide": "Sell",
+    "OrderType": "Limit"
   },
   {
     "AssetName": "UNI/USD",
@@ -19,9 +19,9 @@
     "PostPrice": false,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true,
     "AbsoluteAmount": 18.6,
-    "OrderSide": "Sell"
+    "OrderSide": "Sell",
+    "OrderType": "Limit"
   },
   {
     "AssetName": "FTX-PERP",
@@ -31,9 +31,9 @@
     "PostPrice": false,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true,
     "AbsoluteAmount": 12.5,
-    "OrderSide": "Sell"
+    "OrderSide": "Sell",
+    "OrderType": "Limit"
   },
   {
     "AssetName": "LTC/USD",
@@ -43,9 +43,9 @@
     "PostPrice": false,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true,
     "AbsoluteAmount": 5.50,
-    "OrderSide": "Sell"
+    "OrderSide": "Sell",
+    "OrderType": "Limit"
   },
   {
     "AssetName": "BCH/USD",
@@ -55,9 +55,9 @@
     "PostPrice": false,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true,
     "AbsoluteAmount": 0.508,
-    "OrderSide": "Sell"
+    "OrderSide": "Sell",
+    "OrderType": "Limit"
   },
   {
     "AssetName": "ETH-PERP",
@@ -67,9 +67,9 @@
     "PostPrice": false,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true,
     "AbsoluteAmount": 0.096,
-    "OrderSide": "Buy"
+    "OrderSide": "Buy",
+    "OrderType": "Limit"
   },
   {
     "AssetName": "BTC/USD",
@@ -79,9 +79,9 @@
     "PostPrice": false,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true,
     "AbsoluteAmount": 0.0200,
-    "OrderSide": "Sell"
+    "OrderSide": "Sell",
+    "OrderType": "Limit"
   },
   {
     "AssetName": "FTT-PERP",
@@ -91,9 +91,9 @@
     "PostPrice": false,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true,
     "AbsoluteAmount": 300.0,
-    "OrderSide": "Sell"
+    "OrderSide": "Sell",
+    "OrderType": "Limit"
   },
   {
     "AssetName": "CRO-PERP",
@@ -103,8 +103,8 @@
     "PostPrice": false,
     "Expiry": null,
     "ClientOrderId": null,
-    "IsTradable": true,
     "AbsoluteAmount": 50.0,
-    "OrderSide": "Sell"
+    "OrderSide": "Sell",
+    "OrderType": "Limit"
   }
 ]
