@@ -153,9 +153,9 @@ public class TradeFactory : ITradeFactory
 
                 foreach (var (trade, remainingDeltaPostTrade) in trades)
                 {
-                    var currentProjectedPosition = projectedPositions[trade.AssetName];
+                    var currentProjectedPosition = projectedPositions[trade.Symbol];
                     var newProjectedPosition = currentProjectedPosition + trade;
-                    projectedPositions[trade.AssetName] = newProjectedPosition;
+                    projectedPositions[trade.Symbol] = newProjectedPosition;
                     if (trade.IsTradable(MinOrderValue))
                         yield return trade;
                     else
@@ -168,7 +168,7 @@ public class TradeFactory : ITradeFactory
 
     private static IEnumerable<Trade> CombineOrders(IEnumerable<Trade> trades)
     {
-        return trades.GroupBy(t => t.AssetName)
+        return trades.GroupBy(t => t.Symbol)
             .Select(g => g.Sum());
     }
 

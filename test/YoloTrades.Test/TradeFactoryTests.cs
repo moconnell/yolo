@@ -56,7 +56,7 @@ public class TradeFactoryTests
         var tradesWithDeviatingQuantity = trades
             .Select(t =>
             {
-                var baseAsset = t.AssetName.Split('-', '/')[0];
+                var baseAsset = t.Symbol.Split('-', '/')[0];
                 var expectedTradeQuantity = expectedTrades[baseAsset];
 
                 return (baseAsset, expectedTradeQuantity, t.Amount,

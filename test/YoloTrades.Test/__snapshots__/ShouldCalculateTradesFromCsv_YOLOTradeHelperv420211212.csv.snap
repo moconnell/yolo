@@ -1,6 +1,6 @@
 ﻿[
   {
-    "AssetName": "BCH/USD",
+    "Symbol": "BCH/USD",
     "AssetType": "Spot",
     "Amount": -0.5986,
     "LimitPrice": 459.5500,
@@ -12,7 +12,7 @@
     "OrderType": "Limit"
   },
   {
-    "AssetName": "BTC/USD",
+    "Symbol": "BTC/USD",
     "AssetType": "Spot",
     "Amount": 0.0025,
     "LimitPrice": 49413.0000,
@@ -24,7 +24,7 @@
     "OrderType": "Limit"
   },
   {
-    "AssetName": "CRO/USD",
+    "Symbol": "CRO/USD",
     "AssetType": "Spot",
     "Amount": 947.4349,
     "LimitPrice": 0.5783,
@@ -36,7 +36,7 @@
     "OrderType": "Limit"
   },
   {
-    "AssetName": "DOGE/USD",
+    "Symbol": "DOGE/USD",
     "AssetType": "Spot",
     "Amount": -4131.0624,
     "LimitPrice": 0.1689,
@@ -48,7 +48,7 @@
     "OrderType": "Limit"
   },
   {
-    "AssetName": "ETH/USD",
+    "Symbol": "ETH/USD",
     "AssetType": "Spot",
     "Amount": 0.0949,
     "LimitPrice": 4091.2000,
@@ -60,7 +60,7 @@
     "OrderType": "Limit"
   },
   {
-    "AssetName": "FTT/USD",
+    "Symbol": "FTT/USD",
     "AssetType": "Spot",
     "Amount": -13.1617,
     "LimitPrice": 40.4420,
@@ -72,7 +72,7 @@
     "OrderType": "Limit"
   },
   {
-    "AssetName": "LINK/USD",
+    "Symbol": "LINK/USD",
     "AssetType": "Spot",
     "Amount": -30.3962,
     "LimitPrice": 19.9700,
@@ -84,7 +84,7 @@
     "OrderType": "Limit"
   },
   {
-    "AssetName": "LTC/USD",
+    "Symbol": "LTC/USD",
     "AssetType": "Spot",
     "Amount": -3.3773,
     "LimitPrice": 158.0900,
@@ -96,7 +96,7 @@
     "OrderType": "Limit"
   },
   {
-    "AssetName": "UNI/USD",
+    "Symbol": "UNI/USD",
     "AssetType": "Spot",
     "Amount": -64.4732,
     "LimitPrice": 15.8900,

@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +22,8 @@ internal class Program
 {
     private const int Error = 1;
     private const int Success = 0;
+    private const string QuantityFormat = "F5";
+    private const string PriceFormat = "F3";
     private static ILogger<Program>? _logger;
 
     [Argument('s', "silent", "Silent running: no challenge will be issued before placing trades")]
@@ -89,7 +92,7 @@ __  ______  __    ____  __
                     Console.WriteLine();
                     foreach (var order in orders.Values)
                         Console.WriteLine(
-                            $"{order.AssetName}:\t{ToSide(order.Amount)} {Math.Abs(order.Amount)} at {order.LimitPrice}");
+                            $"{order.Symbol}:\t{ToSide(order.Amount)} {Math.Abs(order.Amount)} at {order.LimitPrice}");
                 }
 
                 return OpenOrders;
@@ -112,7 +115,7 @@ __  ______  __    ____  __
 
             var trades = tradeFactory
                 .CalculateTrades(weights, positions, markets)
-                .OrderBy(trade => trade.AssetName)
+                .OrderBy(trade => trade.Symbol)
                 .ToArray();
 
             if (trades.Length == 0)
@@ -128,7 +131,7 @@ __  ______  __    ____  __
                 Console.WriteLine();
                 foreach (var trade in trades)
                     Console.WriteLine(
-                        $"{trade.AssetName} [{trade.AssetType}]:\t{ToSide(trade.Amount)} {Math.Abs(trade.Amount)} at {trade.LimitPrice.ToString() ?? "Market"}");
+                        $"{trade.Symbol} [{trade.AssetType}]:\t{ToSide(trade.Amount)} {Math.Abs(trade.Amount)} at {trade.LimitPrice.ToString() ?? "Market"}");
                 Console.WriteLine();
                 Console.Write("Proceed? (y/n): ");
 
@@ -151,19 +154,33 @@ __  ______  __    ____  __
                                         : OrderManagementSettings.Default.UnfilledOrderTimeout
                     };
 
-                    await foreach (var update in broker.ManageOrdersAsync(trades, settings, cancellationToken))
+                    _logger.LogInformation("Managing orders for {TradeCount} trades", trades.Length);
+
+                    try
                     {
-                        UpdateOrderTable(table, index, update);
-
-                        if (update.Type == OrderUpdateType.Error)
+                        await foreach (var update in broker.ManageOrdersAsync(trades, settings, cancellationToken))
                         {
-                            _logger.OrderError(update.AssetName, update.Message, Error);
-                            returnCode = new[] { Error, returnCode }.Max();
-                            AnsiConsole.MarkupLine($"[red]Error on {update.AssetName}: {update.Error?.Message}[/]");
-                        }
+                            UpdateOrderTable(table, index, update);
 
-                        ctx.Refresh();
+                            if (update.Type == OrderUpdateType.Error)
+                            {
+                                _logger.OrderError(update.Symbol, update.Message, Error);
+                                returnCode = new[] { Error, returnCode }.Max();
+                                AnsiConsole.MarkupLine($"[red]Error on {update.Symbol}: {update.Error?.Message}[/]");
+                            }
+
+                            ctx.Refresh();
+                        }
                     }
+                    catch (ChannelClosedException)
+                    {
+                        // Expected cancellation, we can ignore this
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Expected cancellation, we can ignore this
+                    }
+
                 });
 
             return returnCode;
@@ -191,7 +208,7 @@ __  ______  __    ____  __
             .BorderColor(Color.Blue)
             .Title("[bold]Orders[/]")
             .Expand()
-            .AddColumn("Asset", c => c.Centered())
+            .AddColumn("Symbol", c => c.Centered())
             .AddColumn("Type", c => c.Centered())
             .AddColumn("Side", c => c.Centered())
             .AddColumn("Amount", c => c.RightAligned().NoWrap())
@@ -206,14 +223,14 @@ __  ______  __    ____  __
         {
             var assetType = trade.AssetType.ToString();
             var side = trade.OrderSide.ToString();
-            var amount = trade.AbsoluteAmount.ToString("F4");
+            var amount = trade.AbsoluteAmount.ToString(QuantityFormat);
             var filled = string.Empty;
-            var price = trade.LimitPrice?.ToString("F2") ?? "Market";
+            var price = trade.LimitPrice?.ToString(PriceFormat) ?? "Market";
             var status = "[yellow]Pending[/]";
             var time = DateTime.Now.ToString("HH:mm:ss");
 
             table.AddRow(
-                trade.AssetName,
+                trade.Symbol,
                 assetType,
                 side,
                 amount,
@@ -222,7 +239,7 @@ __  ______  __    ____  __
                 status,
                 time);
 
-            index[trade.AssetName] = table.Rows.Count - 1;
+            index[trade.Symbol] = table.Rows.Count - 1;
         }
 
         return (table, index);
@@ -231,20 +248,20 @@ __  ______  __    ____  __
     private static void UpdateOrderTable(Table table, ConcurrentDictionary<string, int> index, OrderUpdate update)
     {
         // Find existing row for this asset or add new one
-        var existingRowIndex = FindRowByAsset(table, index, update.AssetName);
+        var existingRowIndex = FindRowByAsset(table, index, update.Symbol);
 
         if (existingRowIndex >= 0)
         {
             var assetType = update.Order?.AssetType.ToString() ?? " ";
             var side = update.Order?.OrderSide.ToString() ?? " ";
-            var amount = update.Order?.Amount.ToString("F4") ?? " ";
-            var filled = update.Order?.Filled?.ToString("F4") ?? " ";
-            var price = update.Order?.LimitPrice?.ToString("F2") ?? "Market";
+            var amount = update.Order?.Amount.ToString(QuantityFormat) ?? " ";
+            var filled = update.Order?.Filled?.ToString(QuantityFormat) ?? " ";
+            var price = update.Order?.LimitPrice?.ToString(PriceFormat) ?? "Market";
             var status = GetStatusMarkup(update.Type);
             var time = DateTime.Now.ToString("HH:mm:ss");
 
             // Update existing row
-            table.UpdateCell(existingRowIndex, 0, update.AssetName);
+            table.UpdateCell(existingRowIndex, 0, update.Symbol);
             table.UpdateCell(existingRowIndex, 1, assetType);
             table.UpdateCell(existingRowIndex, 2, side);
             table.UpdateCell(existingRowIndex, 3, amount);
@@ -269,7 +286,7 @@ __  ______  __    ____  __
     {
         return type switch
         {
-            OrderUpdateType.Created => "[yellow]Creatd[/]",
+            OrderUpdateType.Created => "[yellow]Created[/]",
             OrderUpdateType.PartiallyFilled => "[orange1]Partial[/]",
             OrderUpdateType.Filled => "[green]Filled[/]",
             OrderUpdateType.Cancelled => "[gray]Cancelled[/]",

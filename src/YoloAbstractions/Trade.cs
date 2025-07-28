@@ -3,7 +3,7 @@ using System;
 namespace YoloAbstractions;
 
 public record Trade(
-    string AssetName,
+    string Symbol,
     AssetType AssetType,
     decimal Amount,
     decimal? LimitPrice = null,
@@ -16,7 +16,7 @@ public record Trade(
         if (Amount == 0)
             return false;
 
-        if (string.IsNullOrWhiteSpace(AssetName))
+        if (string.IsNullOrWhiteSpace(Symbol))
             return false;
 
         // Check valid limit price
@@ -35,7 +35,7 @@ public record Trade(
 
     public static Trade operator +(Trade one, Trade two)
     {
-        if (one.AssetName != two.AssetName || one.AssetType != two.AssetType)
+        if (one.Symbol != two.Symbol || one.AssetType != two.AssetType)
             throw new ArgumentException("Cannot add trades for different instruments");
 
         if (one.LimitPrice != two.LimitPrice)
@@ -49,7 +49,7 @@ public record Trade(
                        two.PostPrice == true && Math.Abs(totalAmount) >= Math.Abs(two.Amount);
 
         return new Trade(
-            one.AssetName,
+            one.Symbol,
             one.AssetType,
             totalAmount,
             one.LimitPrice,

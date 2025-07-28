@@ -3,7 +3,7 @@ using System;
 namespace YoloAbstractions;
 
 public record OrderUpdate(
-    string AssetName,
+    string Symbol,
     OrderUpdateType Type,
     Order? Order = null,
     string? Message = null,
