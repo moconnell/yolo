@@ -171,7 +171,7 @@ public class HyperliquidBrokerTest
             // Ensure we clean up the order
             if (orderId > 0)
             {
-                await broker.CancelOrderAsync(trade.AssetName, orderId);
+                await broker.CancelOrderAsync(trade.Symbol, orderId);
             }
         }
     }
@@ -200,6 +200,8 @@ public class HyperliquidBrokerTest
 
         // Round the limit price to the nearest price step
         var roundedLimitPrice = Math.Floor(rawLimitPrice.Value / priceStep.Value) * priceStep.Value;
+
+        Console.WriteLine($"Calculated limit price for {symbol}: {roundedLimitPrice} (raw: {rawLimitPrice.Value}, step: {priceStep.Value})");
 
         return roundedLimitPrice;
     }

@@ -3,7 +3,7 @@ using System;
 namespace YoloAbstractions;
 
 public record Price(
-    string AssetName,
+    string Symbol,
     AssetType AssetType,
     decimal? Ask,
     decimal? Bid,

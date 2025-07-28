@@ -1,6 +1,6 @@
 ﻿[
   {
-    "AssetName": "LINK/USD",
+    "Symbol": "LINK/USD",
     "AssetType": "Spot",
     "Amount": -20.6,
     "LimitPrice": 19.363,
@@ -12,7 +12,7 @@
     "OrderType": "Limit"
   },
   {
-    "AssetName": "UNI/USD",
+    "Symbol": "UNI/USD",
     "AssetType": "Spot",
     "Amount": -18.6,
     "LimitPrice": 15.809,
@@ -24,7 +24,7 @@
     "OrderType": "Limit"
   },
   {
-    "AssetName": "FTX-PERP",
+    "Symbol": "FTX-PERP",
     "AssetType": "Future",
     "Amount": -12.5,
     "LimitPrice": 39.8085,
@@ -36,7 +36,7 @@
     "OrderType": "Limit"
   },
   {
-    "AssetName": "LTC/USD",
+    "Symbol": "LTC/USD",
     "AssetType": "Spot",
     "Amount": -5.50,
     "LimitPrice": 148.795,
@@ -48,7 +48,7 @@
     "OrderType": "Limit"
   },
   {
-    "AssetName": "BCH/USD",
+    "Symbol": "BCH/USD",
     "AssetType": "Spot",
     "Amount": -0.508,
     "LimitPrice": 434.25,
@@ -60,7 +60,7 @@
     "OrderType": "Limit"
   },
   {
-    "AssetName": "ETH-PERP",
+    "Symbol": "ETH-PERP",
     "AssetType": "Future",
     "Amount": 0.096,
     "LimitPrice": 3942.9,
@@ -72,7 +72,7 @@
     "OrderType": "Limit"
   },
   {
-    "AssetName": "BTC/USD",
+    "Symbol": "BTC/USD",
     "AssetType": "Spot",
     "Amount": -0.0200,
     "LimitPrice": 46734.0,
@@ -84,7 +84,7 @@
     "OrderType": "Limit"
   },
   {
-    "AssetName": "FTT-PERP",
+    "Symbol": "FTT-PERP",
     "AssetType": "Future",
     "Amount": -300.0,
     "LimitPrice": 39.8085,
@@ -96,7 +96,7 @@
     "OrderType": "Limit"
   },
   {
-    "AssetName": "CRO-PERP",
+    "Symbol": "CRO-PERP",
     "AssetType": "Future",
     "Amount": -50.0,
     "LimitPrice": 0.5264,

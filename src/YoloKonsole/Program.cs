@@ -115,7 +115,7 @@ __  ______  __    ____  __
 
             var trades = tradeFactory
                 .CalculateTrades(weights, positions, markets)
-                .OrderBy(trade => trade.AssetName)
+                .OrderBy(trade => trade.Symbol)
                 .ToArray();
 
             if (trades.Length == 0)
@@ -131,7 +131,7 @@ __  ______  __    ____  __
                 Console.WriteLine();
                 foreach (var trade in trades)
                     Console.WriteLine(
-                        $"{trade.AssetName} [{trade.AssetType}]:\t{ToSide(trade.Amount)} {Math.Abs(trade.Amount)} at {trade.LimitPrice.ToString() ?? "Market"}");
+                        $"{trade.Symbol} [{trade.AssetType}]:\t{ToSide(trade.Amount)} {Math.Abs(trade.Amount)} at {trade.LimitPrice.ToString() ?? "Market"}");
                 Console.WriteLine();
                 Console.Write("Proceed? (y/n): ");
 
@@ -230,7 +230,7 @@ __  ______  __    ____  __
             var time = DateTime.Now.ToString("HH:mm:ss");
 
             table.AddRow(
-                trade.AssetName,
+                trade.Symbol,
                 assetType,
                 side,
                 amount,
@@ -239,7 +239,7 @@ __  ______  __    ____  __
                 status,
                 time);
 
-            index[trade.AssetName] = table.Rows.Count - 1;
+            index[trade.Symbol] = table.Rows.Count - 1;
         }
 
         return (table, index);
