@@ -1,5 +1,6 @@
 ﻿using System.Security.Cryptography;
 using CryptoExchange.Net.Authentication;
+using CryptoExchange.Net.Objects;
 using HyperLiquid.Net;
 using HyperLiquid.Net.Clients;
 using Microsoft.Extensions.Configuration;
@@ -7,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Shouldly;
 using YoloAbstractions;
+using YoloBroker.Hyperliquid.Extensions;
 
 namespace YoloBroker.Hyperliquid.Test;
 
@@ -191,7 +193,8 @@ public class HyperliquidBrokerTest
         markets.ShouldContainKey(symbol);
         var marketInfo = markets[symbol][0];
 
-        var rawLimitPrice = quantity < 0 ? marketInfo.Ask * 1.01m : marketInfo.Bid * 0.99m;
+        bool isLong = quantity >= 0;
+        var rawLimitPrice = isLong ? marketInfo.Bid * 0.99m : marketInfo.Ask * 1.01m;
         rawLimitPrice.ShouldNotBeNull();
         rawLimitPrice.Value.ShouldBeGreaterThan(0);
 
@@ -199,7 +202,8 @@ public class HyperliquidBrokerTest
         priceStep.ShouldNotBeNull();
 
         // Round the limit price to the nearest price step
-        var roundedLimitPrice = Math.Floor(rawLimitPrice.Value / priceStep.Value) * priceStep.Value;
+        var roundingType = isLong ? RoundingType.Down : RoundingType.Up;
+        var roundedLimitPrice = rawLimitPrice.Value.RoundToValidPrice(priceStep.Value, roundingType);
 
         Console.WriteLine($"Calculated limit price for {symbol}: {roundedLimitPrice} (raw: {rawLimitPrice.Value}, step: {priceStep.Value})");
 

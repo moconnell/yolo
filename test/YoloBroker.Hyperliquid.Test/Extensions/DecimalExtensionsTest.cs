@@ -25,11 +25,10 @@ public class DecimalExtensionsTest
     }
 
     [Fact]
-    public void RoundToValidPrice_WithNegativeTickSize_ReturnsOriginalPrice()
+    public void RoundToValidPrice_WithNegativeTickSize_ThrowsArgumentOutOfRangeException ()
     {
         var price = 123.456m;
-        var result = price.RoundToValidPrice(-0.01m);
-        Assert.Equal(price, result);
+        Assert.Throws<ArgumentOutOfRangeException>(() => price.RoundToValidPrice(-0.01m));
     }
 
     [Theory]

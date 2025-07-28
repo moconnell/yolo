@@ -1,20 +1,27 @@
 using System;
+using CryptoExchange.Net.Objects;
 
 namespace YoloBroker.Hyperliquid.Extensions;
 
 public static class DecimalExtensions
 {
-    public static decimal RoundToValidPrice(this decimal price, decimal tickSize)
+    public static decimal RoundToValidPrice(this decimal price, decimal tickSize, RoundingType roundingType = RoundingType.Closest)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(tickSize, 0, nameof(tickSize));
+
+        // If tick size is zero or negative, return the original price
         if (tickSize <= 0) return price;
 
-        var rounded = Math.Round(price / tickSize) * tickSize;
-
         // Apply 5 significant figures rule
-        var validTickSize = CalculateValidTickSize(rounded, tickSize);
+        var validTickSize = CalculateValidTickSize(price, tickSize);
 
-        // Re-round with the correct tick size
-        return Math.Round(rounded / validTickSize) * validTickSize;
+        // Round once with the correct tick size
+        return roundingType switch
+        {
+            RoundingType.Down => Math.Floor(price / validTickSize) * validTickSize,
+            RoundingType.Up => Math.Ceiling(price / validTickSize) * validTickSize,
+            _ => Math.Round(price / validTickSize) * validTickSize,
+        };
     }
 
     public static decimal CalculateValidTickSize(this decimal price, decimal baseTickSize, int maxSignificantFigures = 5)
