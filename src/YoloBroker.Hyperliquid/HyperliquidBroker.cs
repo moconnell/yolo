@@ -280,20 +280,20 @@ public sealed class HyperliquidBroker : IYoloBroker
                 {
                     case HyperLiquid.Net.Enums.OrderStatus.Filled:
                         orderTrackers.TryRemove(tracker.MarkComplete().Order.Id, out _);
-                        updateChannel.Writer.TryWrite(new OrderUpdate(newOrder.AssetName, OrderUpdateType.Filled, newOrder, Message: message));
+                        updateChannel.Writer.TryWrite(new OrderUpdate(newOrder.Symbol, OrderUpdateType.Filled, newOrder, Message: message));
                         break;
                     case HyperLiquid.Net.Enums.OrderStatus.Canceled:
                     case HyperLiquid.Net.Enums.OrderStatus.Rejected:
                     case HyperLiquid.Net.Enums.OrderStatus.MarginCanceled:
                         orderTrackers.TryRemove(tracker.MarkComplete().Order.Id, out _);
-                        updateChannel.Writer.TryWrite(new OrderUpdate(newOrder.AssetName, OrderUpdateType.Cancelled, newOrder, Message: message));
+                        updateChannel.Writer.TryWrite(new OrderUpdate(newOrder.Symbol, OrderUpdateType.Cancelled, newOrder, Message: message));
                         break;
 
                     default:
                         var orderUpdateType = (update.Order.QuantityRemaining > 0 && update.Order.QuantityRemaining < tracker.Order.Amount) ?
                             OrderUpdateType.PartiallyFilled :
                             OrderUpdateType.Created;
-                        updateChannel.Writer.TryWrite(new OrderUpdate(tracker.Order.AssetName, orderUpdateType, newOrder, Message: message));
+                        updateChannel.Writer.TryWrite(new OrderUpdate(tracker.Order.Symbol, orderUpdateType, newOrder, Message: message));
                         break;
                 }
             }
@@ -320,24 +320,37 @@ public sealed class HyperliquidBroker : IYoloBroker
 
                 foreach (var tracker in timedOutTrackers)
                 {
-                    tracker.MarkComplete();
-                    orderTrackers.TryRemove(tracker.Order.Id, out _);
+                    _logger.LogInformation("Order {OrderId} for {AssetName} timed out and will be cancelled", tracker.Order.Id, tracker.Order.Symbol);
 
-                    updateChannel.Writer.TryWrite(new OrderUpdate(tracker.Order.AssetName, OrderUpdateType.TimedOut, tracker.Order));
+                    await CancelOrderAsync(tracker.Order.Symbol, tracker.Order.Id, ct);
+
+                    updateChannel.Writer.TryWrite(new OrderUpdate(tracker.Order.Symbol, OrderUpdateType.TimedOut, tracker.Order with { OrderStatus = OrderStatus.Canceled }, Message: "Order timed out"));
 
                     if (settings.SwitchToMarketOnTimeout)
                     {
+                        _logger.LogInformation("Creating market order for {AssetName}", tracker.Order.Symbol);
+
                         try
                         {
-                            var marketOrder = tracker.Order with { LimitPrice = null };
-                            await EditOrderAsync(marketOrder, ct);
-                            updateChannel.Writer.TryWrite(new OrderUpdate(marketOrder.AssetName, OrderUpdateType.MarketOrderPlaced, marketOrder));
+                            var marketTrade = tracker.OriginalTrade with { LimitPrice = null };
+                            var marketTradeResult = await PlaceTradeAsync(marketTrade, ct);
+                            if (marketTradeResult.Success)
+                            {
+                                updateChannel.Writer.TryWrite(new OrderUpdate(marketTrade.AssetName, OrderUpdateType.MarketOrderPlaced, marketTradeResult.Order));
+                            }
+                            else
+                            {
+                                updateChannel.Writer.TryWrite(new OrderUpdate(tracker.Order.Symbol, OrderUpdateType.Error, Message: marketTradeResult.Error));
+                            }
                         }
                         catch (Exception ex)
                         {
-                            updateChannel.Writer.TryWrite(new OrderUpdate(tracker.Order.AssetName, OrderUpdateType.Error, Message: ex.Message, Error: ex));
+                            updateChannel.Writer.TryWrite(new OrderUpdate(tracker.Order.Symbol, OrderUpdateType.Error, Message: ex.Message, Error: ex));
                         }
                     }
+
+                    tracker.MarkComplete();
+                    orderTrackers.TryRemove(tracker.Order.Id, out _);
                 }
             }
         },
@@ -360,11 +373,11 @@ public sealed class HyperliquidBroker : IYoloBroker
     {
         ArgumentNullException.ThrowIfNull(order);
 
-        _logger.LogInformation("Updating order {OrderId} for symbol {Symbol}", order.Id, order.AssetName);
+        _logger.LogInformation("Updating order {OrderId} for symbol {Symbol}", order.Id, order.Symbol);
 
         await CallAsync(
-            () => _hyperliquidClient.FuturesApi.Trading.EditOrderAsync(order.AssetName, order.Id, order.ClientId, order.OrderSide.ToHyperLiquid(), order.OrderType.ToHyperLiquid(), order.Amount, order.LimitPrice.GetValueOrDefault(), ct: ct),
-            $"Could not update order {order.Id} for symbol {order.AssetName}");
+            () => _hyperliquidClient.FuturesApi.Trading.EditOrderAsync(order.Symbol, order.Id, order.ClientId, order.OrderSide.ToHyperLiquid(), order.OrderType.ToHyperLiquid(), order.Amount, order.LimitPrice.GetValueOrDefault(), ct: ct),
+            $"Could not update order {order.Id} for symbol {order.Symbol}");
     }
 
     public async Task<IReadOnlyDictionary<long, Order>> GetOpenOrdersAsync(CancellationToken ct = default)
@@ -709,11 +722,7 @@ public sealed class HyperliquidBroker : IYoloBroker
             result.Success,
             result.Error,
             result.ResponseStatusCode,
-            new OrderResult(
-                result.Data.OrderId,
-                result.Data.Status.ToYoloOrderStatus(),
-                result.Data.AveragePrice,
-                result.Data.FilledQuantity));
+            ToOrderResult(result.Data));
 
     private static WebCallResultWrapper<IReadOnlyList<OrderResult>> Wrap(WebCallResult<CallResult<HyperLiquidOrderResult>[]> result) =>
         new(
@@ -722,11 +731,14 @@ public sealed class HyperliquidBroker : IYoloBroker
             result.ResponseStatusCode,
             [.. result.Data
                 .Where(x => x.Success)
-                .Select(x => new OrderResult(
-                                x.Data.OrderId,
-                                x.Data.Status.ToYoloOrderStatus(),
-                                x.Data.AveragePrice,
-                                x.Data.FilledQuantity))]);
+                .Select(x => ToOrderResult(x.Data))]);
+
+    private static OrderResult ToOrderResult(HyperLiquidOrderResult? data) =>
+        new(
+            data?.OrderId,
+            data?.Status.ToYoloOrderStatus() ?? OrderStatus.NotSet,
+            data?.AveragePrice,
+            data?.FilledQuantity);
 
     private record OrderTracker(Order Order, Trade OriginalTrade, DateTime CreatedAt)
     {

@@ -72,17 +72,17 @@ public class HyperliquidBrokerTest
         order.ShouldNotBeNull();
         order.Id.ShouldBeGreaterThan(0);
         order.ClientId.ShouldBe(trade.ClientOrderId);
-        order.AssetName.ShouldBe(symbol);
+        order.Symbol.ShouldBe(symbol);
         order.Amount.ShouldBe(trade.Amount);
 
-        await broker.CancelOrderAsync(order.AssetName, order.Id);
+        await broker.CancelOrderAsync(order.Symbol, order.Id);
     }
 
     [Theory]
     [Trait("Category", "Integration")]
     // [InlineData("HYPE/USDC", AssetType.Spot, 1)]
     [InlineData("ETH", AssetType.Future, 0.01)]
-    [InlineData("BTC", AssetType.Future, 0.01)]
+    [InlineData("BTC", AssetType.Future, 0.001)]
     public async Task ShouldPlaceOrders(string symbol, AssetType assetType, double quantity, bool isLimitOrder = true)
     {
         // arrange
@@ -102,10 +102,10 @@ public class HyperliquidBrokerTest
             order.ShouldNotBeNull();
             order.Id.ShouldBeGreaterThan(0);
             order.ClientId.ShouldBe(trade.ClientOrderId);
-            order.AssetName.ShouldBe(symbol);
+            order.Symbol.ShouldBe(symbol);
             order.Amount.ShouldBe(trade.Amount);
 
-            await broker.CancelOrderAsync(order.AssetName, order.Id);
+            await broker.CancelOrderAsync(order.Symbol, order.Id);
         }
     }
 
@@ -121,32 +121,50 @@ public class HyperliquidBrokerTest
         decimal? orderPrice = isLimitOrder ? await GetLimitPrice(broker, symbol, assetType, quantity) : null;
         var trade = CreateTrade(symbol, assetType, quantity, orderPrice);
         var settings = OrderManagementSettings.Default;
-        var cts = new CancellationTokenSource();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         // act
         var orderUpdates = broker.ManageOrdersAsync([trade], settings, cts.Token);
 
         // assert
         long orderId = 0;
+        var updateCount = 0;
+
         try
         {
             await foreach (var orderUpdate in orderUpdates)
             {
+                updateCount++;
+                Console.WriteLine($"Update {updateCount}: {orderUpdate.Type} - {orderUpdate.Symbol}");
+
                 orderUpdate.ShouldNotBeNull();
+
+                if (orderUpdate.Type == OrderUpdateType.Error)
+                {
+                    Console.WriteLine($"Error: {orderUpdate.Error?.Message}");
+                    throw orderUpdate.Error ?? new Exception("Unknown error");
+                }
+
                 var order = orderUpdate.Order;
                 order.ShouldNotBeNull();
                 orderId = order.Id;
                 order.Id.ShouldBeGreaterThan(0);
                 order.ClientId.ShouldBe(trade.ClientOrderId);
-                order.AssetName.ShouldBe(symbol);
+                order.Symbol.ShouldBe(symbol);
                 order.Amount.ShouldBe(trade.Amount);
                 order.OrderStatus.ShouldBe(OrderStatus.Open);
-                cts.Cancel(); // Cancel the order management process after the first update
+
+                // Cancel after first successful order creation
+                if (orderUpdate.Type == OrderUpdateType.Created)
+                {
+                    cts.Cancel();
+                }
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cts.Token.IsCancellationRequested)
         {
-            // Expected cancellation, we can ignore this
+            // Expected cancellation
+            Console.WriteLine($"Test completed with {updateCount} updates");
         }
         finally
         {
@@ -171,11 +189,19 @@ public class HyperliquidBrokerTest
 
         markets.ShouldNotBeNull();
         markets.ShouldContainKey(symbol);
-        var currentPrice = quantity < 0 ? markets[symbol][0].Ask : markets[symbol][0].Bid;
-        currentPrice.ShouldNotBeNull();
-        currentPrice.Value.ShouldBeGreaterThan(0);
+        var marketInfo = markets[symbol][0];
 
-        return currentPrice.Value;
+        var rawLimitPrice = quantity < 0 ? marketInfo.Ask * 1.01m : marketInfo.Bid * 0.99m;
+        rawLimitPrice.ShouldNotBeNull();
+        rawLimitPrice.Value.ShouldBeGreaterThan(0);
+
+        var priceStep = marketInfo.PriceStep;
+        priceStep.ShouldNotBeNull();
+
+        // Round the limit price to the nearest price step
+        var roundedLimitPrice = Math.Floor(rawLimitPrice.Value / priceStep.Value) * priceStep.Value;
+
+        return roundedLimitPrice;
     }
 
     private static Trade CreateTrade(string symbol, AssetType assetType, double quantity, decimal? price) =>

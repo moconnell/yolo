@@ -4,7 +4,7 @@ namespace YoloAbstractions;
 
 public record Order(
     long Id,
-    string AssetName,
+    string Symbol,
     AssetType AssetType,
     DateTime Created,
     OrderSide OrderSide,
