@@ -582,11 +582,8 @@ public sealed class HyperliquidBroker : IYoloBroker
     {
         var baseTickSize = Convert.ToDecimal(Math.Pow(10, -6 + symbol.QuantityDecimals));
         var quantityStep = Convert.ToDecimal(Math.Pow(10, -symbol.QuantityDecimals));
-
-        // Get current mid price for tick size calculation
         var priceStep = orderBook.Levels.Bids.ElementAtOrDefault(0)?.Price.CalculateValidTickSize(baseTickSize);
         var midPrice = (orderBook.Levels.Asks[0].Price + orderBook.Levels.Bids[0].Price) / 2;
-
         var minProvideSize = Math.Ceiling(10 / orderBook.Levels.Asks[0].Price / quantityStep) * quantityStep;
 
         return new MarketInfo(
