@@ -1,20 +1,17 @@
 # Create secrets directory
-$secretsPath = "C:\secrets\yolo"
+$secretsPath = Join-Path $PWD "secrets"
+$env:YOLO_SECRETS_PATH = $secretsPath
 New-Item -Path $secretsPath -ItemType Directory -Force
 
 # Prompt for secrets securely
-$address = Read-Host -Prompt "Enter Hyperliquid Address"
-$privateKey = Read-Host -Prompt "Enter Hyperliquid Private Key" -AsSecureString
-$apiKey = Read-Host -Prompt "Enter Yolo API Key" -AsSecureString
-
-# Convert secure strings to plain text for file writing
-$privateKeyPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($privateKey))
-$apiKeyPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($apiKey))
+$address = Read-Host -Prompt "Enter Hyperliquid wallet address"
+$privateKey = Read-Host -MaskInput "Enter Hyperliquid wallet private key"
+$apiKey = Read-Host -MaskInput "Enter Yolo API key"
 
 # Write secrets to files
 $address | Out-File -FilePath "$secretsPath\Hyperliquid__Address" -Encoding utf8 -NoNewline
-$privateKeyPlain | Out-File -FilePath "$secretsPath\Hyperliquid__PrivateKey" -Encoding utf8 -NoNewline
-$apiKeyPlain | Out-File -FilePath "$secretsPath\Yolo__ApiKey" -Encoding utf8 -NoNewline
+$privateKey | Out-File -FilePath "$secretsPath\Hyperliquid__PrivateKey" -Encoding utf8 -NoNewline
+$apiKey | Out-File -FilePath "$secretsPath\Yolo__ApiKey" -Encoding utf8 -NoNewline
 
 # Set restrictive permissions (only current user can read)
 $acl = Get-Acl $secretsPath
@@ -35,4 +32,4 @@ Write-Host "Files created:" -ForegroundColor Yellow
 Get-ChildItem $secretsPath | ForEach-Object { Write-Host "  - $($_.Name)" }
 
 # Clear variables containing secrets
-Clear-Variable privateKeyPlain, apiKeyPlain -ErrorAction SilentlyContinue
+Clear-Variable address, privateKey, apiKey -ErrorAction SilentlyContinue
