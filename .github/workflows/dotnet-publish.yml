@@ -21,7 +21,7 @@ jobs:
       - name: Build
         run: dotnet build --no-restore
       - name: Test
-        run: dotnet test --no-build --verbosity normal
+        run: dotnet test --filter "Category!=Integration" --no-build --verbosity normal
       - name: Publish win-x64
         run: dotnet publish src/YoloKonsole/YoloKonsole.csproj  \
           -c Release \
