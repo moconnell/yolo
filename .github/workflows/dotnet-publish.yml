@@ -41,7 +41,7 @@ jobs:
             - run `./run-yolo.ps1` from the command line is best so that you can see the output easily (`Windows`+`R`, `cmd`)
           draft: true
           prerelease: false
-      - uses: xresloader/upload-to-github-release@master
+      - uses: xresloader/upload-to-github-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
