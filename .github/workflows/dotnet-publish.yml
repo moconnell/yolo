@@ -23,10 +23,7 @@ jobs:
       - name: Test
         run: dotnet test --filter "Category!=Integration" --no-build --verbosity normal
       - name: Publish win-x64
-        run: dotnet publish src/YoloKonsole/YoloKonsole.csproj  \
-          -r win-x64 \
-          -p:PublishSingleFile=true \
-          -o releases/win-x64
+        run: dotnet publish src/YoloKonsole/YoloKonsole.csproj -r win-x64 -p:PublishSingleFile=true -o releases/win-x64
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
