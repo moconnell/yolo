@@ -23,7 +23,13 @@ jobs:
       - name: Test
         run: dotnet test --no-build --verbosity normal
       - name: Publish win-x64
-        run: dotnet publish src/YoloKonsole/YoloKonsole.csproj -c Release -o releases/win-x64 --os win
+        run: dotnet publish src/YoloKonsole/YoloKonsole.csproj  \
+          -c Release \
+          -r win-x64 \
+          --self-contained true \
+          -p:PublishSingleFile=true \
+          -p:PublishTrimmed=true \
+          -o releases/win-x64
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -37,15 +43,15 @@ jobs:
 
             - download `YoloKonsole.exe` and `appsettings.json` and save to a new folder on your computer
             - ensure you have [.NET 9.0 runtime](https://dotnet.microsoft.com/download/dotnet/thank-you/runtime-9.0.0-windows-x64-installer) installed
-            - edit `appsettings.json` with the correct settings
-            - run `YoloKonsole.exe` from the command line is best so that you can see the output easily (`Windows`+`R`, `cmd`)
+            - run `./setup-secrets.ps1` to set up your secrets (you can edit the script to change the secrets path)
+            - run `./run-yolo.ps1` from the command line is best so that you can see the output easily (`Windows`+`R`, `cmd`)
           draft: true
           prerelease: false
       - uses: xresloader/upload-to-github-release@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          file: "releases/**/*.exe;releases/**/*.json"
+          file: "releases/**/*.exe;releases/**/*.json;releases/**/*.ps1;releases/**/*.md"
           release_id: ${{ steps.create_release.outputs.id }}
           overwrite: true
           verbose: true
