@@ -24,7 +24,6 @@ jobs:
         run: dotnet test --filter "Category!=Integration" --no-build --verbosity normal
       - name: Publish win-x64
         run: dotnet publish src/YoloKonsole/YoloKonsole.csproj  \
-          -c Release \
           -r win-x64 \
           --self-contained true \
           -p:PublishSingleFile=true \
