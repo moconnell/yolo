@@ -300,7 +300,7 @@ public sealed class HyperliquidBroker : IYoloBroker
 
             if (orderTrackers.IsEmpty)
             {
-                updateChannel.Writer.Complete();
+                updateChannel.Writer.TryComplete();
             }
         }
     }
@@ -309,49 +309,80 @@ public sealed class HyperliquidBroker : IYoloBroker
     {
         return Task.Run(async () =>
         {
-            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
-
-            while (!ct.IsCancellationRequested && await timer.WaitForNextTickAsync(ct))
+            try
             {
-                var now = DateTime.UtcNow;
-                var timedOutTrackers = orderTrackers.Values
-                    .Where(t => now - t.CreatedAt > settings.UnfilledOrderTimeout && !t.IsComplete)
-                    .ToList();
+                using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
 
-                foreach (var tracker in timedOutTrackers)
+                while (!ct.IsCancellationRequested && await timer.WaitForNextTickAsync(ct))
                 {
-                    _logger.LogInformation("Order {OrderId} for {AssetName} timed out and will be cancelled", tracker.Order.Id, tracker.Order.Symbol);
+                    var now = DateTime.UtcNow;
+                    var timedOutTrackers = orderTrackers.Values
+                        .Where(t => now - t.CreatedAt > settings.UnfilledOrderTimeout && !t.IsComplete)
+                        .ToList();
 
-                    await CancelOrderAsync(tracker.Order.Symbol, tracker.Order.Id, ct);
-
-                    updateChannel.Writer.TryWrite(new OrderUpdate(tracker.Order.Symbol, OrderUpdateType.TimedOut, tracker.Order with { OrderStatus = OrderStatus.Canceled }, Message: "Order timed out"));
-
-                    if (settings.SwitchToMarketOnTimeout)
+                    foreach (var tracker in timedOutTrackers)
                     {
-                        _logger.LogInformation("Creating market order for {AssetName}", tracker.Order.Symbol);
+                        _logger.LogInformation("Order {OrderId} for {AssetName} timed out and will be cancelled", tracker.Order.Id, tracker.Order.Symbol);
 
                         try
                         {
-                            var marketTrade = tracker.OriginalTrade with { LimitPrice = null };
-                            var marketTradeResult = await PlaceTradeAsync(marketTrade, ct);
-                            if (marketTradeResult.Success)
+
+                            await CancelOrderAsync(tracker.Order.Symbol, tracker.Order.Id, ct);
+
+                            updateChannel.Writer.TryWrite(new OrderUpdate(tracker.Order.Symbol, OrderUpdateType.TimedOut, tracker.Order with { OrderStatus = OrderStatus.Canceled }, Message: "Order timed out"));
+
+                            if (settings.SwitchToMarketOnTimeout)
                             {
-                                updateChannel.Writer.TryWrite(new OrderUpdate(marketTrade.Symbol, OrderUpdateType.MarketOrderPlaced, marketTradeResult.Order));
+                                _logger.LogInformation("Creating market order for {AssetName}", tracker.Order.Symbol);
+
+                                try
+                                {
+                                    var marketTrade = tracker.OriginalTrade with { LimitPrice = null };
+                                    var marketTradeResult = await PlaceTradeAsync(marketTrade, ct);
+                                    if (marketTradeResult.Success)
+                                    {
+                                        updateChannel.Writer.TryWrite(new OrderUpdate(marketTrade.Symbol, OrderUpdateType.MarketOrderPlaced, marketTradeResult.Order));
+                                    }
+                                    else
+                                    {
+                                        updateChannel.Writer.TryWrite(new OrderUpdate(tracker.Order.Symbol, OrderUpdateType.Error, Message: marketTradeResult.Error));
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    updateChannel.Writer.TryWrite(new OrderUpdate(tracker.Order.Symbol, OrderUpdateType.Error, Message: ex.Message, Error: ex));
+                                }
                             }
-                            else
-                            {
-                                updateChannel.Writer.TryWrite(new OrderUpdate(tracker.Order.Symbol, OrderUpdateType.Error, Message: marketTradeResult.Error));
-                            }
+
+                            tracker.MarkComplete();
+                            orderTrackers.TryRemove(tracker.Order.Id, out _);
                         }
                         catch (Exception ex)
                         {
+                            _logger.LogError(ex, "Failed to cancel order {OrderId} for {AssetName}", tracker.Order.Id, tracker.Order.Symbol);
                             updateChannel.Writer.TryWrite(new OrderUpdate(tracker.Order.Symbol, OrderUpdateType.Error, Message: ex.Message, Error: ex));
+                            tracker.MarkComplete();
+                            orderTrackers.TryRemove(tracker.Order.Id, out _);
                         }
                     }
 
-                    tracker.MarkComplete();
-                    orderTrackers.TryRemove(tracker.Order.Id, out _);
+                    // Check if all orders are complete after timeout processing
+                    if (orderTrackers.IsEmpty)
+                    {
+                        _logger.LogInformation("All orders completed after timeout processing, completing channel");
+                        updateChannel.Writer.TryComplete();
+                        break;
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in timeout monitoring task");
+                updateChannel.Writer.TryComplete(ex);
+            }
+            finally
+            {
+                updateChannel.Writer.TryComplete();
             }
         },
         ct);
