@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Channels;
@@ -22,8 +23,7 @@ internal class Program
 {
     private const int Error = 1;
     private const int Success = 0;
-    private const string QuantityFormat = "F5";
-    private const string PriceFormat = "F3";
+    private const string F5 = "F5";
     private static ILogger<Program>? _logger;
 
     [Argument('s', "silent", "Silent running: no challenge will be issued before placing trades")]
@@ -58,13 +58,18 @@ __  ______  __    ____  __
                 .AddJsonFile($"appsettings.{env}.json", true, true)
                 .AddEnvironmentVariables();
 
+            // add file-based secrets
+            var secretsPath = Environment.GetEnvironmentVariable("YOLO_SECRETS_PATH");
+            if (secretsPath != null && Directory.Exists(secretsPath))
+            {
+                builder.AddKeyPerFile(secretsPath, optional: true);
+            }
+
             var config = builder.Build();
 
             var serviceProvider = new ServiceCollection()
                 .AddLogging(loggingBuilder => loggingBuilder
                     .AddFile(config.GetSection("Logging"))
-                    // .AddConsole()
-                    // .SetMinimumLevel(LogLevel.Debug)
                     )
                 .AddBroker(config)
                 .AddSingleton<ITradeFactory, TradeFactory>()
@@ -223,9 +228,9 @@ __  ______  __    ____  __
         {
             var assetType = trade.AssetType.ToString();
             var side = trade.OrderSide.ToString();
-            var amount = trade.AbsoluteAmount.ToString(QuantityFormat);
+            var amount = trade.AbsoluteAmount.ToString(F5);
             var filled = string.Empty;
-            var price = trade.LimitPrice?.ToString(PriceFormat) ?? "Market";
+            var price = trade.LimitPrice?.ToString(F5) ?? "Market";
             var status = "[yellow]Pending[/]";
             var time = DateTime.Now.ToString("HH:mm:ss");
 
@@ -254,9 +259,9 @@ __  ______  __    ____  __
         {
             var assetType = update.Order?.AssetType.ToString() ?? " ";
             var side = update.Order?.OrderSide.ToString() ?? " ";
-            var amount = update.Order?.Amount.ToString(QuantityFormat) ?? " ";
-            var filled = update.Order?.Filled?.ToString(QuantityFormat) ?? " ";
-            var price = update.Order?.LimitPrice?.ToString(PriceFormat) ?? "Market";
+            var amount = update.Order?.Amount.ToString(F5) ?? " ";
+            var filled = update.Order?.Filled?.ToString(F5) ?? " ";
+            var price = update.Order?.LimitPrice?.ToString(F5) ?? "Market";
             var status = GetStatusMarkup(update.Type);
             var time = DateTime.Now.ToString("HH:mm:ss");
 
