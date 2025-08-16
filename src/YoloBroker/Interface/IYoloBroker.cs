@@ -8,7 +8,7 @@ namespace YoloBroker.Interface;
 
 public interface IYoloBroker : IDisposable
 {
-    Task CancelOrderAsync(string symbol, long orderId, CancellationToken ct = default);
+    Task CancelOrderAsync(Order order, CancellationToken ct = default);
 
     Task<IReadOnlyDictionary<string, IReadOnlyList<MarketInfo>>> GetMarketsAsync(
         ISet<string>? baseAssetFilter = null,

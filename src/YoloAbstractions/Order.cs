@@ -1,5 +1,7 @@
 using System;
 
+using YoloAbstractions.Extensions;
+
 namespace YoloAbstractions;
 
 public record Order(
@@ -15,4 +17,6 @@ public record Order(
     string? ClientId = null)
 {
     public OrderType OrderType => LimitPrice.HasValue ? OrderType.Limit : OrderType.Market;
+
+    public bool IsCompleted() => OrderStatus.IsTerminalStatus();
 }
