@@ -24,15 +24,15 @@ There is a pre-built win64 console app in the releases section, which can be sch
 
 3. **Run Application**:
 
-   ```./YoloKonsole.exe
-
+   ```powershell
+   ./YoloKonsole.exe
    ```
 
 ## Files Included
 
-- `YoloKonsole.exe` - Main application (self-contained)
+- `YoloKonsole.exe` - Main application
 - `setup-secrets.ps1` - Configure your API keys and addresses securely
-- `appsettings.prod.json` - Production configuration
+- `appsettings.json` - Application configuration settings
 - `README.md` - This file
 
 ## Security Notes
@@ -61,7 +61,9 @@ This determines where the application will write logs to. Windows paths using `\
 ```JSON
 {
   "Logging": {
-    "PathFormat": "C:\\logs\\yolo-{Date}.json",
+    "PathFormat": "C:\\logs\\yolo-{Date}.log",
+  }
+}
 ```
 
 ## Yolo/BaseAsset
