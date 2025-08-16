@@ -58,10 +58,10 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 This determines where the application will write logs to. Windows paths using `\` must be escaped as `\\` as below. The substitution token `{Date}` included in the path means that a new file will be written each day. You can omit this if you would prefer to have a single file.
 
-```JSON
+```json
 {
   "Logging": {
-    "PathFormat": "C:\\logs\\yolo-{Date}.log",
+    "PathFormat": "C:\\logs\\yolo-{Date}.log"
   }
 }
 ```
