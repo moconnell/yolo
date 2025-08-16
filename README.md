@@ -1,8 +1,8 @@
-[![Coverage Status](https://coveralls.io/repos/github/moconnell/yolo/badge.svg?branch=master)](https://coveralls.io/github/moconnell/yolo?branch=master)
-
 # yolo
 
 Automation for the [RobotWealth](https://robotwealth.com) cryptocurrency YOLO strategies
+
+[![Coverage Status](https://coveralls.io/repos/github/moconnell/yolo/badge.svg?branch=master)](https://coveralls.io/github/moconnell/yolo?branch=master)
 
 ## YOLO Console - Windows x64 Deployment
 
@@ -10,11 +10,7 @@ There is a pre-built win64 console app in the releases section, which can be sch
 
 ## Quick Start
 
-- download `YoloKonsole.exe`, `appsettings.json` and save to a new folder on your computer
-- edit `appsettings.json` with the correct settings
-- run `YoloKonsole.exe` - from the command line is recommended initially, so that you can see the output easily (Windows+R, cmd) although file logging is also provided
-- by default, the application will issue a `Proceed? (y/n)` challenge before issuing any trades to the broker
-- this can be overridden by using the command-line switch `-s`
+- download `YoloKonsole.exe`, `appsettings.json` and `./setup-secrets.ps1` and save to a new folder on your computer
 
 1. **Setup Secrets** (First time only):
 
@@ -22,30 +18,32 @@ There is a pre-built win64 console app in the releases section, which can be sch
    .\setup-secrets.ps1
    ```
 
-2. **Run Application**:
+2. **Edit appsettings.json**:
 
-   ```powershell
-   .\run-yolo.ps1
+   Adjust additional settings as desired
+
+3. **Run Application**:
+
+   ```./YoloKonsole.exe
+
    ```
 
 ## Files Included
 
 - `YoloKonsole.exe` - Main application (self-contained)
 - `setup-secrets.ps1` - Configure your API keys and addresses securely
-- `run-yolo.ps1` - Launch the application with proper environment
 - `appsettings.prod.json` - Production configuration
 - `README.md` - This file
 
 ## Security Notes
 
-- Secrets are stored in `C:\secrets\yolo\` with restricted permissions
+- Secrets are stored in `.\secrets` under the install directory with restricted permissions
 - Only your Windows user account can access the secret files
-- Never commit or share the contents of `C:\secrets\yolo\`
 
 ## Requirements
 
 - Windows 10/11 x64
-- No .NET installation required (self-contained)
+- .NET 9 installation required
 - PowerShell 5.1+ (included with Windows)
 
 ## Troubleshooting
