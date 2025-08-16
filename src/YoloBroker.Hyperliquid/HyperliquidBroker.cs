@@ -212,20 +212,9 @@ public sealed class HyperliquidBroker : IYoloBroker
             // Place initial limit orders
             await foreach (var result in PlaceTradesAsync(trades, ct))
             {
-                var update = new OrderUpdate(
-                    result.Trade.Symbol,
-                    result.Success ?
-                        result.Trade.OrderType == OrderType.Market ? OrderUpdateType.MarketOrderPlaced : OrderUpdateType.Created :
-                        OrderUpdateType.Error,
-                    result.Order,
-                    Error: result.Success ? null : new HyperliquidException(result.Error!, result.ErrorCode.GetValueOrDefault()));
-
-                if (result.Success && result.Order != null && result.Trade.OrderType != OrderType.Market)
-                {
-                    // Track limit orders for timeout and cancellation
-                    orderTrackers.TryAdd(result.Order.Id, new OrderTracker(result.Order, result.Trade, DateTime.UtcNow));
-                }
-
+                AddOrderTracker(result);
+                var update = ToOrderUpdate(result);
+                _logger.LogDebug("Returning OrderUpdate {OrderUpdate}", update);
                 yield return update;
             }
 
@@ -234,6 +223,7 @@ public sealed class HyperliquidBroker : IYoloBroker
 
             await foreach (var update in updateChannel.Reader.ReadAllAsync(ct))
             {
+                _logger.LogDebug("Returning OrderUpdate {OrderUpdate}", update);
                 yield return update;
             }
 
@@ -279,14 +269,15 @@ public sealed class HyperliquidBroker : IYoloBroker
                 switch (update.Status)
                 {
                     case HyperLiquid.Net.Enums.OrderStatus.Filled:
-                        orderTrackers.TryRemove(tracker.MarkComplete().Order.Id, out _);
                         updateChannel.Writer.TryWrite(new OrderUpdate(newOrder.Symbol, OrderUpdateType.Filled, newOrder, Message: message));
+                        RemoveOrderTracker(tracker.MarkComplete().Order.Id);
                         break;
+
                     case HyperLiquid.Net.Enums.OrderStatus.Canceled:
                     case HyperLiquid.Net.Enums.OrderStatus.Rejected:
                     case HyperLiquid.Net.Enums.OrderStatus.MarginCanceled:
-                        orderTrackers.TryRemove(tracker.MarkComplete().Order.Id, out _);
                         updateChannel.Writer.TryWrite(new OrderUpdate(newOrder.Symbol, OrderUpdateType.Cancelled, newOrder, Message: message));
+                        RemoveOrderTracker(tracker.MarkComplete().Order.Id);
                         break;
 
                     default:
@@ -301,6 +292,63 @@ public sealed class HyperliquidBroker : IYoloBroker
             if (orderTrackers.IsEmpty)
             {
                 updateChannel.Writer.TryComplete();
+            }
+        }
+
+        OrderUpdate ToOrderUpdate(TradeResult result)
+        {
+            OrderUpdateType GetOrderUpdateType()
+            {
+                if (!result.Success || result.Order == null)
+                {
+                    return OrderUpdateType.Error;
+                }
+
+                if (result.Trade.OrderType == OrderType.Market)
+                {
+                    return OrderUpdateType.MarketOrderPlaced;
+                }
+
+                Order order = result.Order;
+                return order.OrderStatus switch
+                {
+                    OrderStatus.Canceled or OrderStatus.MarginCanceled => OrderUpdateType.Cancelled,
+                    OrderStatus.Filled => OrderUpdateType.Filled,
+                    OrderStatus.Rejected => OrderUpdateType.Error,
+                    _ when order.Filled > 0 && order.Filled < order.Amount => OrderUpdateType.PartiallyFilled,
+                    _ => OrderUpdateType.Created
+                };
+            }
+
+            return new OrderUpdate(
+                result.Trade.Symbol,
+                GetOrderUpdateType(),
+                result.Order,
+                Error: result.Success ? null : new HyperliquidException(result.Error!, result.ErrorCode.GetValueOrDefault()));
+        }
+
+        void AddOrderTracker(TradeResult result)
+        {
+            if (!result.Success || result.Order == null)
+            {
+                return;
+            }
+
+            var orderId = result.Order.Id;
+            var order = result.Order;
+            var trade = result.Trade;
+
+            if (orderTrackers.TryAdd(orderId, new OrderTracker(order, trade, DateTime.UtcNow)))
+            {
+                _logger.LogDebug("Added order tracker for order {OrderId} for {Symbol}", orderId, order.Symbol);
+            }
+        }
+
+        void RemoveOrderTracker(long orderId)
+        {
+            if (orderTrackers.TryRemove(orderId, out _))
+            {
+                _logger.LogDebug("Removed order tracker for order {OrderId}", orderId);
             }
         }
     }
