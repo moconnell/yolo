@@ -1,4 +1,5 @@
-﻿using System.Security.Cryptography;
+﻿using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using CryptoExchange.Net.Authentication;
 using CryptoExchange.Net.Objects;
 using HyperLiquid.Net;
@@ -77,7 +78,7 @@ public class HyperliquidBrokerTest
         order.Symbol.ShouldBe(symbol);
         order.Amount.ShouldBe(trade.Amount);
 
-        await broker.CancelOrderAsync(order.Symbol, order.Id);
+        await broker.CancelOrderAsync(order);
     }
 
     [Theory]
@@ -107,7 +108,7 @@ public class HyperliquidBrokerTest
             order.Symbol.ShouldBe(symbol);
             order.Amount.ShouldBe(trade.Amount);
 
-            await broker.CancelOrderAsync(order.Symbol, order.Id);
+            await broker.CancelOrderAsync(order);
         }
     }
 
@@ -124,12 +125,12 @@ public class HyperliquidBrokerTest
         var trade = CreateTrade(symbol, assetType, quantity, orderPrice);
         var settings = OrderManagementSettings.Default;
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var orders = new ConcurrentDictionary<long, Order>();
 
         // act
         var orderUpdates = broker.ManageOrdersAsync([trade], settings, cts.Token);
 
         // assert
-        long orderId = 0;
         var updateCount = 0;
 
         try
@@ -149,7 +150,7 @@ public class HyperliquidBrokerTest
 
                 var order = orderUpdate.Order;
                 order.ShouldNotBeNull();
-                orderId = order.Id;
+                orders.TryAdd(order.Id, order);
                 order.Id.ShouldBeGreaterThan(0);
                 order.ClientId.ShouldBe(trade.ClientOrderId);
                 order.Symbol.ShouldBe(symbol);
@@ -170,10 +171,10 @@ public class HyperliquidBrokerTest
         }
         finally
         {
-            // Ensure we clean up the order
-            if (orderId > 0)
+            // clean-up
+            foreach (var order in orders.Values)
             {
-                await broker.CancelOrderAsync(trade.Symbol, orderId);
+                await broker.CancelOrderAsync(order);
             }
         }
     }

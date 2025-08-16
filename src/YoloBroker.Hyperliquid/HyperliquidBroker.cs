@@ -15,6 +15,7 @@ using HyperLiquid.Net.Interfaces.Clients;
 using HyperLiquid.Net.Objects.Models;
 using Microsoft.Extensions.Logging;
 using YoloAbstractions;
+using YoloAbstractions.Extensions;
 using YoloBroker.Hyperliquid.CustomSigning;
 using YoloBroker.Hyperliquid.Exceptions;
 using YoloBroker.Hyperliquid.Extensions;
@@ -297,16 +298,22 @@ public sealed class HyperliquidBroker : IYoloBroker
 
         OrderUpdate ToOrderUpdate(TradeResult result)
         {
+            return new OrderUpdate(
+                result.Trade.Symbol,
+                GetOrderUpdateType(),
+                result.Order,
+                Error: result.Success ? null : new HyperliquidException(result.Error!, result.ErrorCode.GetValueOrDefault()));
+
             OrderUpdateType GetOrderUpdateType()
             {
-                if (!result.Success || result.Order == null)
-                {
-                    return OrderUpdateType.Error;
-                }
-
                 if (result.Trade.OrderType == OrderType.Market)
                 {
                     return OrderUpdateType.MarketOrderPlaced;
+                }
+
+                if (!result.Success || result.Order == null)
+                {
+                    return OrderUpdateType.Error;
                 }
 
                 Order order = result.Order;
@@ -319,17 +326,11 @@ public sealed class HyperliquidBroker : IYoloBroker
                     _ => OrderUpdateType.Created
                 };
             }
-
-            return new OrderUpdate(
-                result.Trade.Symbol,
-                GetOrderUpdateType(),
-                result.Order,
-                Error: result.Success ? null : new HyperliquidException(result.Error!, result.ErrorCode.GetValueOrDefault()));
         }
 
         void AddOrderTracker(TradeResult result)
         {
-            if (!result.Success || result.Order == null)
+            if (!result.Success || result.Order == null || result.Order.IsCompleted())
             {
                 return;
             }
@@ -375,7 +376,7 @@ public sealed class HyperliquidBroker : IYoloBroker
                         try
                         {
 
-                            await CancelOrderAsync(tracker.Order.Symbol, tracker.Order.Id, ct);
+                            await CancelOrderAsync(tracker.Order, ct);
 
                             updateChannel.Writer.TryWrite(new OrderUpdate(tracker.Order.Symbol, OrderUpdateType.TimedOut, tracker.Order with { OrderStatus = OrderStatus.Canceled }, Message: "Order timed out"));
 
@@ -436,16 +437,36 @@ public sealed class HyperliquidBroker : IYoloBroker
         ct);
     }
 
-    public async Task CancelOrderAsync(string symbol, long orderId, CancellationToken ct = default)
+    public async Task CancelOrderAsync(Order order, CancellationToken ct = default)
     {
-        ArgumentException.ThrowIfNullOrEmpty(symbol);
-        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(orderId, 0);
+        ArgumentNullException.ThrowIfNull(order);
 
-        _logger.LogInformation("Cancelling order {OrderId} for symbol {Symbol}", orderId, symbol);
+        _logger.LogInformation("Cancelling order {Order}", order);
 
-        await CallAsync(
-            () => _hyperliquidClient.FuturesApi.Trading.CancelOrderAsync(symbol, orderId, ct: ct),
-            "Could not cancel order");
+        if (order.IsCompleted())
+        {
+            _logger.LogWarning("Order {OrderId} is already completed, skipping cancellation", order.Id);
+            return;
+        }
+
+        if (order.AssetType == AssetType.Spot)
+        {
+            _logger.LogInformation("Cancelling spot order {OrderId} for symbol {Symbol}", order.Id, order.Symbol);
+            await CallAsync(
+                () => _hyperliquidClient.SpotApi.Trading.CancelOrderAsync(order.Symbol, order.Id, ct: ct),
+                "Could not cancel spot order");
+        }
+        else if (order.AssetType == AssetType.Future)
+        {
+            _logger.LogInformation("Cancelling futures order {OrderId} for symbol {Symbol}", order.Id, order.Symbol);
+            await CallAsync(
+                () => _hyperliquidClient.FuturesApi.Trading.CancelOrderAsync(order.Symbol, order.Id, ct: ct),
+                "Could not cancel order");
+        }
+        else
+        {
+            throw new ArgumentOutOfRangeException(nameof(order.AssetType), order.AssetType, "AssetType not supported");
+        }
     }
 
     public async Task EditOrderAsync(Order order, CancellationToken ct = default)
