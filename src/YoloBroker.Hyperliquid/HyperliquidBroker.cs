@@ -231,7 +231,7 @@ public sealed class HyperliquidBroker : IYoloBroker
         }
         finally
         {
-            updateChannel.Writer.Complete();
+            updateChannel.Writer.TryComplete();
             await spotOrderUpdatesSub.CloseAsync();
             await futuresOrderUpdatesSub.CloseAsync();
             _logger.LogDebug("Unsubscribed from spot and futures order updates");
