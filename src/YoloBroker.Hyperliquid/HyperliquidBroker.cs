@@ -307,14 +307,14 @@ public sealed class HyperliquidBroker : IYoloBroker
 
             OrderUpdateType GetOrderUpdateType()
             {
-                if (result.Trade.OrderType == OrderType.Market)
-                {
-                    return OrderUpdateType.MarketOrderPlaced;
-                }
-
                 if (!result.Success || result.Order == null)
                 {
                     return OrderUpdateType.Error;
+                }
+
+                if (result.Trade.OrderType == OrderType.Market)
+                {
+                    return OrderUpdateType.MarketOrderPlaced;
                 }
 
                 Order order = result.Order;
