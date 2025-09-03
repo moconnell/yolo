@@ -45,6 +45,7 @@ public class TradeTest
     [InlineData("BTC", 10, 4.5789, null, true)]
     [InlineData("BTC", 1, 4.5789, 10.0, false)]
     [InlineData("BTC", 1, null, 10.0, true)]
+    [InlineData("BTC", 2.5, 4.0, 10.0, true)]
 #pragma warning disable xUnit1012 // Null should only be used for nullable parameters
     [InlineData(null, 1, null, 10.0, false)]
     public void ShouldCheckIfTradeIsTradable(string symbol, decimal amount, double? limitPrice, double? minOrderValue, bool expectedResult)
