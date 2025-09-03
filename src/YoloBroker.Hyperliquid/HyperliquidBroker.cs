@@ -390,7 +390,7 @@ public sealed class HyperliquidBroker : IYoloBroker
 
                             try
                             {
-                                var marketTrade = tracker.OriginalTrade with { LimitPrice = null };
+                                var marketTrade = tracker.OriginalTrade with { OrderType = OrderType.Market };
                                 var marketTradeResult = await PlaceTradeAsync(marketTrade, ct);
                                 if (marketTradeResult.Success)
                                 {
@@ -764,7 +764,7 @@ public sealed class HyperliquidBroker : IYoloBroker
             trade.OrderSide.ToHyperLiquid(),
             trade.OrderType.ToHyperLiquid(),
             trade.AbsoluteAmount,
-            trade.LimitPrice.GetValueOrDefault(),
+            trade.LimitPrice.GetValueOrDefault(1),
             clientOrderId: trade.ClientOrderId,
             ct: ct);
 
@@ -778,7 +778,7 @@ public sealed class HyperliquidBroker : IYoloBroker
             trade.OrderSide.ToHyperLiquid(),
             trade.OrderType.ToHyperLiquid(),
             trade.AbsoluteAmount,
-            trade.LimitPrice.GetValueOrDefault(),
+            trade.LimitPrice.GetValueOrDefault(1),
             clientOrderId: trade.ClientOrderId,
             ct: ct);
 
