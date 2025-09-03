@@ -36,7 +36,7 @@ public class TradeTest
         else
         {
             var trade3 = trade1 + trade2;
-            Assert.Equal(trade3.Amount, amount1 + amount2);
+            Assert.Equal(amount1 + amount2, trade3.Amount);
         }
     }
 
