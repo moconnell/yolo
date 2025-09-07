@@ -2,23 +2,26 @@ using System.Text.Json.Serialization;
 
 namespace YoloWeights.Data;
 
-public class Weight
+public record Weight
 {
     [JsonPropertyName("arrival_price")]
-    public double ArrivalPrice { get; set; }
+    public double ArrivalPrice { get; init; }
+
+    [JsonPropertyName("carry_megafactor")]
+    public double CarryMegafactor { get; init; }
 
     [JsonPropertyName("combo_weight")]
-    public double ComboWeight { get; set; }
+    public double ComboWeight { get; init; }
 
     [JsonPropertyName("date")]
-    public required string Date { get; set; }
+    public required string Date { get; init; }
 
     [JsonPropertyName("momentum_megafactor")]
-    public double MomentumMegafactor { get; set; }
+    public double MomentumMegafactor { get; init; }
 
     [JsonPropertyName("ticker")]
-    public required string Ticker { get; set; }
+    public required string Ticker { get; init; }
 
     [JsonPropertyName("trend_megafactor")]
-    public double TrendMegafactor { get; set; }
+    public double TrendMegafactor { get; init; }
 }

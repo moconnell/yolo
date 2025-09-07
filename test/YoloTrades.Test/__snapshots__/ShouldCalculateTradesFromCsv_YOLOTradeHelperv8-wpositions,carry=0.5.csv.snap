@@ -1,0 +1,50 @@
+﻿[
+  {
+    "Symbol": "AVAX/USDC",
+    "AssetType": "Future",
+    "Amount": 12.2496,
+    "LimitPrice": 24.5600,
+    "OrderType": "Limit",
+    "PostPrice": true,
+    "Expiry": null,
+    "ClientOrderId": null,
+    "AbsoluteAmount": 12.2496,
+    "OrderSide": "Buy"
+  },
+  {
+    "Symbol": "BNB/USDC",
+    "AssetType": "Future",
+    "Amount": 1.9751,
+    "LimitPrice": 872.2600,
+    "OrderType": "Limit",
+    "PostPrice": true,
+    "Expiry": null,
+    "ClientOrderId": null,
+    "AbsoluteAmount": 1.9751,
+    "OrderSide": "Buy"
+  },
+  {
+    "Symbol": "DOGE/USDC",
+    "AssetType": "Future",
+    "Amount": 1014.5271,
+    "LimitPrice": 0.2174,
+    "OrderType": "Limit",
+    "PostPrice": true,
+    "Expiry": null,
+    "ClientOrderId": null,
+    "AbsoluteAmount": 1014.5271,
+    "OrderSide": "Buy"
+  },
+  {
+    "Symbol": "TRX/USDC",
+    "AssetType": "Future",
+    "Amount": -8125.9227,
+    "LimitPrice": 0.3271,
+    "OrderType": "Limit",
+    "PostPrice": true,
+    "Expiry": null,
+    "ClientOrderId": null,
+    "AbsoluteAmount": 8125.9227,
+    "OrderSide": "Sell"
+  }
+]

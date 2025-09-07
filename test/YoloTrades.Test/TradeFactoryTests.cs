@@ -20,21 +20,31 @@ namespace YoloTrades.Test;
 public class TradeFactoryTests
 {
     [Theory]
-    [InlineData("./Data/csv/20211212/YOLO Trade Helper v4 20211212.csv")]
+    // [InlineData("./Data/csv/20250907/YOLO Trade Helper v8 - carry=0.csv", 1, 1, 0)]
+    // [InlineData("./Data/csv/20250907/YOLO Trade Helper v8 - carry=0.5.csv", 1, 1, 0.5)]
+    [InlineData("./Data/csv/20250907/YOLO Trade Helper v8 - w positions, carry=0.5.csv", 4, 1, 1, 0.5)]
     public void ShouldCalculateTradesFromCsv(
         string path,
-        string baseCurrency = "USD",
+        int expectedNumberOfTrades,
+        decimal momentumMultiplier = 1,
+        decimal trendMultiplier = 1,
+        decimal carryMultiplier = 1,
+        string baseCurrency = "USDC",
         decimal nominalCash = 10000,
         decimal tradeBuffer = 0.02m,
         decimal stepSize = 0.0001m)
     {
+        // arrange
         var mockLogger = new Mock<ILogger<TradeFactory>>();
 
         var config = new YoloConfig
         {
             BaseAsset = baseCurrency,
             NominalCash = nominalCash,
-            TradeBuffer = tradeBuffer
+            TradeBuffer = tradeBuffer,
+            WeightingMomentumFactor = momentumMultiplier,
+            WeightingTrendFactor = trendMultiplier,
+            WeightingCarryFactor = carryMultiplier
         };
         var tradeFactory = new TradeFactory(mockLogger.Object, config);
 
@@ -47,11 +57,11 @@ public class TradeFactoryTests
 
         Assert.NotNull(trades);
 
-        var filename = path[(path.LastIndexOf("/", StringComparison.Ordinal) + 1)..]
+        var filename = path[(path.LastIndexOf('/') + 1)..]
             .Replace(" ", string.Empty);
         trades.MatchSnapshot($"ShouldCalculateTradesFromCsv_{filename}");
 
-        Assert.Equal(expectedTrades.Count, trades.Length);
+        Assert.Equal(expectedNumberOfTrades, trades.Length);
 
         var tradesWithDeviatingQuantity = trades
             .Select(t =>
@@ -75,10 +85,11 @@ public class TradeFactoryTests
     public async Task ShouldCalculateTrades(
         string path,
         AssetPermissions assetPermissions = AssetPermissions.All,
-        string baseCurrency = "USD",
+        string baseCurrency = "USDC",
         decimal nominalCash = 10000,
         decimal tradeBuffer = 0.04m)
     {
+        // arrange
         var mockLogger = new Mock<ILogger<TradeFactory>>();
 
         var config = new YoloConfig
@@ -92,11 +103,13 @@ public class TradeFactoryTests
 
         var (weights, positions, markets) = await DeserializeInputsAsync(path);
 
+        // act
         var trades = tradeFactory.CalculateTrades(weights, positions, markets);
 
+        // assert
         Assert.NotNull(trades);
 
-        var directory = path[(path.LastIndexOf("/", StringComparison.InvariantCulture) + 1)..];
+        var directory = path[(path.LastIndexOf('/') + 1)..];
         trades.MatchSnapshot($"ShouldCalculateTrades_{directory}");
     }
 
@@ -122,11 +135,12 @@ public class TradeFactoryTests
         var weights = records.Select(x =>
                 new Weight(
                     x.Price,
-                    (x.Momentum + x.Trend) / 2,
+                    x.Carry,
                     DateTime.Today,
                     x.Momentum,
                     $"{x.Ticker}/{baseCurrency}",
-                    x.Trend))
+                    x.Trend,
+                    x.Volatility))
             .ToArray();
 
         var positions = records.ToDictionary(
@@ -136,7 +150,7 @@ public class TradeFactoryTests
                 new(
                     $"{x.Ticker}/{baseCurrency}",
                     x.Ticker,
-                    AssetType.Spot,
+                    AssetType.Future,
                     x.CurrentPosition)
             ]);
 
@@ -148,7 +162,7 @@ public class TradeFactoryTests
                     $"{x.Ticker}/{baseCurrency}",
                     x.Ticker,
                     baseCurrency,
-                    AssetType.Spot,
+                    AssetType.Future,
                     DateTime.UtcNow,
                     stepSize,
                     stepSize,
