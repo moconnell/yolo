@@ -15,7 +15,6 @@ using HyperLiquid.Net.Interfaces.Clients;
 using HyperLiquid.Net.Objects.Models;
 using Microsoft.Extensions.Logging;
 using YoloAbstractions;
-using YoloAbstractions.Extensions;
 using YoloBroker.Hyperliquid.CustomSigning;
 using YoloBroker.Hyperliquid.Exceptions;
 using YoloBroker.Hyperliquid.Extensions;

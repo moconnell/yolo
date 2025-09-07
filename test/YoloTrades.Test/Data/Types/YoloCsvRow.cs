@@ -16,11 +16,17 @@ public class YoloCsvRow
     [Name("Trend")]
     public decimal Trend { get; set; }
 
+    [Name("Carry")]
+    public decimal Carry { get; set; }
+
+    [Name("Vol")]
+    public decimal Volatility { get; set; }
+
     [Name("Unconstrained Target Weight")]
     public decimal UnconstrainedTTargetWeight { get; set; }
 
-    [Name("Constrained Target Weight")]
-    public decimal ConstrainedTTargetWeight { get; set; }
+    [Name("Vol Scaled Target Weight")]
+    public decimal VolScaledTargetWeight { get; set; }
 
     [Name("Current Position")]
     public decimal CurrentPosition { get; set; }
@@ -52,6 +58,8 @@ public class YoloCsvRow
     [Name("Diff to Constrained Target Weight After Trade")]
     public required string DiffToConstrainedTargetWeightPostTrade { get; set; }
 
-    [Name("OK?")] [BooleanTrueValues("YES")] [BooleanFalseValues("NO")]
+    [Name("OK?")]
+    [BooleanTrueValues("YES")]
+    [BooleanFalseValues("NO")]
     public bool Ok { get; set; }
 }

@@ -12,6 +12,7 @@ namespace YoloTrades;
 public class TradeFactory : ITradeFactory
 {
     private readonly ILogger<TradeFactory> _logger;
+    private readonly YoloConfig _yoloConfig;
 
     public TradeFactory(ILogger<TradeFactory> logger, IConfiguration configuration)
         : this(
@@ -25,6 +26,7 @@ public class TradeFactory : ITradeFactory
     public TradeFactory(ILogger<TradeFactory> logger, YoloConfig yoloConfig)
     {
         _logger = logger;
+        _yoloConfig = yoloConfig;
         AssetPermissions = yoloConfig.AssetPermissions;
         TradeBuffer = yoloConfig.TradeBuffer;
         MaxLeverage = yoloConfig.MaxLeverage;
@@ -57,7 +59,7 @@ public class TradeFactory : ITradeFactory
 
         var unconstrainedTargetLeverage = weightsDict
             .Values
-            .Select(w => Math.Abs(w.weight.ComboWeight))
+            .Select(w => Math.Abs(w.weight.GetComboWeight(_yoloConfig)))
             .Sum();
 
         var weightConstraint = unconstrainedTargetLeverage < MaxLeverage
@@ -67,7 +69,7 @@ public class TradeFactory : ITradeFactory
         var droppedTokens = positions.Keys.Except(weightsDict.Keys.Union([BaseAsset]));
         foreach (var token in droppedTokens)
         {
-            var weight = new Weight(0, 0, DateTime.UtcNow, 0, $"{token}/{BaseAsset}", 0);
+            var weight = new Weight(0, 0, DateTime.UtcNow, 0, $"{token}/{BaseAsset}", 0, 1);
             weightsDict[token] = (weight, false);
         }
 
@@ -84,7 +86,7 @@ public class TradeFactory : ITradeFactory
             var tokenPositions = positions.TryGetValue(token, out var pos)
                 ? pos.ToArray()
                 : [];
-            var constrainedTargetWeight = weightConstraint * w.ComboWeight;
+            var constrainedTargetWeight = weightConstraint * w.GetComboWeight(_yoloConfig);
 
             var projectedPositions = markets.GetMarkets(token)
                 .ToDictionary(
@@ -127,8 +129,7 @@ public class TradeFactory : ITradeFactory
                 yield break;
 
             if (isInUniverse &&
-                currentWeight >= constrainedTargetWeight - TradeBuffer &&
-                currentWeight <= constrainedTargetWeight + TradeBuffer)
+                Math.Abs(currentWeight.Value - constrainedTargetWeight) <= TradeBuffer)
             {
                 _logger.WithinTradeBuffer(
                     token,
@@ -140,7 +141,7 @@ public class TradeFactory : ITradeFactory
 
             var tradeBufferAdjustment =
                 isInUniverse ? TradeBuffer * (constrainedTargetWeight < currentWeight ? 1 : -1) : 0;
-            var bufferedTargetWeight = constrainedTargetWeight + tradeBufferAdjustment;
+            var bufferedTargetWeight = constrainedTargetWeight; // + tradeBufferAdjustment;
             var remainingDelta = bufferedTargetWeight - currentWeight.Value;
 
             while (remainingDelta != 0)
@@ -183,7 +184,7 @@ public class TradeFactory : ITradeFactory
         var marketPositions = projectedPositions.Count(HasPosition) switch
         {
             1 when !crossingZeroWeightBoundary => projectedPositions.Where(HasPosition).ToArray(),
-            _ => projectedPositions.ToArray()
+            _ => [.. projectedPositions]
         };
 
         var isBuy = remainingDelta >= 0;
