@@ -1,82 +1,82 @@
 [
   {
-    "Price": 19.967,
-    "ComboWeight": -0.009651776237250435,
-    "Date": "2021-12-03",
-    "MomentumFactor": 0.044776119402985134,
-    "Ticker": "UNI/USD",
-    "TrendFactor": -0.064079671877486
+    "Price": 111071.25,
+    "CarryFactor": -0.0498528311798732,
+    "Date": "2025-09-07",
+    "MomentumFactor": 0.050609756097561,
+    "Ticker": "BTCUSDT",
+    "TrendFactor": -0.0231948588678981
   },
   {
-    "Price": 188.21,
-    "ComboWeight": -0.03708697529233182,
-    "Date": "2021-12-03",
-    "MomentumFactor": -0.018656716417910453,
-    "Ticker": "LTC/USD",
-    "TrendFactor": -0.05551723416675318
+    "Price": 0.21747,
+    "CarryFactor": -0.154451171832054,
+    "Date": "2025-09-07",
+    "MomentumFactor": 0.00182926829268291,
+    "Ticker": "DOGEUSDT",
+    "TrendFactor": -0.0130834853024993
   },
   {
-    "Price": 0.921825,
-    "ComboWeight": -0.09330967576344841,
-    "Date": "2021-12-03",
-    "MomentumFactor": -0.10447761194029853,
-    "Ticker": "XRP/USD",
-    "TrendFactor": -0.08214173958659829
+    "Price": 22.34,
+    "CarryFactor": -0.0264004182839893,
+    "Date": "2025-09-07",
+    "MomentumFactor": -0.110975609756098,
+    "Ticker": "LINKUSDT",
+    "TrendFactor": -0.0132294575887013
   },
   {
-    "Price": 53643.0,
-    "ComboWeight": -0.024673710007914115,
-    "Date": "2021-12-03",
-    "MomentumFactor": 0.0037313432835820903,
-    "Ticker": "BTC/USD",
-    "TrendFactor": -0.053078763299410324
+    "Price": 24.56,
+    "CarryFactor": -0.080465367353816,
+    "Date": "2025-09-07",
+    "MomentumFactor": 0.148170731707317,
+    "Ticker": "AVAXUSDT",
+    "TrendFactor": 0.0213935717697274
   },
   {
-    "Price": 23.328,
-    "ComboWeight": -0.12663596222840884,
-    "Date": "2021-12-03",
-    "MomentumFactor": -0.18283582089552242,
-    "Ticker": "LINK/USD",
-    "TrendFactor": -0.07043610356129529
+    "Price": 2.8327,
+    "CarryFactor": -0.051450378339452,
+    "Date": "2025-09-07",
+    "MomentumFactor": -0.0987804878048781,
+    "Ticker": "XRPUSDT",
+    "TrendFactor": -0.0278193842011567
   },
   {
-    "Price": 532.8,
-    "ComboWeight": -0.033764744050286934,
-    "Date": "2021-12-03",
-    "MomentumFactor": 0.007462686567164128,
-    "Ticker": "BCH/USD",
-    "TrendFactor": -0.074992174667738
+    "Price": 4301.14,
+    "CarryFactor": 0.231050648859361,
+    "Date": "2025-09-07",
+    "MomentumFactor": -0.0560975609756098,
+    "Ticker": "ETHUSDT",
+    "TrendFactor": -0.0148040415946679
   },
   {
-    "Price": 47.08,
-    "ComboWeight": -0.06815256559502549,
-    "Date": "2021-12-03",
-    "MomentumFactor": -0.06343283582089554,
-    "Ticker": "FTT/USD",
-    "TrendFactor": -0.07287229536915543
+    "Price": 872.26,
+    "CarryFactor": 0.169826156302072,
+    "Date": "2025-09-07",
+    "MomentumFactor": 0.190853658536585,
+    "Ticker": "BNBUSDT",
+    "TrendFactor": 0.056064818376349
   },
   {
-    "Price": 0.639,
-    "ComboWeight": 0.1487735820507694,
-    "Date": "2021-12-03",
-    "MomentumFactor": 0.25746268656716426,
-    "Ticker": "CRO/USD",
-    "TrendFactor": 0.040084477534374545
+    "Price": 0.3271,
+    "CarryFactor": 0.0991231948385675,
+    "Date": "2025-09-07",
+    "MomentumFactor": -0.184146341463415,
+    "Ticker": "TRXUSDT",
+    "TrendFactor": -0.065927447355003
   },
   {
-    "Price": 0.200005,
-    "ComboWeight": -0.1017355697722269,
-    "Date": "2021-12-03",
-    "MomentumFactor": -0.13059701492537315,
-    "Ticker": "DOGE/USD",
-    "TrendFactor": -0.07287412461908066
+    "Price": 0.8281,
+    "CarryFactor": -0.0968622387425711,
+    "Date": "2025-09-07",
+    "MomentumFactor": -0.05,
+    "Ticker": "ADAUSDT",
+    "TrendFactor": -0.0190310142874808
   },
   {
-    "Price": 4217.0,
-    "ComboWeight": 0.0820520458348053,
-    "Date": "2021-12-03",
-    "MomentumFactor": 0.1865671641791044,
-    "Ticker": "ETH/USD",
-    "TrendFactor": -0.022463072509493816
+    "Price": 203.54,
+    "CarryFactor": -0.0405175942682446,
+    "Date": "2025-09-07",
+    "MomentumFactor": 0.108536585365854,
+    "Ticker": "SOLUSDT",
+    "TrendFactor": 0.0229878006000569
   }
 ]

@@ -34,6 +34,7 @@ public class TradeFactoryTests
         decimal tradeBuffer = 0.02m,
         decimal stepSize = 0.0001m)
     {
+        // arrange
         var mockLogger = new Mock<ILogger<TradeFactory>>();
 
         var config = new YoloConfig
@@ -77,17 +78,18 @@ public class TradeFactoryTests
         Assert.Empty(tradesWithDeviatingQuantity);
     }
 
-    [Theory(Skip = "Needs updating")]
+    [Theory]
     [InlineData("./Data/json/001")]
-    [InlineData("./Data/json/003_ExistingPositions")]
-    [InlineData("./Data/json/004_TokenUniverseChange")]
+    // [InlineData("./Data/json/003_ExistingPositions")]
+    // [InlineData("./Data/json/004_TokenUniverseChange")]
     public async Task ShouldCalculateTrades(
         string path,
         AssetPermissions assetPermissions = AssetPermissions.All,
-        string baseCurrency = "USD",
+        string baseCurrency = "USDC",
         decimal nominalCash = 10000,
         decimal tradeBuffer = 0.04m)
     {
+        // arrange
         var mockLogger = new Mock<ILogger<TradeFactory>>();
 
         var config = new YoloConfig
@@ -101,8 +103,10 @@ public class TradeFactoryTests
 
         var (weights, positions, markets) = await DeserializeInputsAsync(path);
 
+        // act
         var trades = tradeFactory.CalculateTrades(weights, positions, markets);
 
+        // assert
         Assert.NotNull(trades);
 
         var directory = path[(path.LastIndexOf('/') + 1)..];
