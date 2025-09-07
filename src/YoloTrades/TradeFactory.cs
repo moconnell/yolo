@@ -139,17 +139,14 @@ public class TradeFactory : ITradeFactory
                 yield break;
             }
 
-            var tradeBufferAdjustment =
-                isInUniverse ? TradeBuffer * (constrainedTargetWeight < currentWeight ? 1 : -1) : 0;
-            var bufferedTargetWeight = constrainedTargetWeight; // + tradeBufferAdjustment;
-            var remainingDelta = bufferedTargetWeight - currentWeight.Value;
+            var remainingDelta = constrainedTargetWeight - currentWeight.Value;
 
             while (remainingDelta != 0)
             {
                 var trades = CalcTrades(
                     token,
                     [.. projectedPositions.Values],
-                    bufferedTargetWeight,
+                    constrainedTargetWeight,
                     remainingDelta);
 
                 foreach (var (trade, remainingDeltaPostTrade) in trades)
