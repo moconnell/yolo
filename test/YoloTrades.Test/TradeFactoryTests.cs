@@ -80,8 +80,8 @@ public class TradeFactoryTests
 
     [Theory]
     [InlineData("./Data/json/001")]
-    // [InlineData("./Data/json/003_ExistingPositions")]
-    // [InlineData("./Data/json/004_TokenUniverseChange")]
+    [InlineData("./Data/json/003_ExistingPositions")]
+    [InlineData("./Data/json/004_TokenUniverseChange")]
     public async Task ShouldCalculateTrades(
         string path,
         AssetPermissions assetPermissions = AssetPermissions.All,

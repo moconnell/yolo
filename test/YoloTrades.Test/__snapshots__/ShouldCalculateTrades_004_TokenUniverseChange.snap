@@ -1,0 +1,110 @@
+﻿[
+  {
+    "Symbol": "BTC",
+    "AssetType": "Future",
+    "Amount": -0.02068,
+    "LimitPrice": 111014.0,
+    "OrderType": "Limit",
+    "PostPrice": true,
+    "Expiry": null,
+    "ClientOrderId": null,
+    "AbsoluteAmount": 0.02068,
+    "OrderSide": "Sell"
+  },
+  {
+    "Symbol": "DOGE",
+    "AssetType": "Future",
+    "Amount": -2310.0,
+    "LimitPrice": 0.21743,
+    "OrderType": "Limit",
+    "PostPrice": true,
+    "Expiry": null,
+    "ClientOrderId": null,
+    "AbsoluteAmount": 2310.0,
+    "OrderSide": "Sell"
+  },
+  {
+    "Symbol": "LINK",
+    "AssetType": "Future",
+    "Amount": -21.5,
+    "LimitPrice": 22.234,
+    "OrderType": "Limit",
+    "PostPrice": true,
+    "Expiry": null,
+    "ClientOrderId": null,
+    "AbsoluteAmount": 21.5,
+    "OrderSide": "Sell"
+  },
+  {
+    "Symbol": "XRP",
+    "AssetType": "Future",
+    "Amount": -210.0,
+    "LimitPrice": 2.8255,
+    "OrderType": "Limit",
+    "PostPrice": true,
+    "Expiry": null,
+    "ClientOrderId": null,
+    "AbsoluteAmount": 210.0,
+    "OrderSide": "Sell"
+  },
+  {
+    "Symbol": "ETH",
+    "AssetType": "Future",
+    "Amount": 0.1192,
+    "LimitPrice": 4297.4,
+    "OrderType": "Limit",
+    "PostPrice": true,
+    "Expiry": null,
+    "ClientOrderId": null,
+    "AbsoluteAmount": 0.1192,
+    "OrderSide": "Buy"
+  },
+  {
+    "Symbol": "BNB",
+    "AssetType": "Future",
+    "Amount": 1.593,
+    "LimitPrice": 871.59,
+    "OrderType": "Limit",
+    "PostPrice": true,
+    "Expiry": null,
+    "ClientOrderId": null,
+    "AbsoluteAmount": 1.593,
+    "OrderSide": "Buy"
+  },
+  {
+    "Symbol": "TRX",
+    "AssetType": "Future",
+    "Amount": -1540.0,
+    "LimitPrice": 0.32691,
+    "OrderType": "Limit",
+    "PostPrice": true,
+    "Expiry": null,
+    "ClientOrderId": null,
+    "AbsoluteAmount": 1540.0,
+    "OrderSide": "Sell"
+  },
+  {
+    "Symbol": "ADA",
+    "AssetType": "Future",
+    "Amount": -669.0,
+    "LimitPrice": 0.82744,
+    "OrderType": "Limit",
+    "PostPrice": true,
+    "Expiry": null,
+    "ClientOrderId": null,
+    "AbsoluteAmount": 669.0,
+    "OrderSide": "Sell"
+  },
+  {
+    "Symbol": "UNI",
+    "AssetType": "Future",
+    "Amount": 3.20,
+    "LimitPrice": 9.40750,
+    "OrderType": "Limit",
+    "PostPrice": true,
+    "Expiry": null,
+    "ClientOrderId": null,
+    "AbsoluteAmount": 3.20,
+    "OrderSide": "Buy"
+  }
+]
