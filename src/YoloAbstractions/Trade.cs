@@ -7,6 +7,7 @@ public record Trade(
     AssetType AssetType,
     decimal Amount,
     decimal? LimitPrice = null,
+    OrderType OrderType = OrderType.Limit,
     bool? PostPrice = null,
     DateTime? Expiry = null,
     string? ClientOrderId = null)
@@ -17,6 +18,9 @@ public record Trade(
             return false;
 
         if (string.IsNullOrWhiteSpace(Symbol))
+            return false;
+
+        if (OrderType == OrderType.Limit && !LimitPrice.HasValue)
             return false;
 
         // Check valid limit price
@@ -30,8 +34,6 @@ public record Trade(
     public decimal AbsoluteAmount => Math.Abs(Amount);
 
     public OrderSide OrderSide => Amount < 0 ? OrderSide.Sell : OrderSide.Buy;
-
-    public OrderType OrderType => LimitPrice.HasValue ? OrderType.Limit : OrderType.Market;
 
     public static Trade operator +(Trade one, Trade two)
     {
@@ -53,6 +55,7 @@ public record Trade(
             one.AssetType,
             totalAmount,
             one.LimitPrice,
+            one.OrderType,
             postPrice,
             one.Expiry);
     }

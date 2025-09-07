@@ -230,8 +230,8 @@ public class TradeFactory : ITradeFactory
 
             var trade = market.MinProvideSize switch
             {
-                _ when Math.Abs(size) >= market.MinProvideSize => new Trade(market.Name, market.AssetType, size, CalcLimitPrice(), true),
-                _ => new Trade(market.Name, market.AssetType, size, isBuy ? market.Ask!.Value : market.Bid!.Value, false)
+                _ when Math.Abs(size) >= market.MinProvideSize.GetValueOrDefault() => new Trade(market.Name, market.AssetType, size, CalcLimitPrice(), OrderType.Limit, true),
+                _ => new Trade(market.Name, market.AssetType, size, isBuy ? market.Ask!.Value : market.Bid!.Value, OrderType.Market, false)
             };
 
             if (trade.IsTradable())

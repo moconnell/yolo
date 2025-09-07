@@ -254,10 +254,11 @@ public sealed class HyperliquidBroker : IYoloBroker
                     continue;
                 }
 
+                OrderStatus orderStatus = update.Status.ToYoloOrderStatus();
                 var newOrder = tracker.Order with
                 {
                     Filled = tracker.Order.Amount - update.Order.QuantityRemaining,
-                    OrderStatus = update.Status.ToYoloOrderStatus()
+                    OrderStatus = orderStatus
                 };
 
                 orderTrackers[tracker.Order.Id] = tracker with
@@ -267,16 +268,16 @@ public sealed class HyperliquidBroker : IYoloBroker
 
                 string message = update.Status.ToString();
 
-                switch (update.Status)
+                switch (orderStatus)
                 {
-                    case HyperLiquid.Net.Enums.OrderStatus.Filled:
+                    case OrderStatus.Filled:
                         updateChannel.Writer.TryWrite(new OrderUpdate(newOrder.Symbol, OrderUpdateType.Filled, newOrder, Message: message));
                         RemoveOrderTracker(tracker.MarkComplete().Order.Id);
                         break;
 
-                    case HyperLiquid.Net.Enums.OrderStatus.Canceled:
-                    case HyperLiquid.Net.Enums.OrderStatus.Rejected:
-                    case HyperLiquid.Net.Enums.OrderStatus.MarginCanceled:
+                    case OrderStatus.Canceled:
+                    case OrderStatus.MarginCanceled:
+                    case OrderStatus.Rejected:
                         updateChannel.Writer.TryWrite(new OrderUpdate(newOrder.Symbol, OrderUpdateType.Cancelled, newOrder, Message: message));
                         RemoveOrderTracker(tracker.MarkComplete().Order.Id);
                         break;
@@ -306,14 +307,14 @@ public sealed class HyperliquidBroker : IYoloBroker
 
             OrderUpdateType GetOrderUpdateType()
             {
-                if (result.Trade.OrderType == OrderType.Market)
-                {
-                    return OrderUpdateType.MarketOrderPlaced;
-                }
-
                 if (!result.Success || result.Order == null)
                 {
                     return OrderUpdateType.Error;
+                }
+
+                if (result.Trade.OrderType == OrderType.Market)
+                {
+                    return OrderUpdateType.MarketOrderPlaced;
                 }
 
                 Order order = result.Order;
@@ -375,44 +376,39 @@ public sealed class HyperliquidBroker : IYoloBroker
 
                         try
                         {
-
                             await CancelOrderAsync(tracker.Order, ct);
-
                             updateChannel.Writer.TryWrite(new OrderUpdate(tracker.Order.Symbol, OrderUpdateType.TimedOut, tracker.Order with { OrderStatus = OrderStatus.Canceled }, Message: "Order timed out"));
-
-                            if (settings.SwitchToMarketOnTimeout)
-                            {
-                                _logger.LogInformation("Creating market order for {AssetName}", tracker.Order.Symbol);
-
-                                try
-                                {
-                                    var marketTrade = tracker.OriginalTrade with { LimitPrice = null };
-                                    var marketTradeResult = await PlaceTradeAsync(marketTrade, ct);
-                                    if (marketTradeResult.Success)
-                                    {
-                                        updateChannel.Writer.TryWrite(new OrderUpdate(marketTrade.Symbol, OrderUpdateType.MarketOrderPlaced, marketTradeResult.Order));
-                                    }
-                                    else
-                                    {
-                                        updateChannel.Writer.TryWrite(new OrderUpdate(tracker.Order.Symbol, OrderUpdateType.Error, Message: marketTradeResult.Error));
-                                    }
-                                }
-                                catch (Exception ex)
-                                {
-                                    updateChannel.Writer.TryWrite(new OrderUpdate(tracker.Order.Symbol, OrderUpdateType.Error, Message: ex.Message, Error: ex));
-                                }
-                            }
-
-                            tracker.MarkComplete();
-                            orderTrackers.TryRemove(tracker.Order.Id, out _);
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, "Failed to cancel order {OrderId} for {AssetName}", tracker.Order.Id, tracker.Order.Symbol);
-                            updateChannel.Writer.TryWrite(new OrderUpdate(tracker.Order.Symbol, OrderUpdateType.Error, Message: ex.Message, Error: ex));
-                            tracker.MarkComplete();
-                            orderTrackers.TryRemove(tracker.Order.Id, out _);
+                            _logger.LogError(ex, $"Failed to cancel order {{OrderId}} for {{AssetName}}: {{ErrorMessage}}", tracker.Order.Id, tracker.Order.Symbol, ex.Message);
                         }
+
+                        if (settings.SwitchToMarketOnTimeout)
+                        {
+                            _logger.LogInformation("Creating market order for {AssetName}", tracker.Order.Symbol);
+
+                            try
+                            {
+                                var marketTrade = tracker.OriginalTrade with { OrderType = OrderType.Market };
+                                var marketTradeResult = await PlaceTradeAsync(marketTrade, ct);
+                                if (marketTradeResult.Success)
+                                {
+                                    updateChannel.Writer.TryWrite(new OrderUpdate(marketTrade.Symbol, OrderUpdateType.MarketOrderPlaced, marketTradeResult.Order));
+                                }
+                                else
+                                {
+                                    updateChannel.Writer.TryWrite(new OrderUpdate(tracker.Order.Symbol, OrderUpdateType.Error, Message: $"Failed to create market order: {marketTradeResult.Error}"));
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                updateChannel.Writer.TryWrite(new OrderUpdate(tracker.Order.Symbol, OrderUpdateType.Error, Message: $"Failed to create market order: {ex.Message}", Error: ex));
+                            }
+                        }
+
+                        tracker.MarkComplete();
+                        orderTrackers.TryRemove(tracker.Order.Id, out _);
                     }
 
                     // Check if all orders are complete after timeout processing

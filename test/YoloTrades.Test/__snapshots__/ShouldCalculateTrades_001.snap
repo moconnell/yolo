@@ -4,71 +4,71 @@
     "AssetType": "Spot",
     "Amount": -680.0,
     "LimitPrice": 0.784975,
+    "OrderType": "Limit",
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
     "AbsoluteAmount": 680.0,
-    "OrderSide": "Sell",
-    "OrderType": "Limit"
+    "OrderSide": "Sell"
   },
   {
     "Symbol": "LINK/USD",
     "AssetType": "Spot",
     "Amount": -44.6,
     "LimitPrice": 19.4420,
+    "OrderType": "Limit",
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
     "AbsoluteAmount": 44.6,
-    "OrderSide": "Sell",
-    "OrderType": "Limit"
+    "OrderSide": "Sell"
   },
   {
     "Symbol": "FTT-PERP",
     "AssetType": "Future",
     "Amount": -6.6,
     "LimitPrice": 43.1870,
+    "OrderType": "Limit",
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
     "AbsoluteAmount": 6.6,
-    "OrderSide": "Sell",
-    "OrderType": "Limit"
+    "OrderSide": "Sell"
   },
   {
     "Symbol": "CRO-PERP",
     "AssetType": "Future",
     "Amount": 1980.0,
     "LimitPrice": 0.548750,
+    "OrderType": "Limit",
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
     "AbsoluteAmount": 1980.0,
-    "OrderSide": "Buy",
-    "OrderType": "Limit"
+    "OrderSide": "Buy"
   },
   {
     "Symbol": "DOGE/USD",
     "AssetType": "Spot",
     "Amount": -3774.0,
     "LimitPrice": 0.1636025,
+    "OrderType": "Limit",
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
     "AbsoluteAmount": 3774.0,
-    "OrderSide": "Sell",
-    "OrderType": "Limit"
+    "OrderSide": "Sell"
   },
   {
     "Symbol": "ETH/USD",
     "AssetType": "Spot",
     "Amount": 0.106,
     "LimitPrice": 3957.5,
+    "OrderType": "Limit",
     "PostPrice": true,
     "Expiry": null,
     "ClientOrderId": null,
     "AbsoluteAmount": 0.106,
-    "OrderSide": "Buy",
-    "OrderType": "Limit"
+    "OrderSide": "Buy"
   }
 ]

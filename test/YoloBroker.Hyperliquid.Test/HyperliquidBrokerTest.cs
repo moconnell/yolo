@@ -11,14 +11,18 @@ using Shouldly;
 using YoloAbstractions;
 using YoloBroker.Hyperliquid.Extensions;
 
+using static YoloAbstractions.AssetPermissions;
+using static YoloAbstractions.AssetType;
+using static YoloAbstractions.OrderType;
+
 namespace YoloBroker.Hyperliquid.Test;
 
 public class HyperliquidBrokerTest
 {
     [Theory]
     [Trait("Category", "Integration")]
-    [InlineData("ETH", AssetPermissions.PerpetualFutures, "ETH")]
-    [InlineData("BTC,ETH", AssetPermissions.PerpetualFutures, "BTC,ETH")]
+    [InlineData("ETH", PerpetualFutures, "ETH")]
+    [InlineData("BTC,ETH", PerpetualFutures, "BTC,ETH")]
     public async Task GivenBaseAsset_ShouldGetMarkets(string baseAssetFilterString, AssetPermissions assetPermissions, string expectedMarketsString)
     {
         // arrange
@@ -55,14 +59,14 @@ public class HyperliquidBrokerTest
 
     [Theory]
     [Trait("Category", "Integration")]
-    // [InlineData("HYPE/USDC", AssetType.Spot, 1)]
-    [InlineData("ETH", AssetType.Future, 0.01)]
-    [InlineData("BTC", AssetType.Future, 0.01)]
-    public async Task ShouldPlaceOrder(string symbol, AssetType assetType, double quantity, bool isLimitOrder = true)
+    // [InlineData("HYPE/USDC", Spot, 1)]
+    [InlineData("ETH", Future, 0.01)]
+    [InlineData("BTC", Future, 0.01)]
+    public async Task ShouldPlaceOrder(string symbol, AssetType assetType, double quantity)
     {
         // arrange
         HyperliquidBroker broker = GetTestBroker();
-        decimal? orderPrice = isLimitOrder ? await GetLimitPrice(broker, symbol, assetType, quantity) : null;
+        var orderPrice = await GetLimitPrice(broker, symbol, assetType, quantity);
         var trade = CreateTrade(symbol, assetType, quantity, orderPrice);
 
         // act
@@ -83,15 +87,16 @@ public class HyperliquidBrokerTest
 
     [Theory]
     [Trait("Category", "Integration")]
-    // [InlineData("HYPE/USDC", AssetType.Spot, 1)]
-    [InlineData("ETH", AssetType.Future, 0.01)]
-    [InlineData("BTC", AssetType.Future, 0.001)]
-    public async Task ShouldPlaceOrders(string symbol, AssetType assetType, double quantity, bool isLimitOrder = true)
+    // [InlineData("HYPE/USDC", Spot, 1)]
+    [InlineData("ETH", Future, 0.01)]
+    [InlineData("ETH", Future, 0.0001, Market)]
+    [InlineData("BTC", Future, 0.001)]
+    public async Task ShouldPlaceOrders(string symbol, AssetType assetType, double quantity, OrderType orderType = Limit)
     {
         // arrange
         HyperliquidBroker broker = GetTestBroker();
-        decimal? orderPrice = isLimitOrder ? await GetLimitPrice(broker, symbol, assetType, quantity) : null;
-        var trade = CreateTrade(symbol, assetType, quantity, orderPrice);
+        decimal? limitPrice = orderType == Limit ? await GetLimitPrice(broker, symbol, assetType, quantity) : null;
+        var trade = CreateTrade(symbol, assetType, quantity, limitPrice);
 
         // act
         var tradeResults = broker.PlaceTradesAsync([trade]);
@@ -108,21 +113,24 @@ public class HyperliquidBrokerTest
             order.Symbol.ShouldBe(symbol);
             order.Amount.ShouldBe(trade.Amount);
 
-            await broker.CancelOrderAsync(order);
+            if (orderType == Limit)
+            {
+                await broker.CancelOrderAsync(order);
+            }
         }
     }
 
     [Theory]
     [Trait("Category", "Integration")]
-    // [InlineData("HYPE/USDC", AssetType.Spot, 1)]
-    // [InlineData("ETH", AssetType.Future, 0.01)]
-    [InlineData("BTC", AssetType.Future, 0.0005)]
-    public async Task ShouldManageOrders(string symbol, AssetType assetType, double quantity, bool isLimitOrder = true)
+    // [InlineData("HYPE/USDC", Spot, 1)]
+    // [InlineData("ETH", Future, 0.01)]
+    [InlineData("BTC", Future, 0.0005)]
+    public async Task ShouldManageOrders(string symbol, AssetType assetType, double quantity)
     {
         // arrange
         HyperliquidBroker broker = GetTestBroker();
-        decimal? orderPrice = isLimitOrder ? await GetLimitPrice(broker, symbol, assetType, quantity) : null;
-        var trade = CreateTrade(symbol, assetType, quantity, orderPrice);
+        var limitPrice = await GetLimitPrice(broker, symbol, assetType, quantity);
+        var trade = CreateTrade(symbol, assetType, quantity, limitPrice);
         var settings = OrderManagementSettings.Default;
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var orders = new ConcurrentDictionary<long, Order>();
