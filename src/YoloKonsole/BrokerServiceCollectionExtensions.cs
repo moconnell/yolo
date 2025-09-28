@@ -2,7 +2,7 @@ using CryptoExchange.Net.Authentication;
 using HyperLiquid.Net;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using YoloAbstractions.Config;
+using YoloAbstractions.Exceptions;
 using YoloBroker.Hyperliquid;
 using YoloBroker.Hyperliquid.Config;
 using YoloBroker.Interface;

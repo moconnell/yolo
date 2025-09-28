@@ -1,6 +1,6 @@
 using System;
 
-namespace YoloAbstractions.Config;
+namespace YoloAbstractions.Exceptions;
 
 public class ConfigException : ApplicationException
 {

@@ -5,7 +5,7 @@ public static class WellKnown
     public static class TradeEventIds
     {
         internal const int CalculateTrades = 100;
-        internal const int Weight = 101;
+        internal const int Factors = 101;
         internal const int WithinTradeBuffer = 110;
         internal const int GeneratedTrade = 111;
         internal const int MarketPositions = 112;

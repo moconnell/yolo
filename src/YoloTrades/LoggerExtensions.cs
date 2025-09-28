@@ -10,18 +10,18 @@ public static partial class LoggerExtensions
     [LoggerMessage(
         EventId = TradeEventIds.CalculateTrades,
         Level = LogLevel.Debug,
-            Message = "*** CalculateTrades ***\nWeights: {Weights}\nPositions: {Positions}\nMarkets: {Markets}")]
+            Message = "*** CalculateTrades ***\nWeights: {Factors}\nPositions: {Positions}\nMarkets: {Markets}")]
     public static partial void CalculateTrades(
         this ILogger logger,
-        IReadOnlyDictionary<string, (Weight weight, bool isInUniverse)> weights,
+        IReadOnlyDictionary<string, (IReadOnlyDictionary<FactorType, Factor>, bool isInUniverse)> factors,
         IReadOnlyDictionary<string, IReadOnlyList<Position>> positions,
         IReadOnlyDictionary<string, IReadOnlyList<MarketInfo>> markets);
 
     [LoggerMessage(
-        EventId = TradeEventIds.Weight,
+        EventId = TradeEventIds.Factors,
         Level = LogLevel.Debug,
-        Message = "({Token}): processing {Weight}")]
-    public static partial void Weight(this ILogger logger, string token, Weight weight);
+        Message = "({Token}): processing {Factors}")]
+    public static partial void Factors(this ILogger logger, string token, IReadOnlyDictionary<FactorType, Factor> factors);
 
     [LoggerMessage(
         EventId = TradeEventIds.MarketPositions,

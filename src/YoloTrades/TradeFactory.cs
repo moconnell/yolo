@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using YoloAbstractions;
 using YoloAbstractions.Config;
 using YoloAbstractions.Extensions;
+using YoloAbstractions.Interfaces;
 
 namespace YoloTrades;
 
@@ -45,48 +47,47 @@ public class TradeFactory : ITradeFactory
     private decimal SpreadSplit { get; }
 
     public IEnumerable<Trade> CalculateTrades(
-        IReadOnlyList<Weight> weights,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<FactorType, Factor>> factors,
         IReadOnlyDictionary<string, IReadOnlyList<Position>> positions,
         IReadOnlyDictionary<string, IReadOnlyList<MarketInfo>> markets)
     {
         var nominal = NominalCash ??
                       positions.GetTotalValue(markets, BaseAsset);
-        var weightsDict = weights.ToDictionary(
-            weight => weight.Ticker.GetBaseAndQuoteAssets().BaseAsset,
-            weight => (weight, isInUniverse: true));
+        var factorsDict = factors.ToDictionary(
+            kvp => kvp.Key.GetBaseAndQuoteAssets().BaseAsset,
+            kvp => (Factors: kvp.Value, isInUniverse: true));
 
-        _logger.CalculateTrades(weightsDict, positions, markets);
+        _logger.CalculateTrades(factorsDict, positions, markets);
 
-        var unconstrainedTargetLeverage = weightsDict
+        var unconstrainedTargetLeverage = factorsDict
             .Values
-            .Select(w => Math.Abs(w.weight.GetComboWeight(_yoloConfig)))
+            .Select(w => Math.Abs(w.Factors.GetComboWeight(_yoloConfig)))
             .Sum();
 
         var weightConstraint = unconstrainedTargetLeverage < MaxLeverage
             ? 1
             : MaxLeverage / unconstrainedTargetLeverage;
 
-        var droppedTokens = positions.Keys.Except(weightsDict.Keys.Union([BaseAsset]));
+        var droppedTokens = positions.Keys.Except(factorsDict.Keys.Union([BaseAsset]));
         foreach (var token in droppedTokens)
         {
-            var weight = new Weight(0, 0, DateTime.UtcNow, 0, $"{token}/{BaseAsset}", 0, 1);
-            weightsDict[token] = (weight, false);
+            factorsDict[token] = (ReadOnlyDictionary<FactorType, Factor>.Empty, false);
         }
 
-        return weightsDict
+        return factorsDict
             .Select(RebalancePosition)
             .SelectMany(CombineOrders);
 
-        IEnumerable<Trade> RebalancePosition(KeyValuePair<string, (Weight, bool)> kvp)
+        IEnumerable<Trade> RebalancePosition(KeyValuePair<string, (IReadOnlyDictionary<FactorType, Factor>, bool)> kvp)
         {
-            var (token, (w, isInUniverse)) = kvp;
+            var (token, (factors, isInUniverse)) = kvp;
 
-            _logger.Weight(token, w);
+            _logger.Factors(token, factors);
 
             var tokenPositions = positions.TryGetValue(token, out var pos)
                 ? pos.ToArray()
                 : [];
-            var constrainedTargetWeight = weightConstraint * w.GetComboWeight(_yoloConfig);
+            var constrainedTargetWeight = weightConstraint * factors.GetComboWeight(_yoloConfig);
 
             var projectedPositions = markets.GetMarkets(token)
                 .ToDictionary(

@@ -42,9 +42,12 @@ public class TradeFactoryTests
             BaseAsset = baseCurrency,
             NominalCash = nominalCash,
             TradeBuffer = tradeBuffer,
-            WeightingMomentumFactor = momentumMultiplier,
-            WeightingTrendFactor = trendMultiplier,
-            WeightingCarryFactor = carryMultiplier
+            Weightings = new Dictionary<FactorType, decimal>
+            {
+                { FactorType.Momentum, momentumMultiplier },
+                { FactorType.Trend, trendMultiplier },
+                { FactorType.Carry, carryMultiplier }
+            }
         };
         var tradeFactory = new TradeFactory(mockLogger.Object, config);
 
@@ -114,7 +117,7 @@ public class TradeFactoryTests
     }
 
     private static
-        (Weight[] weights,
+        (Dictionary<string, IReadOnlyDictionary<FactorType, Factor>> weights,
         Dictionary<string, IReadOnlyList<Position>> positions,
         Dictionary<string, IReadOnlyList<MarketInfo>> markets,
         Dictionary<string, decimal> expectedTrades)
@@ -132,16 +135,50 @@ public class TradeFactoryTests
             .GetRecords<YoloCsvRow>()
             .ToArray();
 
-        var weights = records.Select(x =>
-                new Weight(
-                    x.Price,
-                    x.Carry,
-                    DateTime.Today,
-                    x.Momentum,
-                    $"{x.Ticker}/{baseCurrency}",
-                    x.Trend,
-                    x.Volatility))
-            .ToArray();
+        var weights = records.ToDictionary(x => $"{x.Ticker}/{baseCurrency}",
+            IReadOnlyDictionary<FactorType, Factor> (x) =>
+                new Dictionary<FactorType, Factor>
+                {
+                    {
+                        FactorType.Momentum,
+                        new Factor(
+                            $"Csv.{FactorType.Momentum}",
+                            FactorType.Momentum,
+                            x.Ticker,
+                            x.Price,
+                            x.Momentum,
+                            DateTime.Today)
+                    },
+                    {
+                        FactorType.Trend,
+                        new Factor(
+                            $"Csv.{FactorType.Trend}",
+                            FactorType.Trend,
+                            x.Ticker,
+                            x.Price,
+                            x.Trend,
+                            DateTime.Today)
+                    },
+                    {
+                        FactorType.Carry,
+                        new Factor(
+                            $"Csv.{FactorType.Carry}",
+                            FactorType.Carry,
+                            x.Ticker,
+                            0,
+                            x.Carry,
+                            DateTime.Today)
+                    },
+                    {
+                        FactorType.Volatility,
+                        new Factor(
+                            $"Csv.{FactorType.Volatility}",
+                            FactorType.Volatility,
+                            x.Ticker,
+                            x.Price,
+                            x.Volatility,
+                            DateTime.Today)
+                    }});
 
         var positions = records.ToDictionary(
             x => x.Ticker,
@@ -183,11 +220,11 @@ public class TradeFactoryTests
     }
 
     private static async
-        Task<(Weight[], Dictionary<string, IReadOnlyList<Position>>, Dictionary<string, IReadOnlyList<MarketInfo>>)>
+        Task<(Dictionary<string, IReadOnlyDictionary<FactorType, Factor>>, Dictionary<string, IReadOnlyList<Position>>, Dictionary<string, IReadOnlyList<MarketInfo>>)>
         DeserializeInputsAsync(
             string path)
     {
-        var weights = await DeserializeAsync<Weight[]>($"{path}/weights.json");
+        var weights = await DeserializeAsync<Dictionary<string, IReadOnlyDictionary<FactorType, Factor>>>($"{path}/weights.json");
 
         var positions =
             ToEnumerableDictionary(await DeserializeAsync<Dictionary<string, Position[]>>($"{path}/positions.json"));

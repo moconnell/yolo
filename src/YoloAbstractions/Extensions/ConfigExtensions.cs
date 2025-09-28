@@ -1,5 +1,6 @@
 using System;
 using System.Linq.Expressions;
+using YoloAbstractions.Exceptions;
 
 namespace YoloAbstractions.Config;
 

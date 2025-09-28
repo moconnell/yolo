@@ -1,6 +1,6 @@
 using System;
 
-namespace YoloWeights.Exceptions;
+namespace YoloAbstractions.Exceptions;
 
 public class ApiException : ApplicationException
 {

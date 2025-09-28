@@ -12,6 +12,8 @@ using Spectre.Console;
 using Utility.CommandLine;
 using YoloAbstractions;
 using YoloAbstractions.Config;
+using YoloAbstractions.Exceptions;
+using YoloAbstractions.Interfaces;
 using YoloBroker.Interface;
 using YoloTrades;
 using YoloWeights;
@@ -69,9 +71,10 @@ __  ______  __    ____  __
 
             var serviceProvider = new ServiceCollection()
                 .AddLogging(loggingBuilder => loggingBuilder
-                    .AddFile(config.GetSection("Logging"))
-                    )
+                    .AddConsole()
+                    .AddFile(config.GetSection("Logging")))
                 .AddBroker(config)
+                .AddSingleton<IGetFactors, YoloWeightsService>()
                 .AddSingleton<ITradeFactory, TradeFactory>()
                 .AddSingleton<IConfiguration>(config)
                 .BuildServiceProvider();
@@ -81,10 +84,8 @@ __  ______  __    ____  __
             _logger.LogInformation("************ YOLO started ************");
 
             var yoloConfig = config.GetYoloConfig() ?? throw new ConfigException("YOLO configuration is missing or invalid");
-            var weights = await yoloConfig.GetWeights();
 
             using var broker = serviceProvider.GetService<IYoloBroker>()!;
-
             var orders = await broker.GetOpenOrdersAsync(cancellationToken);
 
             if (orders.Count != 0)
@@ -105,9 +106,12 @@ __  ______  __    ____  __
 
             var positions = await broker.GetPositionsAsync(cancellationToken);
 
+            var factorsService = serviceProvider.GetService<IGetFactors>() ?? throw new ConfigException("Weights configuration is missing or invalid");
+            var factors = await factorsService.GetFactorsAsync([], cancellationToken);
+
             var baseAssetFilter = positions
                 .Keys
-                .Union(weights.Select(w => w.Ticker.GetBaseAndQuoteAssets().BaseAsset))
+                .Union(factors.Keys.Select(x => x.GetBaseAndQuoteAssets().BaseAsset))
                 .ToHashSet();
 
             var markets = await broker.GetMarketsAsync(
@@ -119,7 +123,7 @@ __  ______  __    ____  __
             var tradeFactory = serviceProvider.GetService<ITradeFactory>()!;
 
             var trades = tradeFactory
-                .CalculateTrades(weights, positions, markets)
+                .CalculateTrades(factors, positions, markets)
                 .OrderBy(trade => trade.Symbol)
                 .ToArray();
 

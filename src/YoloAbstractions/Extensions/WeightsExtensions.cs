@@ -1,5 +1,6 @@
 
 using System;
+using System.Collections.Generic;
 using YoloAbstractions.Config;
 
 namespace YoloAbstractions.Extensions;
@@ -7,17 +8,33 @@ namespace YoloAbstractions.Extensions;
 public static class WeightsExtensions
 {
     public static decimal GetComboWeight(
-        this Weight weight,
-        YoloConfig config) => Math.Clamp(
-            ((weight.CarryFactor * config.WeightingCarryFactor) +
-            (weight.MomentumFactor * config.WeightingMomentumFactor) +
-            (weight.TrendFactor * config.WeightingTrendFactor)) /
-            (config.GetComboWeightDivisor() * (weight.Volatility > 0 ? weight.Volatility : 1)),
+        this IReadOnlyDictionary<FactorType, Factor> factors,
+        YoloConfig config)
+    {
+        ArgumentNullException.ThrowIfNull(factors);
+        ArgumentNullException.ThrowIfNull(config);
+
+        var weightings = config.Weightings;
+        var totalWeight = 0m;
+        var divisor = 0;
+
+        foreach (var kvp in weightings)
+        {
+            if (kvp.Value > 0)
+            {
+                totalWeight += factors[kvp.Key].Value * kvp.Value;
+                divisor++;
+            }
+        }
+
+        var volatilityFactor = factors.ContainsKey(FactorType.Volatility) ? factors[FactorType.Volatility].Value : 1;
+
+        decimal v = Math.Clamp(
+            totalWeight / (divisor * volatilityFactor),
             -config.MaxWeightingAbs,
             config.MaxWeightingAbs);
 
-    private static int GetComboWeightDivisor(this YoloConfig config) =>
-        (config.WeightingCarryFactor > 0 ? 1 : 0) +
-        (config.WeightingMomentumFactor > 0 ? 1 : 0) +
-        (config.WeightingTrendFactor > 0 ? 1 : 0);
+        return v;
+
+    }
 }
