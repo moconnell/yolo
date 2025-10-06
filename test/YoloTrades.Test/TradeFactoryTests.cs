@@ -32,7 +32,8 @@ public class TradeFactoryTests
         string baseCurrency = "USDC",
         decimal nominalCash = 10000,
         decimal tradeBuffer = 0.02m,
-        decimal stepSize = 0.0001m)
+        decimal stepSize = 0.0001m,
+        decimal maxWeightingAbs = 0.25m)
     {
         // arrange
         var mockLogger = new Mock<ILogger<TradeFactory>>();
@@ -42,7 +43,7 @@ public class TradeFactoryTests
             BaseAsset = baseCurrency,
             NominalCash = nominalCash,
             TradeBuffer = tradeBuffer,
-            Weightings = new Dictionary<FactorType, decimal>
+            FactorWeights = new Dictionary<FactorType, decimal>
             {
                 { FactorType.Momentum, momentumMultiplier },
                 { FactorType.Trend, trendMultiplier },
@@ -52,7 +53,14 @@ public class TradeFactoryTests
         var tradeFactory = new TradeFactory(mockLogger.Object, config);
 
         var (weights, positions, markets, expectedTrades) =
-            DeserializeCsv(path, baseCurrency, stepSize);
+            DeserializeCsv(
+                path,
+                baseCurrency,
+                stepSize,
+                momentumMultiplier,
+                trendMultiplier,
+                carryMultiplier,
+                maxWeightingAbs);
 
         var trades = tradeFactory
             .CalculateTrades(weights, positions, markets)
@@ -117,11 +125,18 @@ public class TradeFactoryTests
     }
 
     private static
-        (Dictionary<string, IReadOnlyDictionary<FactorType, Factor>> weights,
+        (Dictionary<string, Weight> weights,
         Dictionary<string, IReadOnlyList<Position>> positions,
         Dictionary<string, IReadOnlyList<MarketInfo>> markets,
         Dictionary<string, decimal> expectedTrades)
-        DeserializeCsv(string path, string baseCurrency, decimal stepSize)
+        DeserializeCsv(
+            string path,
+            string baseCurrency,
+            decimal stepSize,
+            decimal momentumMultiplier,
+            decimal trendMultiplier,
+            decimal carryMultiplier,
+            decimal maxWeightingAbs)
     {
         var config = new CsvConfiguration(CultureInfo.InvariantCulture)
         {
@@ -135,50 +150,7 @@ public class TradeFactoryTests
             .GetRecords<YoloCsvRow>()
             .ToArray();
 
-        var weights = records.ToDictionary(x => $"{x.Ticker}/{baseCurrency}",
-            IReadOnlyDictionary<FactorType, Factor> (x) =>
-                new Dictionary<FactorType, Factor>
-                {
-                    {
-                        FactorType.Momentum,
-                        new Factor(
-                            $"Csv.{FactorType.Momentum}",
-                            FactorType.Momentum,
-                            x.Ticker,
-                            x.Price,
-                            x.Momentum,
-                            DateTime.Today)
-                    },
-                    {
-                        FactorType.Trend,
-                        new Factor(
-                            $"Csv.{FactorType.Trend}",
-                            FactorType.Trend,
-                            x.Ticker,
-                            x.Price,
-                            x.Trend,
-                            DateTime.Today)
-                    },
-                    {
-                        FactorType.Carry,
-                        new Factor(
-                            $"Csv.{FactorType.Carry}",
-                            FactorType.Carry,
-                            x.Ticker,
-                            0,
-                            x.Carry,
-                            DateTime.Today)
-                    },
-                    {
-                        FactorType.Volatility,
-                        new Factor(
-                            $"Csv.{FactorType.Volatility}",
-                            FactorType.Volatility,
-                            x.Ticker,
-                            x.Price,
-                            x.Volatility,
-                            DateTime.Today)
-                    }});
+        var weights = records.ToDictionary(x => $"{x.Ticker}/{baseCurrency}", ToWeight);
 
         var positions = records.ToDictionary(
             x => x.Ticker,
@@ -217,14 +189,31 @@ public class TradeFactoryTests
                 x => x.TradeQuantity);
 
         return (weights, positions, markets, expectedTrades);
+
+        Weight ToWeight(YoloCsvRow row)
+        {
+            var divisor = (carryMultiplier > 0 ? 1 : 0) +
+                          (momentumMultiplier > 0 ? 1 : 0) +
+                          (trendMultiplier > 0 ? 1 : 0);
+            var volatility = row.Volatility > 0 ? row.Volatility : 1;
+            var volAdjustedWeight = (row.Carry * carryMultiplier +
+                               row.Momentum * momentumMultiplier +
+                               row.Trend * trendMultiplier) /
+                              (divisor * volatility);
+            var clampedWeight = Math.Clamp(volAdjustedWeight, -maxWeightingAbs, maxWeightingAbs);
+
+            return new Weight(row.Ticker, clampedWeight, DateTime.UtcNow);
+        }
     }
 
     private static async
-        Task<(Dictionary<string, IReadOnlyDictionary<FactorType, Factor>>, Dictionary<string, IReadOnlyList<Position>>, Dictionary<string, IReadOnlyList<MarketInfo>>)>
+        Task<(Dictionary<string, Weight>, 
+            Dictionary<string, IReadOnlyList<Position>>,
+            Dictionary<string, IReadOnlyList<MarketInfo>>)>
         DeserializeInputsAsync(
             string path)
     {
-        var weights = await DeserializeAsync<Dictionary<string, IReadOnlyDictionary<FactorType, Factor>>>($"{path}/weights.json");
+        var weights = await DeserializeAsync<Dictionary<string, Weight>>($"{path}/weights.json");
 
         var positions =
             ToEnumerableDictionary(await DeserializeAsync<Dictionary<string, Position[]>>($"{path}/positions.json"));

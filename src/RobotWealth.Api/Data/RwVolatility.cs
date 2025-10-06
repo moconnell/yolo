@@ -1,8 +1,8 @@
 using System.Text.Json.Serialization;
 
-namespace YoloWeights.Data;
+namespace RobotWealth.Api.Data;
 
-public record Volatility
+public record RwVolatility
 {
     [JsonPropertyName("date")]
     public required string Date { get; init; }

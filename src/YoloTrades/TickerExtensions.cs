@@ -9,9 +9,7 @@ public static class TickerExtensions
         @"^(?<base>[\w\d]{3,5})([/-]?(?<quote>USD(\w)?))?$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    public static (string BaseAsset, string QuoteAsset) GetBaseAndQuoteAssets(
-        this string ticker,
-        string separator = "/")
+    public static (string BaseAsset, string QuoteAsset) GetBaseAndQuoteAssets(this string ticker)
     {
         var match = TickerRegex.Match(ticker);
         if (!match.Success)

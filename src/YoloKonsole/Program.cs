@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -11,12 +12,11 @@ using Microsoft.Extensions.Logging;
 using Spectre.Console;
 using Utility.CommandLine;
 using YoloAbstractions;
-using YoloAbstractions.Config;
+using YoloAbstractions.Extensions;
 using YoloAbstractions.Exceptions;
 using YoloAbstractions.Interfaces;
 using YoloBroker.Interface;
 using YoloTrades;
-using YoloWeights;
 using static YoloKonsole.WellKnown.TradeEventIds;
 
 namespace YoloKonsole;
@@ -74,7 +74,6 @@ __  ______  __    ____  __
                     .AddConsole()
                     .AddFile(config.GetSection("Logging")))
                 .AddBroker(config)
-                .AddSingleton<IGetFactors, YoloWeightsService>()
                 .AddSingleton<ITradeFactory, TradeFactory>()
                 .AddSingleton<IConfiguration>(config)
                 .BuildServiceProvider();
@@ -106,12 +105,12 @@ __  ______  __    ____  __
 
             var positions = await broker.GetPositionsAsync(cancellationToken);
 
-            var factorsService = serviceProvider.GetService<IGetFactors>() ?? throw new ConfigException("Weights configuration is missing or invalid");
-            var factors = await factorsService.GetFactorsAsync([], cancellationToken);
+            var factorsService = serviceProvider.GetService<ICalcWeights>() ?? throw new ConfigException("Weights configuration is missing or invalid");
+            var weights = await factorsService.CalculateWeightsAsync([], cancellationToken);
 
             var baseAssetFilter = positions
                 .Keys
-                .Union(factors.Keys.Select(x => x.GetBaseAndQuoteAssets().BaseAsset))
+                .Union(weights.Keys.Select(x => x.GetBaseAndQuoteAssets().BaseAsset))
                 .ToHashSet();
 
             var markets = await broker.GetMarketsAsync(
@@ -123,7 +122,7 @@ __  ______  __    ____  __
             var tradeFactory = serviceProvider.GetService<ITradeFactory>()!;
 
             var trades = tradeFactory
-                .CalculateTrades(factors, positions, markets)
+                .CalculateTrades(weights, positions, markets)
                 .OrderBy(trade => trade.Symbol)
                 .ToArray();
 
@@ -257,7 +256,7 @@ __  ______  __    ____  __
     private static void UpdateOrderTable(Table table, ConcurrentDictionary<string, int> index, OrderUpdate update)
     {
         // Find existing row for this asset or add new one
-        var existingRowIndex = FindRowByAsset(table, index, update.Symbol);
+        var existingRowIndex = FindRowByAsset(index, update.Symbol);
 
         if (existingRowIndex >= 0)
         {
@@ -281,15 +280,7 @@ __  ______  __    ____  __
         }
     }
 
-    private static int FindRowByAsset(Table table, ConcurrentDictionary<string, int> index, string assetName)
-    {
-        if (index.TryGetValue(assetName, out var rowIndex))
-        {
-            return rowIndex;
-        }
-
-        return -1;
-    }
+    private static int FindRowByAsset(ConcurrentDictionary<string, int> index, string assetName) => index.GetValueOrDefault(assetName, -1);
 
     private static string GetStatusMarkup(OrderUpdateType type)
     {

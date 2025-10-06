@@ -1,4 +1,6 @@
-namespace YoloAbstractions.Config;
+using YoloAbstractions.Config;
+
+namespace RobotWealth.Api.Config;
 
 public record RobotWealthConfig : ApiConfig
 {

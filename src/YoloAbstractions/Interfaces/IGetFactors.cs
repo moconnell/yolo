@@ -6,5 +6,5 @@ namespace YoloAbstractions.Interfaces;
 
 public interface IGetFactors
 {
-    Task<IReadOnlyDictionary<string, IReadOnlyDictionary<FactorType, Factor>>> GetFactorsAsync(IEnumerable<string> tickers, CancellationToken cancellationToken = default);
+    Task<IReadOnlyDictionary<string, Dictionary<FactorType, Factor>>> GetFactorsAsync(IEnumerable<string> tickers, CancellationToken cancellationToken = default);
 }

@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Configuration;
+using Unravel.Api.Config;
+using YoloAbstractions.Extensions;
 
-namespace Unravel.Weights.Extensions;
+namespace Unravel.Api.Extensions;
 
 public static class UnravelConfigExtensions
 {
@@ -11,6 +13,6 @@ public static class UnravelConfigExtensions
             .Get<UnravelConfig>()
             ?.Ensure(c => c.ApiBaseUrl)
             ?.Ensure(c => c.ApiKey)
-            ?.Ensure(c => c.Factor);
+            ?.Ensure(c => c.Factors);
     }
 }

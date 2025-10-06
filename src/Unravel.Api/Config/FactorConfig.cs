@@ -1,4 +1,6 @@
-namespace Unravel.Weights.Config;
+using YoloAbstractions;
+
+namespace Unravel.Api.Config;
 
 public record FactorConfig
 {

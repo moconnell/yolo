@@ -2,7 +2,7 @@ using System;
 using System.Linq.Expressions;
 using YoloAbstractions.Exceptions;
 
-namespace YoloAbstractions.Config;
+namespace YoloAbstractions.Extensions;
 
 public static class ConfigExtensions
 {

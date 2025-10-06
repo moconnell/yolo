@@ -2,9 +2,9 @@ using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using YoloAbstractions.Interfaces;
 
-namespace YoloWeights.Data;
+namespace RobotWealth.Api.Data;
 
-public record ApiResponse<T> : IApiResponse<T>
+public record RwApiResponse<T> : IApiResponse<T>
 {
     [JsonPropertyName("data")]
     public required IReadOnlyList<T> Data { get; init; }

@@ -1,8 +1,8 @@
 using System.Text.Json.Serialization;
 
-namespace YoloWeights.Data;
+namespace RobotWealth.Api.Data;
 
-public record Weight
+public record RwWeight
 {
     [JsonPropertyName("arrival_price")]
     public double ArrivalPrice { get; init; }

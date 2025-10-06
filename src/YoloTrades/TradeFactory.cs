@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -11,11 +10,8 @@ using YoloAbstractions.Interfaces;
 
 namespace YoloTrades;
 
-public class TradeFactory : ITradeFactory
+public class TradeFactory(ILogger<TradeFactory> logger, YoloConfig yoloConfig) : ITradeFactory
 {
-    private readonly ILogger<TradeFactory> _logger;
-    private readonly YoloConfig _yoloConfig;
-
     public TradeFactory(ILogger<TradeFactory> logger, IConfiguration configuration)
         : this(
             logger,
@@ -25,43 +21,30 @@ public class TradeFactory : ITradeFactory
     {
     }
 
-    public TradeFactory(ILogger<TradeFactory> logger, YoloConfig yoloConfig)
-    {
-        _logger = logger;
-        _yoloConfig = yoloConfig;
-        AssetPermissions = yoloConfig.AssetPermissions;
-        TradeBuffer = yoloConfig.TradeBuffer;
-        MaxLeverage = yoloConfig.MaxLeverage;
-        MinOrderValue = yoloConfig.MinOrderValue;
-        NominalCash = yoloConfig.NominalCash;
-        BaseAsset = yoloConfig.BaseAsset;
-        SpreadSplit = Math.Max(0, Math.Min(1, yoloConfig.SpreadSplit));
-    }
-
-    private AssetPermissions AssetPermissions { get; }
-    private string BaseAsset { get; }
-    private decimal? MinOrderValue { get; }
-    private decimal? NominalCash { get; }
-    private decimal MaxLeverage { get; }
-    private decimal TradeBuffer { get; }
-    private decimal SpreadSplit { get; }
+    private AssetPermissions AssetPermissions { get; } = yoloConfig.AssetPermissions;
+    private string BaseAsset { get; } = yoloConfig.BaseAsset;
+    private decimal? MinOrderValue { get; } = yoloConfig.MinOrderValue;
+    private decimal? NominalCash { get; } = yoloConfig.NominalCash;
+    private decimal MaxLeverage { get; } = yoloConfig.MaxLeverage;
+    private decimal TradeBuffer { get; } = yoloConfig.TradeBuffer;
+    private decimal SpreadSplit { get; } = Math.Max(0, Math.Min(1, yoloConfig.SpreadSplit));
 
     public IEnumerable<Trade> CalculateTrades(
-        IReadOnlyDictionary<string, IReadOnlyDictionary<FactorType, Factor>> factors,
+        IReadOnlyDictionary<string, Weight> weights,
         IReadOnlyDictionary<string, IReadOnlyList<Position>> positions,
         IReadOnlyDictionary<string, IReadOnlyList<MarketInfo>> markets)
     {
         var nominal = NominalCash ??
                       positions.GetTotalValue(markets, BaseAsset);
-        var factorsDict = factors.ToDictionary(
+        var factorsDict = weights.ToDictionary(
             kvp => kvp.Key.GetBaseAndQuoteAssets().BaseAsset,
-            kvp => (Factors: kvp.Value, isInUniverse: true));
+            kvp => (Weight: kvp.Value, IsInUniverse: true));
 
-        _logger.CalculateTrades(factorsDict, positions, markets);
+        logger.CalculateTrades(factorsDict, positions, markets);
 
         var unconstrainedTargetLeverage = factorsDict
             .Values
-            .Select(w => Math.Abs(w.Factors.GetComboWeight(_yoloConfig)))
+            .Select(w => Math.Abs(w.Weight.Value))
             .Sum();
 
         var weightConstraint = unconstrainedTargetLeverage < MaxLeverage
@@ -71,23 +54,23 @@ public class TradeFactory : ITradeFactory
         var droppedTokens = positions.Keys.Except(factorsDict.Keys.Union([BaseAsset]));
         foreach (var token in droppedTokens)
         {
-            factorsDict[token] = (ReadOnlyDictionary<FactorType, Factor>.Empty, false);
+            factorsDict[token] = (Weight.Empty, false);
         }
 
         return factorsDict
             .Select(RebalancePosition)
             .SelectMany(CombineOrders);
 
-        IEnumerable<Trade> RebalancePosition(KeyValuePair<string, (IReadOnlyDictionary<FactorType, Factor>, bool)> kvp)
+        IEnumerable<Trade> RebalancePosition(KeyValuePair<string, (Weight, bool)> kvp)
         {
-            var (token, (factors, isInUniverse)) = kvp;
+            var (token, (weight, isInUniverse)) = kvp;
 
-            _logger.Factors(token, factors);
+            logger.Weight(token, weight);
 
             var tokenPositions = positions.TryGetValue(token, out var pos)
                 ? pos.ToArray()
                 : [];
-            var constrainedTargetWeight = weightConstraint * factors.GetComboWeight(_yoloConfig);
+            var constrainedTargetWeight = weightConstraint * weight.Value;
 
             var projectedPositions = markets.GetMarkets(token)
                 .ToDictionary(
@@ -95,9 +78,9 @@ public class TradeFactory : ITradeFactory
                     market =>
                     {
                         if (market.Bid is null)
-                            _logger.NoBid(token, market.Key);
+                            logger.NoBid(token, market.Key);
                         if (market.Ask is null)
-                            _logger.NoAsk(token, market.Key);
+                            logger.NoAsk(token, market.Key);
 
                         var position = tokenPositions
                                            .FirstOrDefault(p =>
@@ -113,7 +96,7 @@ public class TradeFactory : ITradeFactory
 
             if (projectedPositions.Count == 0)
             {
-                _logger.NoMarkets(token);
+                logger.NoMarkets(token);
                 yield break;
             }
 
@@ -121,7 +104,7 @@ public class TradeFactory : ITradeFactory
 
             if (projectedPositions.Count(HasPosition) > 1)
             {
-                _logger.MultiplePositions(token);
+                logger.MultiplePositions(token);
                 yield break;
             }
 
@@ -132,7 +115,7 @@ public class TradeFactory : ITradeFactory
             if (isInUniverse &&
                 Math.Abs(currentWeight.Value - constrainedTargetWeight) <= TradeBuffer)
             {
-                _logger.WithinTradeBuffer(
+                logger.WithinTradeBuffer(
                     token,
                     currentWeight.Value,
                     constrainedTargetWeight,
@@ -158,7 +141,7 @@ public class TradeFactory : ITradeFactory
                     if (trade.IsTradable(MinOrderValue))
                         yield return trade;
                     else
-                        _logger.DeltaTooSmall(token, remainingDelta);
+                        logger.DeltaTooSmall(token, remainingDelta);
                     remainingDelta = remainingDeltaPostTrade;
                 }
             }
@@ -193,7 +176,7 @@ public class TradeFactory : ITradeFactory
             .ThenBy(projectedPosition => priceMultiplier * projectedPosition.Market.Last)
             .ToArray();
 
-        _logger.MarketPositions(token, orderedMarkets);
+        logger.MarketPositions(token, orderedMarkets);
 
         foreach (var projectedPosition in orderedMarkets)
         {
@@ -234,7 +217,7 @@ public class TradeFactory : ITradeFactory
             };
 
             if (trade.IsTradable())
-                _logger.GeneratedTrade(token, delta, trade);
+                logger.GeneratedTrade(token, delta, trade);
 
             remainingDelta -= delta;
 
@@ -273,6 +256,6 @@ public class TradeFactory : ITradeFactory
             return value;
         }
 
-        return isBuy ? LogNull(market.Ask, _logger.NoAsk) : LogNull(market.Bid, _logger.NoBid);
+        return isBuy ? LogNull(market.Ask, logger.NoAsk) : LogNull(market.Bid, logger.NoBid);
     }
 }

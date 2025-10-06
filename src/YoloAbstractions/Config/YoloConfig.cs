@@ -13,5 +13,5 @@ public record YoloConfig
     public decimal? MinOrderValue { get; init; }
     public string UnfilledOrderTimeout { get; init; } = "00:05:00"; // Default 5 minutes
     public decimal MaxWeightingAbs { get; init; } = 0.25m;
-    public IReadOnlyDictionary<FactorType, decimal> Weightings { get; init; } = new Dictionary<FactorType, decimal>();
+    public IReadOnlyDictionary<FactorType, decimal> FactorWeights { get; init; } = new Dictionary<FactorType, decimal>();
 }

@@ -1,14 +1,16 @@
-using Microsoft.Extensions.Configuration;
-using static YoloAbstractions.Config.WellKnown.ConfigSections;
+using RobotWealth.Api.Config;
+using YoloAbstractions.Extensions;
 
-namespace YoloAbstractions.Config;
+using Microsoft.Extensions.Configuration;
+
+namespace RobotWealth.Api.Extensions;
 
 public static class RobotWealthConfigExtensions
 {
     public static RobotWealthConfig? GetRobotWealthConfig(this IConfiguration configuration)
     {
         return configuration
-            .GetSection(RobotWealth)
+            .GetSection(nameof(RobotWealth))
             .Get<RobotWealthConfig>()
             ?.Ensure(c => c.ApiBaseUrl)
             ?.Ensure(c => c.ApiKey)

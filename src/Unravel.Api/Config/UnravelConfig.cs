@@ -1,4 +1,6 @@
-namespace Unravel.Weights.Config;
+using YoloAbstractions.Config;
+
+namespace Unravel.Api.Config;
 
 public record UnravelConfig : ApiConfig
 {

@@ -1,7 +1,8 @@
 using Microsoft.Extensions.Configuration;
+using YoloAbstractions.Config;
 using static YoloAbstractions.Config.WellKnown.ConfigSections;
 
-namespace YoloAbstractions.Config;
+namespace YoloAbstractions.Extensions;
 
 public static class YoloConfigExtensions
 {
