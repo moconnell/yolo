@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading;
@@ -8,15 +9,28 @@ using YoloAbstractions.Interfaces;
 
 namespace YoloAbstractions.Extensions;
 
-public static class ApiExtensions
+public static class HttpClientExtensions
 {
-    public static async Task<T> CallApiAsync<T, TData>(this string url, CancellationToken cancellationToken = default)
+    public static async Task<T> GetAsync<T, TData>(
+        this HttpClient httpClient,
+        string url,
+        IReadOnlyDictionary<string, string>? headers = null,
+        CancellationToken cancellationToken = default)
         where T : IApiResponse<TData>
     {
+        ArgumentNullException.ThrowIfNull(httpClient, nameof(httpClient));
         ArgumentException.ThrowIfNullOrEmpty(url, nameof(url));
 
-        using var httpClient = new HttpClient();
-        var response = await httpClient.GetAsync(url, cancellationToken);
+        var request = new HttpRequestMessage(HttpMethod.Get, url);
+        if (headers != null)
+        {
+            foreach (var header in headers)
+            {
+                request.Headers.Add(header.Key, header.Value);
+            }
+        }
+
+        var response = await httpClient.SendAsync(request, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -26,7 +40,7 @@ public static class ApiExtensions
 
         var apiResponse = await response.Content.ReadFromJsonAsync<T>(cancellationToken: cancellationToken);
 
-        if (apiResponse is null || !apiResponse.Success || apiResponse.Data is null || apiResponse.Data.Count == 0)
+        if (apiResponse is null || apiResponse.Data is null || apiResponse.Data.Count == 0)
         {
             throw new ApiException("Invalid response");
         }

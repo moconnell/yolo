@@ -9,10 +9,12 @@ namespace Unravel.Api;
 
 public class UnravelApiService : IGetFactors
 {
+    private readonly HttpClient _httpClient;
     private readonly UnravelConfig _config;
 
-    public UnravelApiService(UnravelConfig config)
+    public UnravelApiService(HttpClient httpClient, UnravelConfig config)
     {
+        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _config = config ?? throw new ArgumentNullException(nameof(config));
     }
 
@@ -49,15 +51,21 @@ public class UnravelApiService : IGetFactors
         foreach (var fc in _config.Factors)
         {
             var factorUrl = string.Format(baseUrl, fc.Id, tickersCsv);
-            var factorResponse = await factorUrl
-                .CallApiAsync<UrApiResponse<dynamic>, dynamic>(cancellationToken: cancellationToken);
-            var factors = factorResponse.Data.Select(d => ToFactor(d)).Cast<Factor>();
+            var factorResponse = await _httpClient
+                .GetAsync<FactorResponse, decimal>(factorUrl, cancellationToken: cancellationToken);
+            var factors = ToFactors(factorResponse, fc.Type);
+            
             yield return new KeyValuePair<FactorType, IEnumerable<Factor>>(fc.Type, factors);
         }
     }
 
-    private static Factor ToFactor(dynamic factor)
+    private static IEnumerable<Factor> ToFactors(FactorResponse response, FactorType factorType)
     {
-        return new Factor(factor.Id, factor.Type, factor.Ticker, factor.RefPrice, factor.Value, factor.TimeStamp);
+        for (var i = 0; i < response.Data.Count; i++)
+        {
+            var ticker = response.Tickers[i];
+            var value = response.Data[i];
+            yield return new Factor($"Ur.{factorType}", factorType, ticker, null, value, response.TimeStamp);
+        }
     }
 }
