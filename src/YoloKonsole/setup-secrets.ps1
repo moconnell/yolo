@@ -6,12 +6,10 @@ New-Item -Path $secretsPath -ItemType Directory -Force
 # Prompt for secrets securely
 $address = Read-Host -Prompt "Enter Hyperliquid wallet address"
 $privateKey = Read-Host -MaskInput "Enter Hyperliquid wallet private key"
-$apiKey = Read-Host -MaskInput "Enter Yolo API key"
 
 # Write secrets to files
 $address | Out-File -FilePath "$secretsPath\Hyperliquid__Address" -Encoding utf8 -NoNewline
 $privateKey | Out-File -FilePath "$secretsPath\Hyperliquid__PrivateKey" -Encoding utf8 -NoNewline
-$apiKey | Out-File -FilePath "$secretsPath\Yolo__ApiKey" -Encoding utf8 -NoNewline
 
 # Set restrictive permissions (only current user can read)
 $acl = Get-Acl $secretsPath

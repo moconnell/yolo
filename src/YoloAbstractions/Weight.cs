@@ -2,11 +2,7 @@ using System;
 
 namespace YoloAbstractions;
 
-public record Weight(
-    decimal Price,
-    decimal CarryFactor,
-    DateTime Date,
-    decimal MomentumFactor,
-    string Ticker,
-    decimal TrendFactor,
-    decimal Volatility);
+public record Weight(string Ticker, decimal Value, DateTime TimeStamp)
+{
+    public static readonly Weight Empty = new(string.Empty, 0.0m, DateTime.MinValue);
+}

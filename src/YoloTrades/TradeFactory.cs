@@ -1,38 +1,27 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using YoloAbstractions;
 using YoloAbstractions.Config;
 using YoloAbstractions.Extensions;
+using YoloAbstractions.Interfaces;
 
 namespace YoloTrades;
 
 public class TradeFactory : ITradeFactory
 {
     private readonly ILogger<TradeFactory> _logger;
-    private readonly YoloConfig _yoloConfig;
-
-    public TradeFactory(ILogger<TradeFactory> logger, IConfiguration configuration)
-        : this(
-            logger,
-            configuration.GetYoloConfig()
-                ?? throw new InvalidOperationException("YoloConfig is required but was not found in configuration")
-        )
-    {
-    }
 
     public TradeFactory(ILogger<TradeFactory> logger, YoloConfig yoloConfig)
     {
         _logger = logger;
-        _yoloConfig = yoloConfig;
         AssetPermissions = yoloConfig.AssetPermissions;
-        TradeBuffer = yoloConfig.TradeBuffer;
-        MaxLeverage = yoloConfig.MaxLeverage;
+        BaseAsset = yoloConfig.BaseAsset;
         MinOrderValue = yoloConfig.MinOrderValue;
         NominalCash = yoloConfig.NominalCash;
-        BaseAsset = yoloConfig.BaseAsset;
+        MaxLeverage = yoloConfig.MaxLeverage;
+        TradeBuffer = yoloConfig.TradeBuffer;
         SpreadSplit = Math.Max(0, Math.Min(1, yoloConfig.SpreadSplit));
     }
 
@@ -45,48 +34,47 @@ public class TradeFactory : ITradeFactory
     private decimal SpreadSplit { get; }
 
     public IEnumerable<Trade> CalculateTrades(
-        IReadOnlyList<Weight> weights,
+        IReadOnlyDictionary<string, Weight> weights,
         IReadOnlyDictionary<string, IReadOnlyList<Position>> positions,
         IReadOnlyDictionary<string, IReadOnlyList<MarketInfo>> markets)
     {
         var nominal = NominalCash ??
                       positions.GetTotalValue(markets, BaseAsset);
-        var weightsDict = weights.ToDictionary(
-            weight => weight.Ticker.GetBaseAndQuoteAssets().BaseAsset,
-            weight => (weight, isInUniverse: true));
+        var factorsDict = weights.ToDictionary(
+            kvp => kvp.Key.GetBaseAndQuoteAssets().BaseAsset,
+            kvp => (Weight: kvp.Value, IsInUniverse: true));
 
-        _logger.CalculateTrades(weightsDict, positions, markets);
+        _logger.CalculateTrades(factorsDict, positions, markets);
 
-        var unconstrainedTargetLeverage = weightsDict
+        var unconstrainedTargetLeverage = factorsDict
             .Values
-            .Select(w => Math.Abs(w.weight.GetComboWeight(_yoloConfig)))
+            .Select(w => Math.Abs(w.Weight.Value))
             .Sum();
 
         var weightConstraint = unconstrainedTargetLeverage < MaxLeverage
             ? 1
             : MaxLeverage / unconstrainedTargetLeverage;
 
-        var droppedTokens = positions.Keys.Except(weightsDict.Keys.Union([BaseAsset]));
+        var droppedTokens = positions.Keys.Except(factorsDict.Keys.Union([BaseAsset]));
         foreach (var token in droppedTokens)
         {
-            var weight = new Weight(0, 0, DateTime.UtcNow, 0, $"{token}/{BaseAsset}", 0, 1);
-            weightsDict[token] = (weight, false);
+            factorsDict[token] = (Weight.Empty, false);
         }
 
-        return weightsDict
+        return factorsDict
             .Select(RebalancePosition)
             .SelectMany(CombineOrders);
 
         IEnumerable<Trade> RebalancePosition(KeyValuePair<string, (Weight, bool)> kvp)
         {
-            var (token, (w, isInUniverse)) = kvp;
+            var (token, (weight, isInUniverse)) = kvp;
 
-            _logger.Weight(token, w);
+            _logger.Weight(token, weight);
 
             var tokenPositions = positions.TryGetValue(token, out var pos)
                 ? pos.ToArray()
                 : [];
-            var constrainedTargetWeight = weightConstraint * w.GetComboWeight(_yoloConfig);
+            var constrainedTargetWeight = weightConstraint * weight.Value;
 
             var projectedPositions = markets.GetMarkets(token)
                 .ToDictionary(

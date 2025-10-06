@@ -1,82 +1,62 @@
-[
-  {
-    "Price": 111071.25,
-    "CarryFactor": -0.0498528311798732,
-    "Date": "2025-09-07",
-    "MomentumFactor": 0.050609756097561,
-    "Ticker": "BTCUSDT",
-    "TrendFactor": -0.0231948588678981
+{
+  "BTCUSDT": {
+    "RefPrice": 111071.25,
+    "TimeStamp": "2025-09-07",
+    "Value": 0.050609756097561,
+    "Ticker": "BTCUSDT"
   },
-  {
-    "Price": 0.21747,
-    "CarryFactor": -0.154451171832054,
-    "Date": "2025-09-07",
-    "MomentumFactor": 0.00182926829268291,
-    "Ticker": "DOGEUSDT",
-    "TrendFactor": -0.0130834853024993
+  "DOGEUSDT": {
+    "RefPrice": 0.21747,
+    "Value": -0.154451171832054,
+    "TimeStamp": "2025-09-07",
+    "Ticker": "DOGEUSDT"
   },
-  {
-    "Price": 22.34,
-    "CarryFactor": -0.0264004182839893,
-    "Date": "2025-09-07",
-    "MomentumFactor": -0.110975609756098,
-    "Ticker": "LINKUSDT",
-    "TrendFactor": -0.0132294575887013
+  "LINKUSDT": {
+    "RefPrice": 22.34,
+    "Value": -0.0264004182839893,
+    "TimeStamp": "2025-09-07",
+    "Ticker": "LINKUSDT"
   },
-  {
-    "Price": 24.56,
-    "CarryFactor": -0.080465367353816,
-    "Date": "2025-09-07",
-    "MomentumFactor": 0.148170731707317,
-    "Ticker": "AVAXUSDT",
-    "TrendFactor": 0.0213935717697274
+  "AVAXUSDT": {
+    "RefPrice": 24.56,
+    "TimeStamp": "2025-09-07",
+    "Value": 0.148170731707317,
+    "Ticker": "AVAXUSDT"
   },
-  {
-    "Price": 2.8327,
-    "CarryFactor": -0.051450378339452,
-    "Date": "2025-09-07",
-    "MomentumFactor": -0.0987804878048781,
-    "Ticker": "XRPUSDT",
-    "TrendFactor": -0.0278193842011567
+  "XRPUSDT": {
+    "RefPrice": 2.8327,
+    "TimeStamp": "2025-09-07",
+    "Value": -0.0987804878048781,
+    "Ticker": "XRPUSDT"
   },
-  {
-    "Price": 4301.14,
-    "CarryFactor": 0.231050648859361,
-    "Date": "2025-09-07",
-    "MomentumFactor": -0.0560975609756098,
-    "Ticker": "ETHUSDT",
-    "TrendFactor": -0.0148040415946679
+  "ETHUSDT": {
+    "RefPrice": 4301.14,
+    "Value": 0.231050648859361,
+    "TimeStamp": "2025-09-07",
+    "Ticker": "ETHUSDT"
   },
-  {
-    "Price": 872.26,
-    "CarryFactor": 0.169826156302072,
-    "Date": "2025-09-07",
-    "MomentumFactor": 0.190853658536585,
-    "Ticker": "BNBUSDT",
-    "TrendFactor": 0.056064818376349
+  "BNBUSDT": {
+    "RefPrice": 872.26,
+    "Value": 0.169826156302072,
+    "TimeStamp": "2025-09-07",
+    "Ticker": "BNBUSDT"
   },
-  {
-    "Price": 0.3271,
-    "CarryFactor": 0.0991231948385675,
-    "Date": "2025-09-07",
-    "MomentumFactor": -0.184146341463415,
-    "Ticker": "TRXUSDT",
-    "TrendFactor": -0.065927447355003
+  "TRXUSDT": {
+    "RefPrice": 0.3271,
+    "TimeStamp": "2025-09-07",
+    "Value": -0.184146341463415,
+    "Ticker": "TRXUSDT"
   },
-  {
-    "Price": 0.8281,
-    "CarryFactor": -0.0968622387425711,
-    "Date": "2025-09-07",
-    "MomentumFactor": -0.05,
-    "Ticker": "ADAUSDT",
-    "TrendFactor": -0.0190310142874808
+  "ADAUSDT": {
+    "RefPrice": 0.8281,
+    "TimeStamp": "2025-09-07",
+    "Value": -0.05,
+    "Ticker": "ADAUSDT"
   },
-  {
-    "Price": 203.54,
-    "CarryFactor": -0.0405175942682446,
-    "Date": "2025-09-07",
-    "MomentumFactor": 0.108536585365854,
-    "Ticker": "SOLUSDT",
-    "TrendFactor": 0.0229878006000569
+  "SOLUSDT": {
+    "RefPrice": 203.54,
+    "TimeStamp": "2025-09-07",
+    "Value": 0.108536585365854,
+    "Ticker": "SOLUSDT"
   }
-]
+}
