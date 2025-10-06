@@ -11,7 +11,7 @@ public class UnravelApiService : IGetFactors
 {
     private const string Ur = nameof(Ur);
     private const string ApiKeyHeader = "X-API-KEY";
-    
+
     private readonly HttpClient _httpClient;
     private readonly UnravelConfig _config;
     private readonly Dictionary<string, string> _headers;
@@ -32,8 +32,15 @@ public class UnravelApiService : IGetFactors
         IEnumerable<string> tickers,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(tickers);
+        var tickersArray = tickers as string[] ?? tickers.ToArray();
+        if (tickersArray.Length == 0)
+        {
+            throw new ArgumentException("No tickers provided", nameof(tickers));
+        }
+
         var values = new Dictionary<string, Dictionary<FactorType, Factor>>();
-        await foreach (var factorKvp in GetFactorsImplAsync(tickers, cancellationToken))
+        await foreach (var factorKvp in GetFactorsImplAsync(tickersArray, cancellationToken))
         {
             foreach (var factor in factorKvp.Value)
             {
@@ -71,6 +78,12 @@ public class UnravelApiService : IGetFactors
 
     private static IEnumerable<Factor> ToFactors(FactorResponse response, FactorType factorType)
     {
+        if (response.Data.Count != response.Tickers.Count)
+        {
+            throw new InvalidOperationException(
+                $"{nameof(response.Data)} count ({response.Data.Count}) does not match {nameof(response.Tickers)} count ({response.Tickers.Count})");
+        }
+
         for (var i = 0; i < response.Data.Count; i++)
         {
             var ticker = response.Tickers[i];
