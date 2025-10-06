@@ -1,7 +1,7 @@
 using System;
 using System.Text.RegularExpressions;
 
-namespace YoloTrades;
+namespace YoloAbstractions.Extensions;
 
 public static class TickerExtensions
 {

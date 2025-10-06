@@ -24,6 +24,8 @@ public class RobotWealthApiService : IGetFactors
         _config = config ?? throw new ArgumentNullException(nameof(config));
     }
 
+    public bool RequireTickers => false;
+
     public async Task<IReadOnlyDictionary<string, Dictionary<FactorType, Factor>>> GetFactorsAsync(
         IEnumerable<string> tickers,
         CancellationToken cancellationToken = default)

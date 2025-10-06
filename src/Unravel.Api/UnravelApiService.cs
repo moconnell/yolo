@@ -26,6 +26,8 @@ public class UnravelApiService : IGetFactors
         };
     }
 
+    public bool RequireTickers => true;
+
     public async Task<IReadOnlyDictionary<string, Dictionary<FactorType, Factor>>> GetFactorsAsync(
         IEnumerable<string> tickers,
         CancellationToken cancellationToken = default)

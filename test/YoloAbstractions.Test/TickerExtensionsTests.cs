@@ -1,6 +1,7 @@
 using Xunit;
+using YoloAbstractions.Extensions;
 
-namespace YoloTrades.Test;
+namespace YoloAbstractions.Test;
 
 public class TickerExtensionsTests
 {

@@ -1,5 +1,6 @@
 ﻿using YoloAbstractions;
 using YoloAbstractions.Config;
+using YoloAbstractions.Extensions;
 using YoloAbstractions.Interfaces;
 
 namespace YoloWeights;
@@ -78,35 +79,36 @@ public class YoloWeightsService : ICalcWeights
         IEnumerable<string> tickers,
         CancellationToken cancellationToken = default)
     {
-        var tasks = _inner.Select(s => s.GetFactorsAsync(tickers, cancellationToken));
+        var baseAssets = new HashSet<string>(tickers);
+        var result = new Dictionary<string, Dictionary<FactorType, Factor>>();
 
-        return await Task.WhenAll(tasks)
-            .ContinueWith(
-                t =>
+        foreach (var svc in _inner
+                     .OrderBy(x => x.RequireTickers))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var dict = await svc.GetFactorsAsync(baseAssets, cancellationToken);
+
+            foreach (var (ticker, factors) in dict)
+            {
+                var (baseAsset, _) = ticker.GetBaseAndQuoteAssets();
+                baseAssets.Add(baseAsset);
+
+                if (!result.TryGetValue(ticker, out var factorsByType))
                 {
-                    var result = new Dictionary<string, Dictionary<FactorType, Factor>>();
+                    factorsByType = [];
+                    result[ticker] = factorsByType;
+                }
 
-                    foreach (var dict in t.Result)
-                    {
-                        foreach (var (ticker, factors) in dict)
-                        {
-                            if (!result.TryGetValue(ticker, out var factorsByType))
-                            {
-                                factorsByType = [];
-                                result[ticker] = factorsByType;
-                            }
+                foreach (var factorKvp in factors)
+                {
+                    factorsByType[factorKvp.Key] = factorKvp.Value;
+                }
+            }
+        }
 
-                            foreach (var factorKvp in factors)
-                            {
-                                factorsByType[factorKvp.Key] = factorKvp.Value;
-                            }
-                        }
-                    }
-
-                    return result.ToDictionary(
-                        kvp => kvp.Key,
-                        IReadOnlyDictionary<FactorType, Factor> (kvp) => kvp.Value);
-                },
-                cancellationToken);
+        return result.ToDictionary(
+            kvp => kvp.Key,
+            IReadOnlyDictionary<FactorType, Factor> (kvp) => kvp.Value);
     }
 }
