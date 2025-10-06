@@ -20,7 +20,7 @@ public class RobotWealthApiService : IGetFactors
 
     public RobotWealthApiService(HttpClient httpClient, RobotWealthConfig config)
     {
-        _httpClient = httpClient;
+        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _config = config ?? throw new ArgumentNullException(nameof(config));
     }
 
