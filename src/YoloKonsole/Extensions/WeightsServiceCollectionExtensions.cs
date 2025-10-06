@@ -30,7 +30,7 @@ public static class WeightsServiceCollectionExtensions
             services.AddSingleton<IGetFactors, UnravelApiService>();
         }
 
-        services.AddSingleton<HttpClient>();
+        services.AddHttpClient();
         services.AddSingleton<YoloConfig>(_ => config.GetYoloConfig()!);
         services.AddSingleton<ICalcWeights, YoloWeightsService>();
 
