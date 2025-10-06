@@ -30,6 +30,8 @@ public class YoloWeightsService : ICalcWeights
         IEnumerable<string> tickers,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(tickers);
+
         var factors = await GetFactorsAsync(tickers, cancellationToken);
 
         var weights = new Dictionary<string, Weight>();
