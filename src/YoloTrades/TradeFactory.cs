@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using YoloAbstractions;
 using YoloAbstractions.Config;
@@ -10,24 +9,29 @@ using YoloAbstractions.Interfaces;
 
 namespace YoloTrades;
 
-public class TradeFactory(ILogger<TradeFactory> logger, YoloConfig yoloConfig) : ITradeFactory
+public class TradeFactory : ITradeFactory
 {
-    public TradeFactory(ILogger<TradeFactory> logger, IConfiguration configuration)
-        : this(
-            logger,
-            configuration.GetYoloConfig()
-                ?? throw new InvalidOperationException("YoloConfig is required but was not found in configuration")
-        )
+    private readonly ILogger<TradeFactory> _logger;
+
+    public TradeFactory(ILogger<TradeFactory> logger, YoloConfig yoloConfig)
     {
+        _logger = logger;
+        AssetPermissions = yoloConfig.AssetPermissions;
+        BaseAsset = yoloConfig.BaseAsset;
+        MinOrderValue = yoloConfig.MinOrderValue;
+        NominalCash = yoloConfig.NominalCash;
+        MaxLeverage = yoloConfig.MaxLeverage;
+        TradeBuffer = yoloConfig.TradeBuffer;
+        SpreadSplit = Math.Max(0, Math.Min(1, yoloConfig.SpreadSplit));
     }
 
-    private AssetPermissions AssetPermissions { get; } = yoloConfig.AssetPermissions;
-    private string BaseAsset { get; } = yoloConfig.BaseAsset;
-    private decimal? MinOrderValue { get; } = yoloConfig.MinOrderValue;
-    private decimal? NominalCash { get; } = yoloConfig.NominalCash;
-    private decimal MaxLeverage { get; } = yoloConfig.MaxLeverage;
-    private decimal TradeBuffer { get; } = yoloConfig.TradeBuffer;
-    private decimal SpreadSplit { get; } = Math.Max(0, Math.Min(1, yoloConfig.SpreadSplit));
+    private AssetPermissions AssetPermissions { get; }
+    private string BaseAsset { get; }
+    private decimal? MinOrderValue { get; }
+    private decimal? NominalCash { get; }
+    private decimal MaxLeverage { get; }
+    private decimal TradeBuffer { get; }
+    private decimal SpreadSplit { get; }
 
     public IEnumerable<Trade> CalculateTrades(
         IReadOnlyDictionary<string, Weight> weights,
@@ -40,7 +44,7 @@ public class TradeFactory(ILogger<TradeFactory> logger, YoloConfig yoloConfig) :
             kvp => kvp.Key.GetBaseAndQuoteAssets().BaseAsset,
             kvp => (Weight: kvp.Value, IsInUniverse: true));
 
-        logger.CalculateTrades(factorsDict, positions, markets);
+        _logger.CalculateTrades(factorsDict, positions, markets);
 
         var unconstrainedTargetLeverage = factorsDict
             .Values
@@ -65,7 +69,7 @@ public class TradeFactory(ILogger<TradeFactory> logger, YoloConfig yoloConfig) :
         {
             var (token, (weight, isInUniverse)) = kvp;
 
-            logger.Weight(token, weight);
+            _logger.Weight(token, weight);
 
             var tokenPositions = positions.TryGetValue(token, out var pos)
                 ? pos.ToArray()
@@ -78,9 +82,9 @@ public class TradeFactory(ILogger<TradeFactory> logger, YoloConfig yoloConfig) :
                     market =>
                     {
                         if (market.Bid is null)
-                            logger.NoBid(token, market.Key);
+                            _logger.NoBid(token, market.Key);
                         if (market.Ask is null)
-                            logger.NoAsk(token, market.Key);
+                            _logger.NoAsk(token, market.Key);
 
                         var position = tokenPositions
                                            .FirstOrDefault(p =>
@@ -96,7 +100,7 @@ public class TradeFactory(ILogger<TradeFactory> logger, YoloConfig yoloConfig) :
 
             if (projectedPositions.Count == 0)
             {
-                logger.NoMarkets(token);
+                _logger.NoMarkets(token);
                 yield break;
             }
 
@@ -104,7 +108,7 @@ public class TradeFactory(ILogger<TradeFactory> logger, YoloConfig yoloConfig) :
 
             if (projectedPositions.Count(HasPosition) > 1)
             {
-                logger.MultiplePositions(token);
+                _logger.MultiplePositions(token);
                 yield break;
             }
 
@@ -115,7 +119,7 @@ public class TradeFactory(ILogger<TradeFactory> logger, YoloConfig yoloConfig) :
             if (isInUniverse &&
                 Math.Abs(currentWeight.Value - constrainedTargetWeight) <= TradeBuffer)
             {
-                logger.WithinTradeBuffer(
+                _logger.WithinTradeBuffer(
                     token,
                     currentWeight.Value,
                     constrainedTargetWeight,
@@ -141,7 +145,7 @@ public class TradeFactory(ILogger<TradeFactory> logger, YoloConfig yoloConfig) :
                     if (trade.IsTradable(MinOrderValue))
                         yield return trade;
                     else
-                        logger.DeltaTooSmall(token, remainingDelta);
+                        _logger.DeltaTooSmall(token, remainingDelta);
                     remainingDelta = remainingDeltaPostTrade;
                 }
             }
@@ -176,7 +180,7 @@ public class TradeFactory(ILogger<TradeFactory> logger, YoloConfig yoloConfig) :
             .ThenBy(projectedPosition => priceMultiplier * projectedPosition.Market.Last)
             .ToArray();
 
-        logger.MarketPositions(token, orderedMarkets);
+        _logger.MarketPositions(token, orderedMarkets);
 
         foreach (var projectedPosition in orderedMarkets)
         {
@@ -217,7 +221,7 @@ public class TradeFactory(ILogger<TradeFactory> logger, YoloConfig yoloConfig) :
             };
 
             if (trade.IsTradable())
-                logger.GeneratedTrade(token, delta, trade);
+                _logger.GeneratedTrade(token, delta, trade);
 
             remainingDelta -= delta;
 
@@ -256,6 +260,6 @@ public class TradeFactory(ILogger<TradeFactory> logger, YoloConfig yoloConfig) :
             return value;
         }
 
-        return isBuy ? LogNull(market.Ask, logger.NoAsk) : LogNull(market.Bid, logger.NoBid);
+        return isBuy ? LogNull(market.Ask, _logger.NoAsk) : LogNull(market.Bid, _logger.NoBid);
     }
 }

@@ -26,6 +26,7 @@
     <ProjectReference Include="..\YoloTrades\YoloTrades.csproj" />
     <ProjectReference Include="..\RobotWealth.Api\RobotWealth.Api.csproj" />
     <ProjectReference Include="..\Unravel.Api\Unravel.Api.csproj" />
+    <ProjectReference Include="..\YoloWeights\YoloWeights.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Update="appsettings.json">

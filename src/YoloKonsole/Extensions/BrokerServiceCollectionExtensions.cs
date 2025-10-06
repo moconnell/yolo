@@ -7,7 +7,7 @@ using YoloBroker.Hyperliquid;
 using YoloBroker.Hyperliquid.Config;
 using YoloBroker.Interface;
 
-namespace YoloKonsole;
+namespace YoloKonsole.Extensions;
 
 public static class BrokerServiceCollectionExtensions
 {

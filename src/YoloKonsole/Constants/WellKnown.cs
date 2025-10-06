@@ -1,4 +1,4 @@
-namespace YoloKonsole;
+namespace YoloKonsole.Constants;
 
 public static class WellKnown
 {

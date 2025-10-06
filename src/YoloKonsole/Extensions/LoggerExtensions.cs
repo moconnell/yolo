@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using YoloAbstractions;
+using YoloKonsole.Constants;
 
-namespace YoloKonsole;
+namespace YoloKonsole.Extensions;
 
 public static partial class LoggerExtensions
 {

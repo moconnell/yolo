@@ -9,13 +9,21 @@ namespace Unravel.Api;
 
 public class UnravelApiService : IGetFactors
 {
+    private const string Ur = nameof(Ur);
+    private const string ApiKeyHeader = "X-API-KEY";
+    
     private readonly HttpClient _httpClient;
     private readonly UnravelConfig _config;
+    private readonly Dictionary<string, string> _headers;
 
     public UnravelApiService(HttpClient httpClient, UnravelConfig config)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _config = config ?? throw new ArgumentNullException(nameof(config));
+        _headers = new Dictionary<string, string>
+        {
+            { ApiKeyHeader, _config.ApiKey }
+        };
     }
 
     public async Task<IReadOnlyDictionary<string, Dictionary<FactorType, Factor>>> GetFactorsAsync(
@@ -52,9 +60,9 @@ public class UnravelApiService : IGetFactors
         {
             var factorUrl = string.Format(baseUrl, fc.Id, tickersCsv);
             var factorResponse = await _httpClient
-                .GetAsync<FactorResponse, decimal>(factorUrl, cancellationToken: cancellationToken);
+                .GetAsync<FactorResponse, decimal>(factorUrl, _headers, cancellationToken);
             var factors = ToFactors(factorResponse, fc.Type);
-            
+
             yield return new KeyValuePair<FactorType, IEnumerable<Factor>>(fc.Type, factors);
         }
     }
@@ -65,7 +73,7 @@ public class UnravelApiService : IGetFactors
         {
             var ticker = response.Tickers[i];
             var value = response.Data[i];
-            yield return new Factor($"Ur.{factorType}", factorType, ticker, null, value, response.TimeStamp);
+            yield return new Factor($"{Ur}.{factorType}", factorType, ticker, null, value, response.TimeStamp);
         }
     }
 }

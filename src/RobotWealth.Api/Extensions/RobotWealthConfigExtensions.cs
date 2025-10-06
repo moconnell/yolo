@@ -7,6 +7,18 @@ namespace RobotWealth.Api.Extensions;
 
 public static class RobotWealthConfigExtensions
 {
+    public static bool HasRobotWealthConfig(this IConfiguration configuration)
+    {
+        try
+        {
+            return configuration.GetRobotWealthConfig() is not null;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+    
     public static RobotWealthConfig? GetRobotWealthConfig(this IConfiguration configuration)
     {
         return configuration

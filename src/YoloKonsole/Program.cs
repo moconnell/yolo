@@ -16,8 +16,9 @@ using YoloAbstractions.Extensions;
 using YoloAbstractions.Exceptions;
 using YoloAbstractions.Interfaces;
 using YoloBroker.Interface;
+using YoloKonsole.Extensions;
 using YoloTrades;
-using static YoloKonsole.WellKnown.TradeEventIds;
+using static YoloKonsole.Constants.WellKnown.TradeEventIds;
 
 namespace YoloKonsole;
 
@@ -74,6 +75,7 @@ __  ______  __    ____  __
                     .AddConsole()
                     .AddFile(config.GetSection("Logging")))
                 .AddBroker(config)
+                .AddWeightsServices(config)
                 .AddSingleton<ITradeFactory, TradeFactory>()
                 .AddSingleton<IConfiguration>(config)
                 .BuildServiceProvider();
@@ -105,8 +107,8 @@ __  ______  __    ____  __
 
             var positions = await broker.GetPositionsAsync(cancellationToken);
 
-            var factorsService = serviceProvider.GetService<ICalcWeights>() ?? throw new ConfigException("Weights configuration is missing or invalid");
-            var weights = await factorsService.CalculateWeightsAsync([], cancellationToken);
+            var weightsService = serviceProvider.GetService<ICalcWeights>() ?? throw new ConfigException("Weights configuration is missing or invalid");
+            var weights = await weightsService.CalculateWeightsAsync(positions.Keys, cancellationToken);
 
             var baseAssetFilter = positions
                 .Keys
@@ -172,7 +174,7 @@ __  ______  __    ____  __
 
                             if (update.Type == OrderUpdateType.Error)
                             {
-                                _logger.OrderError(update.Symbol, update.Message, Error);
+                                Extensions.LoggerExtensions.OrderError(_logger, update.Symbol, update.Message, Error);
                                 returnCode = new[] { Error, returnCode }.Max();
                                 AnsiConsole.MarkupLine($"[red]Error on {update.Symbol}: {update.Error?.Message}[/]");
                             }
