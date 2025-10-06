@@ -48,9 +48,9 @@ public class RobotWealthApiService : IGetFactors
         foreach (var kvp in weightsFactors)
         {
             var factorsList = kvp.Value.ToDictionary(f => f.Type, f => f);
-            if (volatilityFactors.TryGetValue(kvp.Key, out Factor? value))
+            if (volatilityFactors.TryGetValue(kvp.Key, out var factor))
             {
-                factorsList[FactorType.Volatility] = value;
+                factorsList[FactorType.Volatility] = factor;
             }
 
             mergedFactors[kvp.Key] = factorsList;
