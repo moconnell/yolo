@@ -174,7 +174,7 @@ __  ______  __    ____  __
 
                             if (update.Type == OrderUpdateType.Error)
                             {
-                                Extensions.LoggerExtensions.OrderError(_logger, update.Symbol, update.Message, Error);
+                                _logger.OrderError(update.Symbol, update.Message, Error);
                                 returnCode = new[] { Error, returnCode }.Max();
                                 AnsiConsole.MarkupLine($"[red]Error on {update.Symbol}: {update.Error?.Message}[/]");
                             }
