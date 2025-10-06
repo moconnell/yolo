@@ -25,8 +25,8 @@ public static class RobotWealthConfigExtensions
             .GetSection(nameof(RobotWealth))
             .Get<RobotWealthConfig>()
             ?.Ensure(c => c.ApiBaseUrl)
-            ?.Ensure(c => c.ApiKey)
-            ?.Ensure(c => c.VolatilitiesUrlPath)
-            ?.Ensure(c => c.WeightsUrlPath);
+            .Ensure(c => c.ApiKey)
+            .Ensure(c => c.VolatilitiesUrlPath)
+            .Ensure(c => c.WeightsUrlPath);
     }
 }
