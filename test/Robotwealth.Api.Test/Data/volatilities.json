@@ -1,0 +1,56 @@
+{
+  "data": [
+    {
+      "date": "2025-10-06",
+      "ewvol": 0.272582342594688,
+      "ticker": "BTCUSDT"
+    },
+    {
+      "date": "2025-10-06",
+      "ewvol": 0.206326780885067,
+      "ticker": "TRXUSDT"
+    },
+    {
+      "date": "2025-10-06",
+      "ewvol": 0.612685057553632,
+      "ticker": "SOLUSDT"
+    },
+    {
+      "date": "2025-10-06",
+      "ewvol": 0.448837473383841,
+      "ticker": "ETHUSDT"
+    },
+    {
+      "date": "2025-10-06",
+      "ewvol": 0.606095757117143,
+      "ticker": "ADAUSDT"
+    },
+    {
+      "date": "2025-10-06",
+      "ewvol": 0.580763842822481,
+      "ticker": "BNBUSDT"
+    },
+    {
+      "date": "2025-10-06",
+      "ewvol": 0.621196763623851,
+      "ticker": "LINKUSDT"
+    },
+    {
+      "date": "2025-10-06",
+      "ewvol": 0.453655456936192,
+      "ticker": "XRPUSDT"
+    },
+    {
+      "date": "2025-10-06",
+      "ewvol": 0.892056603314692,
+      "ticker": "AVAXUSDT"
+    },
+    {
+      "date": "2025-10-06",
+      "ewvol": 0.768202632663139,
+      "ticker": "DOGEUSDT"
+    }
+  ],
+  "last_updated": 1759761547,
+  "success": "true"
+}

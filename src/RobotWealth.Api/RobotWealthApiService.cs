@@ -59,10 +59,10 @@ public class RobotWealthApiService : IGetFactors
 
     private Factor ToFactor(RwVolatility volatility) =>
         new(
-            $"RobotWealth.{FactorType.Volatility}",
+            $"{Rw}.{FactorType.Volatility}",
             FactorType.Volatility,
             volatility.Ticker,
-            0,
+            null,
             Convert.ToDecimal(volatility.EwVol),
             DateTime.ParseExact(volatility.Date, _config.DateFormat, CultureInfo.InvariantCulture)
         );
@@ -73,7 +73,7 @@ public class RobotWealthApiService : IGetFactors
         var timeStamp = DateTime.ParseExact(weight.Date, _config.DateFormat, CultureInfo.InvariantCulture);
 
         yield return new Factor(
-            $"RobotWealth.{FactorType.Carry}",
+            $"{Rw}.{FactorType.Carry}",
             FactorType.Carry,
             weight.Ticker,
             refPrice,
@@ -82,7 +82,7 @@ public class RobotWealthApiService : IGetFactors
         );
 
         yield return new Factor(
-            $"RobotWealth.{FactorType.Momentum}",
+            $"{Rw}.{FactorType.Momentum}",
             FactorType.Momentum,
             weight.Ticker,
             refPrice,
@@ -91,7 +91,7 @@ public class RobotWealthApiService : IGetFactors
         );
 
         yield return new Factor(
-            $"RobotWealth.{FactorType.Trend}",
+            $"{Rw}.{FactorType.Trend}",
             FactorType.Trend,
             weight.Ticker,
             refPrice,
@@ -99,6 +99,8 @@ public class RobotWealthApiService : IGetFactors
             timeStamp
         );
     }
+
+    private const string Rw = nameof(Rw);
 
     private string GetVolatilitiesUrl() => GetUrl(_config.VolatilitiesUrlPath);
 

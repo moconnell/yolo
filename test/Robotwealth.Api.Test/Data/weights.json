@@ -1,0 +1,96 @@
+{
+  "data": [
+    {
+      "arrival_price": 1208.56,
+      "carry_megafactor": 0.0126196438202477,
+      "combo_weight": 0.11492681581632,
+      "date": "2025-10-06",
+      "momentum_megafactor": 0.216208133971292,
+      "ticker": "BNBUSDT",
+      "trend_megafactor": 0.115987151150316
+    },
+    {
+      "arrival_price": 0.3438,
+      "carry_megafactor": 0.260726804839073,
+      "combo_weight": 0.0868474293503531,
+      "date": "2025-10-06",
+      "momentum_megafactor": -0.0230263157894737,
+      "ticker": "TRXUSDT",
+      "trend_megafactor": 0.0228678558359487
+    },
+    {
+      "arrival_price": 2.9873,
+      "carry_megafactor": -0.124780803880826,
+      "combo_weight": -0.0535749088745405,
+      "date": "2025-10-06",
+      "momentum_megafactor": -0.0529306220095694,
+      "ticker": "XRPUSDT",
+      "trend_megafactor": 0.0169706251867037
+    },
+    {
+      "arrival_price": 0.8518,
+      "carry_megafactor": -0.159168789907254,
+      "combo_weight": -0.0834643027803965,
+      "date": "2025-10-06",
+      "momentum_megafactor": -0.0977870813397129,
+      "ticker": "ADAUSDT",
+      "trend_megafactor": 0.00653792111076411
+    },
+    {
+      "arrival_price": 4561.61,
+      "carry_megafactor": 0.047417338670787,
+      "combo_weight": 0.0585505028170611,
+      "date": "2025-10-06",
+      "momentum_megafactor": 0.0936004784688995,
+      "ticker": "ETHUSDT",
+      "trend_megafactor": 0.0346512582190327
+    },
+    {
+      "arrival_price": 233.71,
+      "carry_megafactor": 0.0655552642550076,
+      "combo_weight": 0.0554533328180936,
+      "date": "2025-10-06",
+      "momentum_megafactor": 0.0607057416267943,
+      "ticker": "SOLUSDT",
+      "trend_megafactor": 0.0401156302360908
+    },
+    {
+      "arrival_price": 22.15,
+      "carry_megafactor": -0.0974163885952297,
+      "combo_weight": -0.0910623463874044,
+      "date": "2025-10-06",
+      "momentum_megafactor": -0.169557416267943,
+      "ticker": "LINKUSDT",
+      "trend_megafactor": -0.00624055573510086
+    },
+    {
+      "arrival_price": 30.39,
+      "carry_megafactor": 0.113680948414885,
+      "combo_weight": -0.000140764047867232,
+      "date": "2025-10-06",
+      "momentum_megafactor": -0.127691387559809,
+      "ticker": "AVAXUSDT",
+      "trend_megafactor": 0.0135881047678843
+    },
+    {
+      "arrival_price": 0.25746,
+      "carry_megafactor": -0.00257735653576401,
+      "combo_weight": -0.00325188707276734,
+      "date": "2025-10-06",
+      "momentum_megafactor": -0.0290071770334928,
+      "ticker": "DOGEUSDT",
+      "trend_megafactor": 0.0218278966872666
+    },
+    {
+      "arrival_price": 123846.55,
+      "carry_megafactor": -0.116056661080926,
+      "combo_weight": 0.0329195014123296,
+      "date": "2025-10-06",
+      "momentum_megafactor": 0.129485645933014,
+      "ticker": "BTCUSDT",
+      "trend_megafactor": 0.0853393962230077
+    }
+  ],
+  "last_updated": 1759761545,
+  "success": "true"
+}
