@@ -38,7 +38,9 @@ public class YoloWeightsService : ICalcWeights
         {
             var timeStamp = DateTime.UtcNow;
 
-            var volatilityFactor = factorDict.TryGetValue(FactorType.Volatility, out var fac) ? fac.Value : 1;
+            var volatilityFactor = factorDict.TryGetValue(FactorType.Volatility, out var fac) && fac.Value > 0
+                ? fac.Value
+                : 1;
 
             var weightNumerator = 0m;
             var weightDenominator = 0;
