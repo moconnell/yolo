@@ -195,11 +195,17 @@ public class TradeFactoryTests
             var divisor = (carryMultiplier > 0 ? 1 : 0) +
                           (momentumMultiplier > 0 ? 1 : 0) +
                           (trendMultiplier > 0 ? 1 : 0);
+
+            if (divisor == 0)
+            {
+                return new Weight(row.Ticker, 0m, DateTime.UtcNow);
+            }
+
             var volatility = row.Volatility > 0 ? row.Volatility : 1;
             var volAdjustedWeight = (row.Carry * carryMultiplier +
-                               row.Momentum * momentumMultiplier +
-                               row.Trend * trendMultiplier) /
-                              (divisor * volatility);
+                                     row.Momentum * momentumMultiplier +
+                                     row.Trend * trendMultiplier) /
+                                    (divisor * volatility);
             var clampedWeight = Math.Clamp(volAdjustedWeight, -maxWeightingAbs, maxWeightingAbs);
 
             return new Weight(row.Ticker, clampedWeight, DateTime.UtcNow);
@@ -207,7 +213,7 @@ public class TradeFactoryTests
     }
 
     private static async
-        Task<(Dictionary<string, Weight>, 
+        Task<(Dictionary<string, Weight>,
             Dictionary<string, IReadOnlyList<Position>>,
             Dictionary<string, IReadOnlyList<MarketInfo>>)>
         DeserializeInputsAsync(
