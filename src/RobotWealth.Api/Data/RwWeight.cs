@@ -1,3 +1,4 @@
+using System;
 using System.Text.Json.Serialization;
 
 namespace RobotWealth.Api.Data;
@@ -5,23 +6,23 @@ namespace RobotWealth.Api.Data;
 public record RwWeight
 {
     [JsonPropertyName("arrival_price")]
-    public double ArrivalPrice { get; init; }
+    public decimal ArrivalPrice { get; init; }
 
     [JsonPropertyName("carry_megafactor")]
-    public double CarryMegafactor { get; init; }
+    public decimal CarryMegafactor { get; init; }
 
     [JsonPropertyName("combo_weight")]
-    public double ComboWeight { get; init; }
+    public decimal ComboWeight { get; init; }
 
     [JsonPropertyName("date")]
-    public required string Date { get; init; }
+    public required DateTime Date { get; init; }
 
     [JsonPropertyName("momentum_megafactor")]
-    public double MomentumMegafactor { get; init; }
+    public decimal MomentumMegafactor { get; init; }
 
     [JsonPropertyName("ticker")]
     public required string Ticker { get; init; }
 
     [JsonPropertyName("trend_megafactor")]
-    public double TrendMegafactor { get; init; }
+    public decimal TrendMegafactor { get; init; }
 }

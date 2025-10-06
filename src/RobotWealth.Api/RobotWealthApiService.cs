@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
@@ -59,46 +58,43 @@ public class RobotWealthApiService : IGetFactors
         return mergedFactors;
     }
 
-    private Factor ToFactor(RwVolatility volatility) =>
+    private static Factor ToFactor(RwVolatility volatility) =>
         new(
             $"{Rw}.{FactorType.Volatility}",
             FactorType.Volatility,
             volatility.Ticker,
             null,
-            Convert.ToDecimal(volatility.EwVol),
-            DateTime.ParseExact(volatility.Date, _config.DateFormat, CultureInfo.InvariantCulture)
+            volatility.EwVol,
+            volatility.Date
         );
 
     private IEnumerable<Factor> ToFactors(RwWeight weight)
     {
-        var refPrice = Convert.ToDecimal(weight.ArrivalPrice);
-        var timeStamp = DateTime.ParseExact(weight.Date, _config.DateFormat, CultureInfo.InvariantCulture);
-
         yield return new Factor(
             $"{Rw}.{FactorType.Carry}",
             FactorType.Carry,
             weight.Ticker,
-            refPrice,
-            Convert.ToDecimal(weight.CarryMegafactor),
-            timeStamp
+            weight.ArrivalPrice,
+            weight.CarryMegafactor,
+            weight.Date
         );
 
         yield return new Factor(
             $"{Rw}.{FactorType.Momentum}",
             FactorType.Momentum,
             weight.Ticker,
-            refPrice,
-            Convert.ToDecimal(weight.MomentumMegafactor),
-            timeStamp
+            weight.ArrivalPrice,
+            weight.MomentumMegafactor,
+            weight.Date
         );
 
         yield return new Factor(
             $"{Rw}.{FactorType.Trend}",
             FactorType.Trend,
             weight.Ticker,
-            refPrice,
-            Convert.ToDecimal(weight.TrendMegafactor),
-            timeStamp
+            weight.ArrivalPrice,
+            weight.TrendMegafactor,
+            weight.Date
         );
     }
 
