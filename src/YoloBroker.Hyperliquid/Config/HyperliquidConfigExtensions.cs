@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Configuration;
-using YoloAbstractions.Config;
+using YoloAbstractions.Extensions;
 using static YoloBroker.Hyperliquid.Config.WellKnown;
 
 namespace YoloBroker.Hyperliquid.Config;

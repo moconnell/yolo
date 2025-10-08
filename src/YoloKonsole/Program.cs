@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -11,11 +12,13 @@ using Microsoft.Extensions.Logging;
 using Spectre.Console;
 using Utility.CommandLine;
 using YoloAbstractions;
-using YoloAbstractions.Config;
+using YoloAbstractions.Extensions;
+using YoloAbstractions.Exceptions;
+using YoloAbstractions.Interfaces;
 using YoloBroker.Interface;
+using YoloKonsole.Extensions;
 using YoloTrades;
-using YoloWeights;
-using static YoloKonsole.WellKnown.TradeEventIds;
+using static YoloKonsole.Constants.WellKnown.TradeEventIds;
 
 namespace YoloKonsole;
 
@@ -69,9 +72,10 @@ __  ______  __    ____  __
 
             var serviceProvider = new ServiceCollection()
                 .AddLogging(loggingBuilder => loggingBuilder
-                    .AddFile(config.GetSection("Logging"))
-                    )
+                    .AddConsole()
+                    .AddFile(config.GetSection("Logging:File")))
                 .AddBroker(config)
+                .AddWeightsServices(config)
                 .AddSingleton<ITradeFactory, TradeFactory>()
                 .AddSingleton<IConfiguration>(config)
                 .BuildServiceProvider();
@@ -81,10 +85,8 @@ __  ______  __    ____  __
             _logger.LogInformation("************ YOLO started ************");
 
             var yoloConfig = config.GetYoloConfig() ?? throw new ConfigException("YOLO configuration is missing or invalid");
-            var weights = await yoloConfig.GetWeights();
 
             using var broker = serviceProvider.GetService<IYoloBroker>()!;
-
             var orders = await broker.GetOpenOrdersAsync(cancellationToken);
 
             if (orders.Count != 0)
@@ -105,9 +107,12 @@ __  ______  __    ____  __
 
             var positions = await broker.GetPositionsAsync(cancellationToken);
 
+            var weightsService = serviceProvider.GetService<ICalcWeights>() ?? throw new ConfigException("Weights configuration is missing or invalid");
+            var weights = await weightsService.CalculateWeightsAsync(positions.Keys, cancellationToken);
+
             var baseAssetFilter = positions
                 .Keys
-                .Union(weights.Select(w => w.Ticker.GetBaseAndQuoteAssets().BaseAsset))
+                .Union(weights.Keys.Select(x => x.GetBaseAndQuoteAssets().BaseAsset))
                 .ToHashSet();
 
             var markets = await broker.GetMarketsAsync(
@@ -253,7 +258,7 @@ __  ______  __    ____  __
     private static void UpdateOrderTable(Table table, ConcurrentDictionary<string, int> index, OrderUpdate update)
     {
         // Find existing row for this asset or add new one
-        var existingRowIndex = FindRowByAsset(table, index, update.Symbol);
+        var existingRowIndex = FindRowByAsset(index, update.Symbol);
 
         if (existingRowIndex >= 0)
         {
@@ -277,15 +282,7 @@ __  ______  __    ____  __
         }
     }
 
-    private static int FindRowByAsset(Table table, ConcurrentDictionary<string, int> index, string assetName)
-    {
-        if (index.TryGetValue(assetName, out var rowIndex))
-        {
-            return rowIndex;
-        }
-
-        return -1;
-    }
+    private static int FindRowByAsset(ConcurrentDictionary<string, int> index, string assetName) => index.GetValueOrDefault(assetName, -1);
 
     private static string GetStatusMarkup(OrderUpdateType type)
     {
