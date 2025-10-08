@@ -62,8 +62,8 @@ public class UnravelApiService : IGetFactors
         IEnumerable<string> tickers,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var baseUrl = $"{_config.ApiBaseUrl}{_config.FactorsUrlPath}";
-        var tickersCsv = tickers.ToCsv();
+        var baseUrl = $"{_config.ApiBaseUrl}/{_config.FactorsUrlPath}";
+        var tickersCsv = tickers.ToCsv().ToUpperInvariant();
 
         foreach (var fc in _config.Factors)
         {
