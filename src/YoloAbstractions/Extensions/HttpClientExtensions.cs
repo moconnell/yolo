@@ -42,7 +42,7 @@ public static class HttpClientExtensions
 
         if (apiResponse is null || apiResponse.Data is null || apiResponse.Data.Count == 0)
         {
-            throw new ApiException("Invalid response");
+            throw new ApiException("Response contained no data");
         }
 
         return apiResponse;

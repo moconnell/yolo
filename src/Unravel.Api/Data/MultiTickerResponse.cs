@@ -3,13 +3,13 @@ using YoloAbstractions.Interfaces;
 
 namespace Unravel.Api.Data;
 
-public class FactorResponse : IApiResponse<decimal>
+public class MultiTickerResponse : IApiResponse<double[]>
 {
     [JsonPropertyName("data")]
-    public required IReadOnlyList<decimal> Data { get; init; }
+    public required IReadOnlyList<double[]> Data { get; init; }
 
     [JsonPropertyName("index")]
-    public required DateTime TimeStamp { get; init; }
+    public required IReadOnlyList<DateTime> Index { get; init; }
 
     [JsonPropertyName("columns")]
     public required IReadOnlyList<string> Tickers { get; init; }

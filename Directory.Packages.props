@@ -7,6 +7,8 @@
     <PackageVersion Include="coverlet.msbuild" Version="6.0.4" />
     <PackageVersion Include="CsvHelper" Version="33.1.0" />
     <PackageVersion Include="HyperLiquid.Net" Version="2.13.0" />
+    <PackageVersion Include="MathNet.Numerics" Version="5.0.0" />
+    <PackageVersion Include="MathNet.NumericsNet" Version="5.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Configuration" Version="9.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.9" />

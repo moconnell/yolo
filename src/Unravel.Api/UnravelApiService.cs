@@ -1,4 +1,5 @@
 ﻿using System.Runtime.CompilerServices;
+using MathNet.Numerics.LinearAlgebra;
 using Unravel.Api.Config;
 using Unravel.Api.Data;
 using YoloAbstractions;
@@ -59,36 +60,43 @@ public class UnravelApiService : IGetFactors
     }
 
     private async IAsyncEnumerable<KeyValuePair<FactorType, IEnumerable<Factor>>> GetFactorsImplAsync(
-        IEnumerable<string> tickers,
+        IReadOnlyList<string> tickers,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var baseUrl = $"{_config.ApiBaseUrl}{_config.FactorsUrlPath}";
-        var tickersCsv = tickers.ToCsv();
+        var baseUrl = $"{_config.ApiBaseUrl}/{_config.FactorsUrlPath}";
 
         foreach (var fc in _config.Factors)
         {
-            var factorUrl = string.Format(baseUrl, fc.Id, tickersCsv);
-            var factorResponse = await _httpClient
-                .GetAsync<FactorResponse, decimal>(factorUrl, _headers, cancellationToken);
-            var factors = ToFactors(factorResponse, fc.Type);
-
+            var factors = await GetTickerZScoreFactorsAsync(tickers, baseUrl, fc, cancellationToken);
             yield return new KeyValuePair<FactorType, IEnumerable<Factor>>(fc.Type, factors);
         }
     }
 
-    private static IEnumerable<Factor> ToFactors(FactorResponse response, FactorType factorType)
+    private async Task<IEnumerable<Factor>> GetTickerZScoreFactorsAsync(
+        IReadOnlyList<string> tickers,
+        string baseUrl,
+        FactorConfig fc,
+        CancellationToken cancellationToken)
     {
-        if (response.Data.Count != response.Tickers.Count)
-        {
-            throw new InvalidOperationException(
-                $"{nameof(response.Data)} count ({response.Data.Count}) does not match {nameof(response.Tickers)} count ({response.Tickers.Count})");
-        }
+        var from = DateTime.Today.AddDays(-fc.Window);
+        var url = string.Format(baseUrl, fc.Id, tickers.ToCsv().ToUpperInvariant(), from.ToString(_config.DateFormat));
+        var response = await _httpClient
+            .GetAsync<MultiTickerResponse, double[]>(url, _headers, cancellationToken);
+        var factors = ToZScoreFactors(response, fc.Type);
+        return factors;
+    }
 
-        for (var i = 0; i < response.Data.Count; i++)
+    private static IEnumerable<Factor> ToZScoreFactors(MultiTickerResponse response, FactorType factorType)
+    {
+        var matrix = Matrix<double>.Build.DenseOfRowArrays(response.Data);
+        var zScores = matrix.ZScoreColumns();
+        var lastRow = response.Data.Count - 1;
+        for (var i = 0; i < matrix.ColumnCount; i++)
         {
+            var timeStamp = response.Index[^1];
             var ticker = response.Tickers[i];
-            var value = response.Data[i];
-            yield return new Factor($"{Ur}.{factorType}", factorType, ticker, null, value, response.TimeStamp);
+            var value = Convert.ToDecimal(zScores[lastRow, i]);
+            yield return new Factor($"{Ur}.{factorType}", factorType, ticker, null, value, timeStamp);
         }
     }
 }
