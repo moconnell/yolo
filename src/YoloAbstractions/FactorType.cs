@@ -7,5 +7,7 @@ public enum FactorType
     Momentum,
     Trend,
     Volatility,
-    RetailFlow
+    OpenInterestDivergence,
+    RetailFlow,
+    SupplyVelocity,
 }
