@@ -23,7 +23,13 @@ public class RobotWealthFactorService : IGetFactors
         CancellationToken cancellationToken = default)
     {
         var weights = await _apiService.GetWeightsAsync(cancellationToken);
+        if (!weights.Any())
+            throw new ApiException("No weights returned");
+        
         var volatilities = await _apiService.GetVolatilitiesAsync(cancellationToken);
+        if (!volatilities.Any())
+            throw new ApiException("No volatilities returned");
+        
         var factorDataFrame = ToFactorDataFrame(weights, volatilities);
 
         return factorDataFrame;

@@ -1,9 +1,6 @@
-﻿using System.Net;
-using Moq;
-using Moq.Contrib.HttpClient;
+﻿using Moq;
 using RobotWealth.Api;
 using Shouldly;
-using RobotWealth.Api.Config;
 using RobotWealth.Api.Data;
 using RobotWealth.Api.Interfaces;
 using YoloAbstractions;
@@ -66,7 +63,64 @@ public class RobotWealthFactorServiceTest
         btcUsdtFactors[FactorType.Trend].ShouldBe(trendValue);
         btcUsdtFactors[FactorType.Volatility].ShouldBe(volatilityValue);
     }
-    
+
+    [Theory]
+    [InlineData(true, true, false)]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, true)]
+    public async Task GivenApiService_WhenNoResults_ShouldThrow(bool hasWeights, bool hasVolatilities, bool shouldThrow)
+    {
+        // arrange
+        var mockApiService = new Mock<IRobotWealthApiService>();
+
+        mockApiService.Setup(x => x.GetWeightsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                hasWeights
+                    ?
+                    [
+                        new RwWeight
+                        {
+                            ArrivalPrice = 100000,
+                            CarryMegafactor = 1,
+                            MomentumMegafactor = 2,
+                            TrendMegafactor = 3,
+                            Date = DateTime.Today,
+                            Ticker = BtcUsdt
+                        }
+                    ]
+                    : []);
+
+        mockApiService.Setup(x => x.GetVolatilitiesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                hasVolatilities
+                    ?
+                    [
+                        new RwVolatility
+                        {
+                            Date = DateTime.Today,
+                            EwVol = 4,
+                            Ticker = BtcUsdt
+                        }
+                    ]
+                    : []);
+
+        var svc = new RobotWealthFactorService(mockApiService.Object);
+
+        // act
+        var f = () => svc.GetFactorsAsync();
+
+        // assert
+        if (shouldThrow)
+        {
+            await f.ShouldThrowAsync<ApiException>();
+        }
+        else
+        {
+            var res = await f();
+            res.ShouldNotBeNull();
+        }
+    }
+
     [Fact]
     public async Task GivenApiService_WhenTickerMismatch_ShouldThrow()
     {
