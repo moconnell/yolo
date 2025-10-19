@@ -4,7 +4,6 @@ using Unravel.Api.Config;
 using Unravel.Api.Data;
 using Unravel.Api.Interfaces;
 using YoloAbstractions;
-using YoloAbstractions.Exceptions;
 using YoloAbstractions.Extensions;
 
 namespace Unravel.Api;
@@ -31,8 +30,16 @@ public class UnravelApiService : IUnravelApiService
         IEnumerable<string> tickers,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        if (_config.Factors.Length == 0)
+            yield break;
+
+        ArgumentNullException.ThrowIfNull(tickers);
+        var tickersArray = tickers.Select(x => x.ToUpperInvariant()).Distinct().ToArray();
+        if (tickersArray.Length == 0)
+            throw new ArgumentException("Tickers cannot be empty.", nameof(tickers));
+        
         var baseUrl = $"{_config.ApiBaseUrl}/{_config.UrlPathFactors}";
-        var tickersCsv = tickers.ToCsv().ToUpperInvariant();
+        var tickersCsv = tickersArray.ToCsv().ToUpperInvariant();
         var startDate = DateTime.Today.AddDays(-_config.Lookback).ToString(_config.DateFormat);
 
         foreach (var fc in _config.Factors)
@@ -53,12 +60,15 @@ public class UnravelApiService : IUnravelApiService
         CancellationToken cancellationToken = default)
     {
         if (_config.Factors.Length == 0)
-        {
             return FactorDataFrame.Empty;
-        }
+
+        ArgumentNullException.ThrowIfNull(tickers);
+        var tickersArray = tickers.Select(x => x.ToUpperInvariant()).Distinct().ToArray();
+        if (tickersArray.Length == 0)
+            throw new ArgumentException("Tickers cannot be empty.", nameof(tickers));
 
         var baseUrl = $"{_config.ApiBaseUrl}/{_config.UrlPathFactorsLive}";
-        var tickersCsv = tickers.ToCsv().ToUpperInvariant();
+        var tickersCsv = tickersArray.ToCsv().ToUpperInvariant();
         var results = new List<FactorDataFrame>();
 
         foreach (var fc in _config.Factors)
