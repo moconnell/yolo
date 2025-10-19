@@ -26,7 +26,7 @@ public class FactorDataFrameTest
         // assert
         Assert.Throws<ArgumentException>(func);
     }
-    
+
     [Fact]
     public void GivenDifferingValueLengths_WhenNewFromCalled_ShouldThrow()
     {
@@ -39,6 +39,23 @@ public class FactorDataFrameTest
             DateTime.Today,
             (Carry, [0.15, 0.10, 0.02]),
             (Momentum, [0.15, 0.10, 0.02, 0.01]));
+
+        // assert
+        Assert.Throws<ArgumentException>(func);
+    }
+
+    [Fact]
+    public void GivenDuplicateTickers_WhenNewFromCalled_ShouldThrow()
+    {
+        // arrange
+        string[] tickers = ["BTC", "ETH", "Eth"];
+
+        // act
+        var func = () => FactorDataFrame.NewFrom(
+            tickers,
+            DateTime.Today,
+            (Carry, [0.15, 0.10, 0.02]),
+            (Momentum, [0.15, 0.10, 0.02]));
 
         // assert
         Assert.Throws<ArgumentException>(func);

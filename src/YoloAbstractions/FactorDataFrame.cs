@@ -35,9 +35,12 @@ public sealed record FactorDataFrame
         DateTime timestamp,
         params (FactorType FactorType, IReadOnlyList<double> Values)[] values)
     {
+        if (tickers.Select(x => x.ToUpperInvariant()).Distinct().Count() != tickers.Count)
+            throw new ArgumentException("Duplicate tickers.", nameof(tickers));
+
         if (values.Select(v => v.FactorType).Distinct().Count() != values.Length)
             throw new ArgumentException("Duplicate factor types.", nameof(values));
-        
+
         foreach (var v in values)
         {
             if (v.Values.Count != tickers.Count)
@@ -56,8 +59,11 @@ public sealed record FactorDataFrame
         return new FactorDataFrame(df, factorTypes);
     }
 
-    public double Value(FactorType factorType, string ticker) =>
-        (double) _dataFrame[factorType.ToString()][_tickerIndex[ticker]];
+    public double Value(FactorType factorType, string ticker)
+    {
+        var val = (double?) _dataFrame[factorType.ToString()][_tickerIndex[ticker]];
+        return val ?? double.NaN;
+    }
 
     // Indexer by ticker symbol
     public IReadOnlyDictionary<FactorType, double> this[string ticker]
