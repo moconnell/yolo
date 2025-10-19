@@ -1,5 +1,6 @@
 using Unravel.Api.Interfaces;
 using YoloAbstractions;
+using YoloAbstractions.Exceptions;
 using YoloAbstractions.Interfaces;
 
 namespace Unravel.Api;
@@ -19,7 +20,7 @@ public class UnravelFactorService : IGetFactors
         var tickersArray = await GetTickers(tickers, cancellationToken);
         if (tickersArray.Count == 0)
         {
-            throw new ArgumentException("No tickers provided or resolved", nameof(tickers));
+            throw new ApiException("No tickers provided or resolved");
         }
 
         var factorsLive = await _unravelApiService.GetFactorsLiveAsync(
@@ -33,12 +34,7 @@ public class UnravelFactorService : IGetFactors
         IEnumerable<string>? tickers,
         CancellationToken cancellationToken = default)
     {
-        var tickerArray = tickers != null ? tickers as string[] ?? tickers.ToArray() : [];
-        if (tickerArray.Length != 0)
-        {
-            return tickerArray;
-        }
-
-        return await _unravelApiService.GetUniverseAsync(cancellationToken);
+        var tickerArray = tickers != null ? tickers.Select(x => x.ToUpperInvariant()).Distinct().ToArray() : [];
+        return tickerArray.Length != 0 ? tickerArray : await _unravelApiService.GetUniverseAsync(cancellationToken);
     }
 }
