@@ -11,6 +11,40 @@ namespace YoloAbstractions.Test;
 public class FactorDataFrameTest
 {
     [Fact]
+    public void GivenDuplicateFactorTypes_WhenNewFromCalled_ShouldThrow()
+    {
+        // arrange
+        string[] tickers = ["BTC", "ETH", "ETC"];
+
+        // act
+        var func = () => FactorDataFrame.NewFrom(
+            tickers,
+            DateTime.Today,
+            (Carry, [0.15, 0.10, 0.02]),
+            (Carry, [0.15, 0.10, 0.02]));
+
+        // assert
+        Assert.Throws<ArgumentException>(func);
+    }
+    
+    [Fact]
+    public void GivenDifferingValueLengths_WhenNewFromCalled_ShouldThrow()
+    {
+        // arrange
+        string[] tickers = ["BTC", "ETH", "ETC"];
+
+        // act
+        var func = () => FactorDataFrame.NewFrom(
+            tickers,
+            DateTime.Today,
+            (Carry, [0.15, 0.10, 0.02]),
+            (Momentum, [0.15, 0.10, 0.02, 0.01]));
+
+        // assert
+        Assert.Throws<ArgumentException>(func);
+    }
+
+    [Fact]
     public void GivenTwoFactorDataFrames_WhenTickersNotEqual_ShouldThrow()
     {
         // arrange

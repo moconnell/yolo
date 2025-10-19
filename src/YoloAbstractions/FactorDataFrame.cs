@@ -35,6 +35,16 @@ public sealed record FactorDataFrame
         DateTime timestamp,
         params (FactorType FactorType, IReadOnlyList<double> Values)[] values)
     {
+        if (values.Select(v => v.FactorType).Distinct().Count() != values.Length)
+            throw new ArgumentException("Duplicate factor types.", nameof(values));
+        
+        foreach (var v in values)
+        {
+            if (v.Values.Count != tickers.Count)
+                throw new ArgumentException(
+                    $"Length mismatch for {v.FactorType}: expected {tickers.Count}, got {v.Values.Count}.");
+        }
+
         var df = new DataFrame(
         [
             new PrimitiveDataFrameColumn<DateTime>("Date", Enumerable.Repeat(timestamp, tickers.Count)),
