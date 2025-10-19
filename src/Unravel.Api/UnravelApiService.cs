@@ -4,6 +4,7 @@ using Unravel.Api.Config;
 using Unravel.Api.Data;
 using Unravel.Api.Interfaces;
 using YoloAbstractions;
+using YoloAbstractions.Exceptions;
 using YoloAbstractions.Extensions;
 
 namespace Unravel.Api;
@@ -51,6 +52,11 @@ public class UnravelApiService : IUnravelApiService
         IEnumerable<string> tickers,
         CancellationToken cancellationToken = default)
     {
+        if (_config.Factors.Length == 0)
+        {
+            return FactorDataFrame.Empty;
+        }
+
         var baseUrl = $"{_config.ApiBaseUrl}/{_config.UrlPathFactorsLive}";
         var tickersCsv = tickers.ToCsv().ToUpperInvariant();
         var results = new List<FactorDataFrame>();

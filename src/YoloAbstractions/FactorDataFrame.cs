@@ -28,6 +28,8 @@ public sealed record FactorDataFrame
 
     public IReadOnlyList<string> Tickers => ((StringDataFrameColumn) _dataFrame["Ticker"]).ToArray();
 
+    public static readonly FactorDataFrame Empty = NewFrom([], DateTime.MinValue);
+
     public static FactorDataFrame NewFrom(
         IReadOnlyList<string> tickers,
         DateTime timestamp,

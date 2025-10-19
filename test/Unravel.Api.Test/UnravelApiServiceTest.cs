@@ -58,6 +58,26 @@ public class UnravelApiServiceTest
         result.Tickers.ShouldBe([btc]);
         result.Value(FactorType.RetailFlow, btc).ShouldBe(0.25, 0.000000001);
     }
+    
+    [Fact]
+    public async Task GivenEmptyConfig_WhenMocked_ShouldReturnEmpty()
+    {
+        // arrange
+        const string btc = "BTC";
+
+        var handler = new Mock<HttpMessageHandler>();
+        var httpClient = handler.CreateClient();
+        var config = new UnravelConfig();
+        var svc = new UnravelApiService(httpClient, config);
+
+        // act
+        var result = await svc.GetFactorsLiveAsync([btc]);
+
+        // assert
+        result.ShouldNotBeNull();
+        result.FactorTypes.ShouldBe([]);
+        result.Tickers.ShouldBe([]);
+    }
 
     [Fact]
     [Trait("Category", "Integration")]
