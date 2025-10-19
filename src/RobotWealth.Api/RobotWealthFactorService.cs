@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using RobotWealth.Api.Data;
 using RobotWealth.Api.Interfaces;
 using YoloAbstractions;
+using YoloAbstractions.Exceptions;
 using YoloAbstractions.Interfaces;
 
 namespace RobotWealth.Api;
@@ -33,14 +34,20 @@ public class RobotWealthFactorService : IGetFactors
         IReadOnlyList<RwVolatility> volatilities)
     {
         var orderedWeights = weights.OrderBy(x => x.Ticker).ToArray();
-        var tickers = orderedWeights.Select(w => w.Ticker).ToArray();
+        var weightsTickers = orderedWeights.Select(w => w.Ticker).ToArray();
         var carryFrame = orderedWeights.Select(w => w.CarryMegafactor).ToArray();
         var momentumFrame = orderedWeights.Select(w => w.MomentumMegafactor).ToArray();
         var trendFrame = orderedWeights.Select(w => w.TrendMegafactor).ToArray();
-        var volFrame = volatilities.OrderBy(x => x.Ticker).Select(w => w.EwVol).ToArray();
+        var orderedVolatilities = volatilities.OrderBy(x => x.Ticker).ToArray();
+        var volTickers = orderedVolatilities.Select(x => x.Ticker).ToArray();
+        if (weightsTickers.Length != volTickers.Length ||
+            weightsTickers.Except(volTickers).Any() ||
+            volTickers.Except(weightsTickers).Any())
+            throw new ApiException("Weights/volatilities tickers mismatch");
+        var volFrame = orderedVolatilities.Select(w => w.EwVol).ToArray();
 
         return FactorDataFrame.NewFrom(
-            tickers,
+            weightsTickers,
             weights[0].Date,
             (FactorType.Carry, carryFrame),
             (FactorType.Momentum, momentumFrame),
