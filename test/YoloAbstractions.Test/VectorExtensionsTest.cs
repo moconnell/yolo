@@ -38,6 +38,7 @@ public class VectorExtensionsTest(ITestOutputHelper output)
         else
         {
             result.Min().ShouldBeGreaterThanOrEqualTo(0);
+            result.Sum().ShouldBe(1.0, tolerance: 0.001);
         }
 
         result.Max().ShouldBeLessThanOrEqualTo(1);
