@@ -114,29 +114,35 @@ public sealed record FactorDataFrame
     {
         ArgumentNullException.ThrowIfNull(weights);
 
-        var orderedWeights = weights.OrderBy(x => x.Key.ToString())
-            .Select(x => x.Value)
-            .ToArray();
         var factorCols = _dataFrame.Columns
             .Skip(2)
-            .Where(c => c.Name != nameof(Volatility))
-            .OrderBy(c => c.Name)
-            .Cast<DoubleDataFrameColumn>()
+            .Where(c => !string.Equals(c.Name, nameof(Volatility), StringComparison.Ordinal))
+            .OfType<DoubleDataFrameColumn>()
+            .OrderBy(c => c.Name, StringComparer.Ordinal)
+            .ToArray();
+        var alignedWeights = factorCols
+            .Select(c => Enum.TryParse<FactorType>(c.Name, out var ft) && weights.TryGetValue(ft, out var w) ? w : 0d)
             .ToArray();
 
         var rows = (int) _dataFrame.Rows.Count;
         var columns = factorCols.Length;
-        var data = factorCols.Select(c => c.ToArray().Cast<double>()).ToArray();
+        var data = factorCols
+            .Select(c => c.Select(x => x ?? 0d).ToArray())
+            .ToArray();
 
         var m = Matrix<double>.Build.DenseOfColumns(rows, columns, data);
-        var v = Vector<double>.Build.DenseOfArray(orderedWeights);
+        var v = Vector<double>.Build.DenseOfArray(alignedWeights);
 
-        var tickerWeights = m * v / orderedWeights.Count(w => w > 0); // (rows x 1)
+        var normalizer = alignedWeights.Count(w => Math.Abs(w) > 0);
+        if (normalizer <= 0)
+            normalizer = 1;
+        var tickerWeights = (m * v) / normalizer; // (rows x 1)
         if (volatilityScaling &&
             _dataFrame.Columns.FirstOrDefault(c => c.Name == nameof(Volatility)) is DoubleDataFrameColumn volCol)
         {
-            var tickerVolatilities = Vector<double>.Build.DenseOfArray(volCol.Cast<double>().ToArray());
-            tickerWeights = tickerWeights.PointwiseDivide(tickerVolatilities);
+            var vol = Vector<double>.Build.DenseOfArray(
+                volCol.Select(x => x is > 0d ? x.Value : 1d).ToArray());
+            tickerWeights = tickerWeights.PointwiseDivide(vol);
         }
 
         if (maxWeightAbs.HasValue)
