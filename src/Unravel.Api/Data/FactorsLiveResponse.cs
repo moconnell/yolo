@@ -3,10 +3,10 @@ using YoloAbstractions.Interfaces;
 
 namespace Unravel.Api.Data;
 
-public class FactorResponse : IApiResponse<decimal>
+public class FactorsLiveResponse : IApiResponse<double>
 {
-    [JsonPropertyName("data")]
-    public required IReadOnlyList<decimal> Data { get; init; }
+    [JsonPropertyName("data")]      
+    public required IReadOnlyList<double> Data { get; init; }
 
     [JsonPropertyName("index")]
     public required DateTime TimeStamp { get; init; }

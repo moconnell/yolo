@@ -3,6 +3,7 @@ using Shouldly;
 using YoloAbstractions;
 using YoloAbstractions.Config;
 using YoloAbstractions.Interfaces;
+using static YoloAbstractions.FactorType;
 
 namespace YoloWeights.Test;
 
@@ -23,55 +24,25 @@ public class YoloWeightsServiceTest
     {
         // arrange
         const string btcUsdt = "BTC/USDT";
-        const int refPrice = 100000;
 
         var config = new YoloConfig
         {
             BaseAsset = "USDC",
             FactorWeights = new Dictionary<FactorType, decimal>
             {
-                { FactorType.Trend, trendWeight },
-                { FactorType.RetailFlow, retailFlowWeight }
+                { Trend, trendWeight },
+                { RetailFlow, retailFlowWeight }
             }
         };
 
         var mockFactorService1 = new Mock<IGetFactors>();
-        var factorDict1 = new Dictionary<string, Dictionary<FactorType, Factor>>
-        {
-            {
-                btcUsdt, new Dictionary<FactorType, Factor>
-                {
-                    {
-                        FactorType.Trend,
-                        new Factor("Rw.Trend", FactorType.Trend, btcUsdt, refPrice, trendValue, DateTime.UtcNow)
-                    }
-                }
-            }
-        };
         mockFactorService1.Setup(x => x.GetFactorsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(factorDict1);
+            .ReturnsAsync(FactorDataFrame.NewFrom([btcUsdt], DateTime.Today, (Trend, [Convert.ToDouble(trendValue)])));
 
         var mockFactorService2 = new Mock<IGetFactors>();
-        var factorDict2 = new Dictionary<string, Dictionary<FactorType, Factor>>
-        {
-            {
-                btcUsdt, new Dictionary<FactorType, Factor>
-                {
-                    {
-                        FactorType.RetailFlow,
-                        new Factor(
-                            "Ur.RetailFlow",
-                            FactorType.RetailFlow,
-                            btcUsdt,
-                            refPrice,
-                            retailFlowValue,
-                            DateTime.UtcNow)
-                    }
-                }
-            }
-        };
         mockFactorService2.Setup(x => x.GetFactorsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(factorDict2);
+            .ReturnsAsync(
+                FactorDataFrame.NewFrom([btcUsdt], DateTime.Today, (RetailFlow, [Convert.ToDouble(retailFlowValue)])));
 
         var svc = new YoloWeightsService([mockFactorService1.Object, mockFactorService2.Object], config);
 
@@ -81,6 +52,6 @@ public class YoloWeightsServiceTest
         // assert
         weights.ShouldNotBeNull();
         weights.Count.ShouldBe(1);
-        weights[btcUsdt].Value.ShouldBe(expectedWeight);
+        weights[btcUsdt].ShouldBe(expectedWeight);
     }
 }

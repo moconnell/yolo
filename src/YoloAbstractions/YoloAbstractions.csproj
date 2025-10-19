@@ -5,6 +5,8 @@
     <LanguageVersion>latest</LanguageVersion>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="MathNet.Numerics" />
+    <PackageReference Include="Microsoft.Data.Analysis" />
     <PackageReference Include="Microsoft.Extensions.Configuration" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
   </ItemGroup>

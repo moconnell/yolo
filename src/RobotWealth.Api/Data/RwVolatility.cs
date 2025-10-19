@@ -9,7 +9,7 @@ public record RwVolatility
     public required DateTime Date { get; init; }
 
     [JsonPropertyName("ewvol")]
-    public decimal EwVol { get; init; }
+    public double EwVol { get; init; }
 
     [JsonPropertyName("ticker")]
     public required string Ticker { get; init; }

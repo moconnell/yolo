@@ -13,15 +13,15 @@ public static partial class LoggerExtensions
             Message = "*** CalculateTrades ***\nWeights: {Weights}\nPositions: {Positions}\nMarkets: {Markets}")]
     public static partial void CalculateTrades(
         this ILogger logger,
-        IReadOnlyDictionary<string, (Weight, bool isInUniverse)> weights,
+        IReadOnlyDictionary<string, (decimal, bool)> weights,
         IReadOnlyDictionary<string, IReadOnlyList<Position>> positions,
         IReadOnlyDictionary<string, IReadOnlyList<MarketInfo>> markets);
 
     [LoggerMessage(
         EventId = TradeEventIds.Factors,
         Level = LogLevel.Debug,
-        Message = "({Token}): processing {Weight}")]
-    public static partial void Weight(this ILogger logger, string token, Weight weight);
+        Message = "({Token}): processing {Weight}")]    
+    public static partial void Weight(this ILogger logger, string token, decimal weight);
 
     [LoggerMessage(
         EventId = TradeEventIds.MarketPositions,

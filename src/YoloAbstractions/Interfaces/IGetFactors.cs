@@ -6,6 +6,9 @@ namespace YoloAbstractions.Interfaces;
 
 public interface IGetFactors
 {
-    bool RequireTickers { get; }
-    Task<IReadOnlyDictionary<string, Dictionary<FactorType, Factor>>> GetFactorsAsync(IEnumerable<string> tickers, CancellationToken cancellationToken = default);
+    bool IsFixedUniverse { get; }
+
+    Task<FactorDataFrame> GetFactorsAsync(
+        IEnumerable<string>? tickers = null,
+        CancellationToken cancellationToken = default);
 }

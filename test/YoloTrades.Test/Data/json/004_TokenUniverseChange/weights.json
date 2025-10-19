@@ -1,62 +1,12 @@
 {
-  "BTCUSDT": {
-    "RefPrice": 111071.25,
-    "TimeStamp": "2025-09-07",
-    "Value": 0.050609756097561,
-    "Ticker": "BTCUSDT"
-  },
-  "DOGEUSDT": {
-    "RefPrice": 0.21747,
-    "Value": -0.154451171832054,
-    "TimeStamp": "2025-09-07",
-    "Ticker": "DOGEUSDT"
-  },
-  "LINKUSDT": {
-    "RefPrice": 22.34,
-    "Value": -0.0264004182839893,
-    "TimeStamp": "2025-09-07",
-    "Ticker": "LINKUSDT"
-  },
-  "AVAXUSDT": {
-    "RefPrice": 24.56,
-    "TimeStamp": "2025-09-07",
-    "Value": 0.148170731707317,
-    "Ticker": "AVAXUSDT"
-  },
-  "XRPUSDT": {
-    "RefPrice": 2.8327,
-    "TimeStamp": "2025-09-07",
-    "Value": -0.0987804878048781,
-    "Ticker": "XRPUSDT"
-  },
-  "ETHUSDT": {
-    "RefPrice": 4301.14,
-    "Value": 0.231050648859361,
-    "TimeStamp": "2025-09-07",
-    "Ticker": "ETHUSDT"
-  },
-  "BNBUSDT": {
-    "RefPrice": 872.26,
-    "Value": 0.169826156302072,
-    "TimeStamp": "2025-09-07",
-    "Ticker": "BNBUSDT"
-  },
-  "TRXUSDT": {
-    "RefPrice": 0.3271,
-    "TimeStamp": "2025-09-07",
-    "Value": -0.184146341463415,
-    "Ticker": "TRXUSDT"
-  },
-  "ADAUSDT": {
-    "RefPrice": 0.8281,
-    "TimeStamp": "2025-09-07",
-    "Value": -0.05,
-    "Ticker": "ADAUSDT"
-  },
-  "SOLUSDT": {
-    "RefPrice": 203.54,
-    "TimeStamp": "2025-09-07",
-    "Value": 0.108536585365854,
-    "Ticker": "SOLUSDT"
-  }
+  "BTCUSDT": 0.050609756097561,
+  "DOGEUSDT": -0.154451171832054,
+  "LINKUSDT": -0.0264004182839893,
+  "AVAXUSDT": 0.148170731707317,
+  "XRPUSDT": -0.0987804878048781,
+  "ETHUSDT": 0.231050648859361,
+  "BNBUSDT": 0.169826156302072,
+  "TRXUSDT": -0.184146341463415,
+  "ADAUSDT": -0.05,
+  "SOLUSDT": 0.108536585365854
 }

@@ -4,18 +4,17 @@ using Moq.Contrib.HttpClient;
 using RobotWealth.Api;
 using Shouldly;
 using RobotWealth.Api.Config;
-using YoloAbstractions;
 
 namespace Robotwealth.Api.Test;
 
 public class RobotWealthApiServiceTest
 {
+    private const string BtcUsdt = "BTCUSDT";
+
     [Fact]
-    public async Task GivenGoodConfig_ShouldReturnFactors()
+    public async Task GivenGoodConfig_ShouldGetWeights()
     {
         // arrange
-        const string btcUsdt = "BTCUSDT";
-
         var handler = new Mock<HttpMessageHandler>();
         var httpClient = handler.CreateClient();
         var config = new RobotWealthConfig
@@ -26,71 +25,68 @@ public class RobotWealthApiServiceTest
             WeightsUrlPath = "weights"
         };
 
-        SetupRequest(config.VolatilitiesUrlPath, "Data/volatilities.json");
-        SetupRequest(config.WeightsUrlPath, "Data/weights.json");
+        SetupRequest(config.WeightsUrlPath, "Data/weights.json", config, handler);
 
         var svc = new RobotWealthApiService(httpClient, config);
 
         // act
-        var factors = await svc.GetFactorsAsync([btcUsdt]);
+        var weights = await svc.GetWeightsAsync();
 
         // assert
-        factors.ShouldNotBeNull();
-        factors.ShouldNotBeEmpty();
-        var btcUsdtFactors = factors[btcUsdt];
-        btcUsdtFactors.ShouldNotBeNull();
-        btcUsdtFactors.Count.ShouldBe(4);
-        btcUsdtFactors[FactorType.Carry]
-            .ShouldBe(
-                new Factor(
-                    "Rw.Carry",
-                    FactorType.Carry,
-                    btcUsdt,
-                    123846.55m,
-                    -0.116056661080926m,
-                    new DateTime(2025, 10, 6)));
-        btcUsdtFactors[FactorType.Momentum]
-            .ShouldBe(
-                new Factor(
-                    "Rw.Momentum",
-                    FactorType.Momentum,
-                    btcUsdt,
-                    123846.55m,
-                    0.129485645933014m,
-                    new DateTime(2025, 10, 6)));
-        btcUsdtFactors[FactorType.Trend]
-            .ShouldBe(
-                new Factor(
-                    "Rw.Trend",
-                    FactorType.Trend,
-                    btcUsdt,
-                    123846.55m,
-                    0.0853393962230077m,
-                    new DateTime(2025, 10, 6)));
-        btcUsdtFactors[FactorType.Volatility]
-            .ShouldBe(
-                new Factor(
-                    "Rw.Volatility",
-                    FactorType.Volatility,
-                    btcUsdt,
-                    null,
-                    0.272582342594688m,
-                    new DateTime(2025, 10, 6)));
-        return;
+        weights.ShouldNotBeNull();
+        weights.Count.ShouldBe(10);
+        var weight = weights.FirstOrDefault(x => x.Ticker == BtcUsdt);
+        weight.ShouldNotBeNull();
+        weight.CarryMegafactor.ShouldBe(-0.116056661080926);
+        weight.MomentumMegafactor.ShouldBe(0.129485645933014);
+        weight.TrendMegafactor.ShouldBe(0.0853393962230077);
+    }
 
-        void SetupRequest(string methodPath, string responseFilePath)
+    [Fact]
+    public async Task GivenGoodConfig_ShouldGetVolatilities()
+    {
+        // arrange
+        var handler = new Mock<HttpMessageHandler>();
+        var httpClient = handler.CreateClient();
+        var config = new RobotWealthConfig
         {
-            var requestUrl = $"{config.ApiBaseUrl}/{methodPath}?api_key={Uri.EscapeDataString(config.ApiKey)}";
-            var json = GetFileContent(responseFilePath);
-            var httpResponseMessage = new HttpResponseMessage
-            {
-                Content = new StringContent(json),
-                StatusCode = HttpStatusCode.OK
-            };
+            ApiBaseUrl = "http://foo.org/api",
+            ApiKey = Guid.NewGuid().ToString(),
+            VolatilitiesUrlPath = "volatilities",
+            WeightsUrlPath = "weights"
+        };
 
-            handler.SetupRequest(HttpMethod.Get, requestUrl)
-                .ReturnsAsync(httpResponseMessage);
-        }
+        SetupRequest(config.VolatilitiesUrlPath, "Data/volatilities.json", config, handler);
+
+        var svc = new RobotWealthApiService(httpClient, config);
+
+        // act
+        var volatilities = await svc.GetVolatilitiesAsync();
+
+        // assert
+        volatilities.ShouldNotBeNull();
+        volatilities.Count.ShouldBe(10);
+        var volBtc = volatilities.FirstOrDefault(x => x.Ticker == BtcUsdt);
+        volBtc.ShouldNotBeNull();
+        volBtc.EwVol.ShouldBe(0.272582342594688);
+    }
+
+    private static void SetupRequest(
+        string methodPath,
+        string responseFilePath,
+        RobotWealthConfig config,
+        Mock<HttpMessageHandler> handler)
+    {
+        var requestUrl = $"{config.ApiBaseUrl}/{methodPath}?api_key={Uri.EscapeDataString(config.ApiKey)}";
+        var json = GetFileContent(responseFilePath);
+        var httpResponseMessage = new HttpResponseMessage
+        {
+            Content = new StringContent(json),
+            StatusCode = HttpStatusCode.OK
+        };
+
+        handler.SetupRequest(HttpMethod.Get, requestUrl)
+            .ReturnsAsync(httpResponseMessage);
     }
 
     private static string GetFileContent(string fileName) =>

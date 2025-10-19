@@ -8,9 +8,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Shouldly;
+using Xunit.Abstractions;
 using YoloAbstractions;
 using YoloBroker.Hyperliquid.Extensions;
-
 using static YoloAbstractions.AssetPermissions;
 using static YoloAbstractions.AssetType;
 using static YoloAbstractions.OrderType;
@@ -19,17 +19,27 @@ namespace YoloBroker.Hyperliquid.Test;
 
 public class HyperliquidBrokerTest
 {
+    private readonly ITestOutputHelper _testOutputHelper;
+
+    public HyperliquidBrokerTest(ITestOutputHelper testOutputHelper)
+    {
+        _testOutputHelper = testOutputHelper;
+    }
+
     [Theory]
     [Trait("Category", "Integration")]
     [InlineData("ETH", PerpetualFutures, "ETH")]
     [InlineData("BTC,ETH", PerpetualFutures, "BTC,ETH")]
-    public async Task GivenBaseAsset_ShouldGetMarkets(string baseAssetFilterString, AssetPermissions assetPermissions, string expectedMarketsString)
+    public async Task GivenBaseAsset_ShouldGetMarkets(
+        string baseAssetFilterString,
+        AssetPermissions assetPermissions,
+        string expectedMarketsString)
     {
         // arrange
         var baseAssetFilter = baseAssetFilterString.Split(',').Select(asset => asset.Trim()).ToHashSet();
         var expectedMarkets = expectedMarketsString.Split(',').Select(market => market.Trim()).ToHashSet();
 
-        HyperliquidBroker broker = GetTestBroker();
+        var broker = GetTestBroker();
 
         // act
         var results = await broker.GetMarketsAsync(baseAssetFilter, assetPermissions: assetPermissions);
@@ -48,7 +58,7 @@ public class HyperliquidBrokerTest
     public async Task ShouldGetOpenOrders()
     {
         // arrange
-        HyperliquidBroker broker = GetTestBroker();
+        var broker = GetTestBroker();
 
         // act
         var results = await broker.GetOpenOrdersAsync();
@@ -65,7 +75,7 @@ public class HyperliquidBrokerTest
     public async Task ShouldPlaceOrder(string symbol, AssetType assetType, double quantity)
     {
         // arrange
-        HyperliquidBroker broker = GetTestBroker();
+        var broker = GetTestBroker();
         var orderPrice = await GetLimitPrice(broker, symbol, assetType, quantity);
         var trade = CreateTrade(symbol, assetType, quantity, orderPrice);
 
@@ -91,10 +101,14 @@ public class HyperliquidBrokerTest
     [InlineData("ETH", Future, 0.01)]
     [InlineData("ETH", Future, 0.0001, Market)]
     [InlineData("BTC", Future, 0.001)]
-    public async Task ShouldPlaceOrders(string symbol, AssetType assetType, double quantity, OrderType orderType = Limit)
+    public async Task ShouldPlaceOrders(
+        string symbol,
+        AssetType assetType,
+        double quantity,
+        OrderType orderType = Limit)
     {
         // arrange
-        HyperliquidBroker broker = GetTestBroker();
+        var broker = GetTestBroker();
         decimal? limitPrice = orderType == Limit ? await GetLimitPrice(broker, symbol, assetType, quantity) : null;
         var trade = CreateTrade(symbol, assetType, quantity, limitPrice);
 
@@ -128,7 +142,7 @@ public class HyperliquidBrokerTest
     public async Task ShouldManageOrders(string symbol, AssetType assetType, double quantity)
     {
         // arrange
-        HyperliquidBroker broker = GetTestBroker();
+        var broker = GetTestBroker();
         var limitPrice = await GetLimitPrice(broker, symbol, assetType, quantity);
         var trade = CreateTrade(symbol, assetType, quantity, limitPrice);
         var settings = OrderManagementSettings.Default;
@@ -146,13 +160,13 @@ public class HyperliquidBrokerTest
             await foreach (var orderUpdate in orderUpdates)
             {
                 updateCount++;
-                Console.WriteLine($"Update {updateCount}: {orderUpdate.Type} - {orderUpdate.Symbol}");
+                _testOutputHelper.WriteLine($"Update {updateCount}: {orderUpdate.Type} - {orderUpdate.Symbol}");
 
                 orderUpdate.ShouldNotBeNull();
 
                 if (orderUpdate.Type == OrderUpdateType.Error)
                 {
-                    Console.WriteLine($"Error: {orderUpdate.Error?.Message}");
+                    _testOutputHelper.WriteLine($"Error: {orderUpdate.Error?.Message}");
                     throw orderUpdate.Error ?? new Exception("Unknown error");
                 }
 
@@ -168,14 +182,14 @@ public class HyperliquidBrokerTest
                 // Cancel after first successful order creation
                 if (orderUpdate.Type == OrderUpdateType.Created)
                 {
-                    cts.Cancel();
+                    await cts.CancelAsync();
                 }
             }
         }
         catch (OperationCanceledException) when (cts.Token.IsCancellationRequested)
         {
             // Expected cancellation
-            Console.WriteLine($"Test completed with {updateCount} updates");
+            _testOutputHelper.WriteLine($"Test completed with {updateCount} updates");
         }
         finally
         {
@@ -187,14 +201,23 @@ public class HyperliquidBrokerTest
         }
     }
 
-    private static async Task<decimal> GetLimitPrice(HyperliquidBroker broker, string symbol, AssetType assetType, double quantity)
+    private async Task<decimal> GetLimitPrice(
+        HyperliquidBroker broker,
+        string symbol,
+        AssetType assetType,
+        double quantity)
     {
         // Get current market price first
         var assets = symbol.Split('/').Select(s => s.Trim()).ToArray();
         var markets = assetType switch
         {
-            AssetType.Spot => await broker.GetMarketsAsync(new HashSet<string> { assets[0] }, assets[1], assetPermissions: AssetPermissions.Spot),
-            AssetType.Future => await broker.GetMarketsAsync(new HashSet<string> { assets[0] }, assetPermissions: AssetPermissions.PerpetualFutures),
+            AssetType.Spot => await broker.GetMarketsAsync(
+                new HashSet<string> { assets[0] },
+                assets[1],
+                assetPermissions: AssetPermissions.Spot),
+            Future => await broker.GetMarketsAsync(
+                new HashSet<string> { assets[0] },
+                assetPermissions: PerpetualFutures),
             _ => throw new NotSupportedException($"Asset type {assetType} is not supported.")
         };
 
@@ -202,7 +225,7 @@ public class HyperliquidBrokerTest
         markets.ShouldContainKey(symbol);
         var marketInfo = markets[symbol][0];
 
-        bool isLong = quantity >= 0;
+        var isLong = quantity >= 0;
         var rawLimitPrice = isLong ? marketInfo.Bid * 0.99m : marketInfo.Ask * 1.01m;
         rawLimitPrice.ShouldNotBeNull();
         rawLimitPrice.Value.ShouldBeGreaterThan(0);
@@ -214,13 +237,19 @@ public class HyperliquidBrokerTest
         var roundingType = isLong ? RoundingType.Down : RoundingType.Up;
         var roundedLimitPrice = rawLimitPrice.Value.RoundToValidPrice(priceStep.Value, roundingType);
 
-        Console.WriteLine($"Calculated limit price for {symbol}: {roundedLimitPrice} (raw: {rawLimitPrice.Value}, step: {priceStep.Value})");
+        _testOutputHelper.WriteLine(
+            $"Calculated limit price for {symbol}: {roundedLimitPrice} (raw: {rawLimitPrice.Value}, step: {priceStep.Value})");
 
         return roundedLimitPrice;
     }
 
     private static Trade CreateTrade(string symbol, AssetType assetType, double quantity, decimal? price) =>
-        new(symbol, assetType, Convert.ToDecimal(quantity), price, ClientOrderId: $"0x{RandomNumberGenerator.GetHexString(32, true)}");
+        new(
+            symbol,
+            assetType,
+            Convert.ToDecimal(quantity),
+            price,
+            ClientOrderId: $"0x{RandomNumberGenerator.GetHexString(32, true)}");
 
 
     private static HyperliquidBroker GetTestBroker()
