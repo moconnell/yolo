@@ -61,7 +61,12 @@ public sealed record FactorDataFrame
 
     public double Value(FactorType factorType, string ticker)
     {
-        var val = (double?) _dataFrame[factorType.ToString()][_tickerIndex[ticker]];
+        if (!FactorTypes.Contains(factorType) || !_tickerIndex.TryGetValue(ticker, out var index))
+        {
+            return double.NaN;
+        }
+
+        var val = (double?) _dataFrame[factorType.ToString()][index];
         return val ?? double.NaN;
     }
 

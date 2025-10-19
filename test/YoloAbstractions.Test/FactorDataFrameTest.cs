@@ -61,6 +61,35 @@ public class FactorDataFrameTest
         Assert.Throws<ArgumentException>(func);
     }
 
+    [Theory]
+    [InlineData("BTC", Carry, 0.15)]
+    [InlineData("BTC", Momentum, 0.17)]
+    [InlineData("ETH", Carry, 0.10)]
+    [InlineData("ETH", Momentum, 0.11)]
+    [InlineData("BNB", Carry, 0.02)]
+    [InlineData("BNB", Momentum, 0.03)]
+    [InlineData("BNB", Trend, double.NaN)]
+    [InlineData("XRP", Carry, double.NaN)]
+    [InlineData("XRP", Momentum, double.NaN)]
+    public void GivenGoodSetup_WhenValueCalledForNonExistentTicker_ShouldReturnNan(
+        string ticker,
+        FactorType factorType,
+        double expected)
+    {
+        // arrange
+        string[] tickers = ["BTC", "ETH", "BNB"];
+
+        // act
+        var fdf = FactorDataFrame.NewFrom(
+            tickers,
+            DateTime.Today,
+            (Carry, [0.15, 0.10, 0.02]),
+            (Momentum, [0.17, 0.11, 0.03]));
+
+        // assert
+        fdf.Value(factorType, ticker).ShouldBe(expected);
+    }
+
     [Fact]
     public void GivenTwoFactorDataFrames_WhenTickersNotEqual_ShouldThrow()
     {
