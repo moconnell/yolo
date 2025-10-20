@@ -15,6 +15,8 @@ public class VectorExtensionsTest(ITestOutputHelper output)
     [InlineData(5, false)]
     [InlineData(10, true)]
     [InlineData(10, false)]
+    [InlineData(20, true)]
+    [InlineData(20, false)]
     public void GivenVector_WhenMarketNeutral_ShouldSumToZero(int bins, bool marketNeutral)
     {
         // setup
@@ -32,8 +34,8 @@ public class VectorExtensionsTest(ITestOutputHelper output)
         if (marketNeutral)
         {
             result.Min().ShouldBeGreaterThanOrEqualTo(-1);
-            result.Sum().ShouldBeGreaterThanOrEqualTo(-0.5);
-            result.Sum().ShouldBeLessThanOrEqualTo(0.5);
+            result.Sum(Math.Abs).ShouldBe(1.0, tolerance: 0.001);
+            result.Sum().ShouldBe(0, tolerance: 0.5);
         }
         else
         {
