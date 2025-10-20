@@ -5,6 +5,8 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <IsPackable>false</IsPackable>
+        <AssemblyName>RobotWealth.Api.Test</AssemblyName>
+        <RootNamespace>RobotWealth.Api.Test</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>

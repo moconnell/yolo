@@ -5,7 +5,7 @@ using RobotWealth.Api;
 using Shouldly;
 using RobotWealth.Api.Config;
 
-namespace Robotwealth.Api.Test;
+namespace RobotWealth.Api.Test;
 
 public class RobotWealthApiServiceTest
 {

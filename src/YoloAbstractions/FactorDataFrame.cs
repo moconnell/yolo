@@ -148,10 +148,10 @@ public sealed record FactorDataFrame
         var m = Matrix<double>.Build.DenseOfColumns(rows, columns, data);
         var v = Vector<double>.Build.DenseOfArray(alignedWeights);
 
-        var normalizer = alignedWeights.Count(w => Math.Abs(w) > 0);
+        var normalizer = alignedWeights.Sum(Math.Abs);
         if (normalizer <= 0)
             normalizer = 1;
-        var tickerWeights = (m * v) / normalizer; // (rows x 1)
+        var tickerWeights = m * v / normalizer; // (rows x 1)
         if (volatilityScaling &&
             _dataFrame.Columns.FirstOrDefault(c => c.Name == nameof(Volatility)) is DoubleDataFrameColumn volCol)
         {

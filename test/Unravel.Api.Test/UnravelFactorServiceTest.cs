@@ -9,7 +9,21 @@ namespace Unravel.Api.Test;
 public class UnravelFactorServiceTest
 {
     [Fact]
-    public async Task GivenGoodConfig_WhenMocked_ShouldReturnFactors()
+    public void GivenApiService_ShouldReturnFixedUniverse()
+    {
+        // arrange
+        var mockApiSvc = new Mock<IUnravelApiService>();
+        var svc = new UnravelFactorService(mockApiSvc.Object);
+        
+        // act
+        var isFixedUniverse = svc.IsFixedUniverse;
+        
+        // assert
+        isFixedUniverse.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task GivenGoodConfig_WhenTickersSupplied_ShouldReturnFactors()
     {
         // arrange
         const string btc = "BTC";
@@ -34,6 +48,39 @@ public class UnravelFactorServiceTest
         keyValuePair.Key.ShouldBe(RetailFlow);
         keyValuePair.Value.ShouldBe(retailFlowValueBtc, 0.000000001);
     }
+
+    [Fact]
+    public async Task GivenGoodConfig_WhenNoTickersSupplied_ShouldFetchUniverse()
+    {
+        // arrange
+        const string btc = "BTC";
+        string[] tickers = [btc];
+        const double retailFlowValueBtc = 0.25;
+
+        var mockApiSvc = new Mock<IUnravelApiService>();
+        
+        mockApiSvc.Setup(apiSvc => apiSvc.GetUniverseAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(tickers);
+
+        mockApiSvc
+            .Setup(apiSvc => apiSvc.GetFactorsLiveAsync(tickers, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                FactorDataFrame.NewFrom(tickers, DateTime.Today, (RetailFlow, [retailFlowValueBtc])));
+
+        var svc = new UnravelFactorService(mockApiSvc.Object);
+
+        // act
+        var factors = await svc.GetFactorsAsync(tickers);
+
+        // assert
+        factors.ShouldNotBeNull();
+        factors[btc].ShouldNotBeNull();
+        factors[btc].Count.ShouldBe(1);
+        var keyValuePair = factors[btc].First();
+        keyValuePair.Key.ShouldBe(RetailFlow);
+        keyValuePair.Value.ShouldBe(retailFlowValueBtc, 0.000000001);
+    }
+
 
     [Fact]
     public async Task GivenDupeTickers_WhenMocked_ShouldReturnFactors()

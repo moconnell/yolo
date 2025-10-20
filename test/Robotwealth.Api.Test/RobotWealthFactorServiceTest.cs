@@ -6,11 +6,25 @@ using RobotWealth.Api.Interfaces;
 using YoloAbstractions;
 using YoloAbstractions.Exceptions;
 
-namespace Robotwealth.Api.Test;
+namespace RobotWealth.Api.Test;
 
 public class RobotWealthFactorServiceTest
 {
     private const string BtcUsdt = "BTCUSDT";
+    
+    [Fact]
+    public void GivenApiService_ShouldReturnFixedUniverse()
+    {
+        // arrange
+        var mockApiSvc = new Mock<IRobotWealthApiService>();
+        var svc = new RobotWealthFactorService(mockApiSvc.Object);
+        
+        // act
+        var isFixedUniverse = svc.IsFixedUniverse;
+        
+        // assert
+        isFixedUniverse.ShouldBeTrue();
+    }
 
     [Fact]
     public async Task GivenApiService_WhenValidValues_ShouldReturnFactorDataFrame()

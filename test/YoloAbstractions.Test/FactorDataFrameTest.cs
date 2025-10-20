@@ -219,10 +219,10 @@ public class FactorDataFrameTest
     }
 
     [Theory]
-    [InlineData(null, false, 0.21166667, 0.24333333, 0.04666667)]
-    [InlineData(0.25, false, 0.21166667, 0.24333333, 0.04666667)]
-    [InlineData(null, true, 0.66145833, 0.31601732, 0.05072464)]
-    [InlineData(0.5, true, 0.5, 0.31601732, 0.05072464)]
+    [InlineData(null, false, 0.254, 0.292, 0.056)]
+    [InlineData(0.25, false, 0.25, 0.25, 0.056)]
+    [InlineData(null, true, 0.79375d, 0.3792207792207792d, 0.060869565217391314d)]
+    [InlineData(0.5, true, 0.5, 0.3792207792207792d, 0.060869565217391314d)]
     public void GivenFactorDataFrameAndWeightsDict_WhenTickersEqual_ShouldMultiply(
         double? maxWeightAbs,
         bool volScaling,
@@ -268,11 +268,7 @@ public class FactorDataFrameTest
         {
             var calculatedWeight = calculatedWeights[i];
             var expectedValue = expectedValues[i];
-            var delta = Math.Abs(calculatedWeight - expectedValue);
-            delta.ShouldBeLessThan(
-                tolerance,
-                $"difference between expected value {expectedValue} and calculated weight {calculatedWeight} exceeded tolerance"
-            );
+            calculatedWeight.ShouldBe(expectedValue, tolerance);
         }
     }
 }

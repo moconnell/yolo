@@ -13,8 +13,8 @@ public class YoloWeightsServiceTest
     [InlineData(1, 1, 0.15)]
     [InlineData(0, 1, 0.2)]
     [InlineData(1, 0, 0.1)]
-    [InlineData(1, 0.5, 0.1)]
-    [InlineData(0.5, 1, 0.125)]
+    [InlineData(1, 0.5, 0.133333333333333)]
+    [InlineData(0.5, 1, 0.166666666666667)]
     public async Task GivenTwoFactorServices_ShouldCombineIntoSingleWeighting(
         decimal trendWeight,
         decimal retailFlowWeight,
