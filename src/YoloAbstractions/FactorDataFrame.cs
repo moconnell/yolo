@@ -99,7 +99,9 @@ public sealed record FactorDataFrame
     {
         ArgumentNullException.ThrowIfNull(one);
         ArgumentNullException.ThrowIfNull(two);
-        ArgumentOutOfRangeException.ThrowIfNotEqual(one.Tickers.ToCsv(), two.Tickers.ToCsv());
+        if (one.Tickers.Count != two.Tickers.Count ||
+            one.Tickers.Except(two.Tickers, StringComparer.OrdinalIgnoreCase).Any())
+            throw new ArgumentException("Ticker sets must match.");
 
         var joinedColumns = one._dataFrame.Columns
             .UnionBy(two._dataFrame.Columns, c => c.Name)

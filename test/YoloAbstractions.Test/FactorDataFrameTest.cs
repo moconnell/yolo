@@ -90,21 +90,30 @@ public class FactorDataFrameTest
         fdf[factorType, ticker].ShouldBe(expected);
     }
 
-    [Fact]
-    public void GivenTwoFactorDataFrames_WhenTickersNotEqual_ShouldThrow()
+    [Theory]
+    [InlineData("BTC,ETH,ETC", "BTC,ETH,ETC", false)]
+    [InlineData("BTC,ETH,ETC", "BTC,ETH,Etc", false)]
+    [InlineData("BTC,ETH,ETC", "BTC,ETC,ETH", false)]
+    [InlineData("BTC,ETH,ETC", "ETC,ETH,BTC", false)]
+    [InlineData("BTC,ETH,ETC", "BTC,ETH,BNB", true)]
+    [InlineData("BTC,ETH,ETC", "BTC,ETH,bnb", true)]
+    public void GivenTwoFactorDataFrames_WhenTickersNotEqual_ShouldThrow(
+        string tickers1,
+        string tickers2,
+        bool shouldThrow)
     {
         // arrange
         var one = new FactorDataFrame(
             new DataFrame(
                 new DateTimeDataFrameColumn("Date", Enumerable.Repeat(DateTime.Today, 3)),
-                new StringDataFrameColumn("Ticker", ["BTC", "ETH", "ETC"]),
+                new StringDataFrameColumn("Ticker", tickers1.Split(',')),
                 new DoubleDataFrameColumn(nameof(Carry), [0.15, 0.10, 0.02])),
             Carry);
 
         var two = new FactorDataFrame(
             new DataFrame(
                 new DateTimeDataFrameColumn("Date", Enumerable.Repeat(DateTime.Today, 3)),
-                new StringDataFrameColumn("Ticker", ["BTC", "ETH", "BNB"]),
+                new StringDataFrameColumn("Ticker", tickers2.Split(',')),
                 new DoubleDataFrameColumn(nameof(Momentum), [0.15, 0.10, 0.02])),
             Momentum);
 
@@ -112,7 +121,15 @@ public class FactorDataFrameTest
         var func = () => one + two;
 
         // assert
-        Assert.Throws<ArgumentOutOfRangeException>(func);
+        if (shouldThrow)
+        {
+            Assert.Throws<ArgumentException>(func);
+        }
+        else
+        {
+            var res = func();
+            res.ShouldNotBeNull();
+        }
     }
 
     [Fact]
