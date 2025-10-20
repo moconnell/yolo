@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using MathNet.Numerics.LinearAlgebra;
 using Microsoft.Data.Analysis;
-using YoloAbstractions.Extensions;
 using static YoloAbstractions.FactorType;
 
 namespace YoloAbstractions;
