@@ -70,7 +70,7 @@ public class UnravelFactorServiceTest
         var svc = new UnravelFactorService(mockApiSvc.Object);
 
         // act
-        var factors = await svc.GetFactorsAsync(tickers);
+        var factors = await svc.GetFactorsAsync();
 
         // assert
         factors.ShouldNotBeNull();
@@ -79,6 +79,8 @@ public class UnravelFactorServiceTest
         var keyValuePair = factors[btc].First();
         keyValuePair.Key.ShouldBe(RetailFlow);
         keyValuePair.Value.ShouldBe(retailFlowValueBtc, 0.000000001);
+
+        mockApiSvc.Verify(apiSvc => apiSvc.GetUniverseAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
 
