@@ -87,7 +87,7 @@ public class FactorDataFrameTest
             (Momentum, [0.17, 0.11, 0.03]));
 
         // assert
-        fdf.Value(factorType, ticker).ShouldBe(expected);
+        fdf[factorType, ticker].ShouldBe(expected);
     }
 
     [Fact]
@@ -151,9 +151,9 @@ public class FactorDataFrameTest
         var i = 0;
         foreach (var ticker in tickers)
         {
-            result.Value(Carry, ticker).ShouldBe(carryValues[i]);
-            result.Value(Momentum, ticker).ShouldBe(momoValues[i]);
-            result.Value(Trend, ticker).ShouldBe(trendValues[i++]);
+            result[Carry, ticker].ShouldBe(carryValues[i]);
+            result[Momentum, ticker].ShouldBe(momoValues[i]);
+            result[Trend, ticker].ShouldBe(trendValues[i++]);
         }
     }
 

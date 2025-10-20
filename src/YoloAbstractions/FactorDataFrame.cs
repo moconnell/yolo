@@ -59,15 +59,18 @@ public sealed record FactorDataFrame
         return new FactorDataFrame(df, factorTypes);
     }
 
-    public double Value(FactorType factorType, string ticker)
+    public double this[FactorType factorType, string ticker]
     {
-        if (!FactorTypes.Contains(factorType) || !_tickerIndex.TryGetValue(ticker, out var index))
+        get
         {
-            return double.NaN;
-        }
+            if (!FactorTypes.Contains(factorType) || !_tickerIndex.TryGetValue(ticker, out var index))
+            {
+                return double.NaN;
+            }
 
-        var val = (double?) _dataFrame[factorType.ToString()][index];
-        return val ?? double.NaN;
+            var val = (double?) _dataFrame[factorType.ToString()][index];
+            return val ?? double.NaN;
+        }
     }
 
     // Indexer by ticker symbol

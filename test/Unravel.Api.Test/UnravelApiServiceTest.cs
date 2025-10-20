@@ -56,9 +56,9 @@ public class UnravelApiServiceTest
         result.ShouldNotBeNull();
         result.FactorTypes.ShouldBe([FactorType.RetailFlow]);
         result.Tickers.ShouldBe([btc]);
-        result.Value(FactorType.RetailFlow, btc).ShouldBe(0.25, 0.000000001);
+        result[FactorType.RetailFlow, btc].ShouldBe(0.25, 0.000000001);
     }
-    
+
     [Fact]
     public async Task GivenEmptyConfig_WhenMocked_ShouldReturnEmpty()
     {
