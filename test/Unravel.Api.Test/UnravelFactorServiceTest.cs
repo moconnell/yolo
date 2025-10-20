@@ -1,8 +1,6 @@
-﻿using System.Globalization;
-using Moq;
+﻿using Moq;
 using Shouldly;
 using Unravel.Api.Interfaces;
-using Xunit.Abstractions;
 using YoloAbstractions;
 using static YoloAbstractions.FactorType;
 
@@ -10,10 +8,6 @@ namespace Unravel.Api.Test;
 
 public class UnravelFactorServiceTest
 {
-    private readonly ITestOutputHelper _testOutputHelper;
-
-    public UnravelFactorServiceTest(ITestOutputHelper testOutputHelper) => _testOutputHelper = testOutputHelper;
-
     [Fact]
     public async Task GivenGoodConfig_WhenMocked_ShouldReturnFactors()
     {
@@ -40,7 +34,7 @@ public class UnravelFactorServiceTest
         keyValuePair.Key.ShouldBe(RetailFlow);
         keyValuePair.Value.ShouldBe(retailFlowValueBtc, 0.000000001);
     }
-    
+
     [Fact]
     public async Task GivenDupeTickers_WhenMocked_ShouldReturnFactors()
     {
