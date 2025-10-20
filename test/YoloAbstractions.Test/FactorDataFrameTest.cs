@@ -132,6 +132,50 @@ public class FactorDataFrameTest
         }
     }
 
+    [Theory]
+    [InlineData("Carry", "Momentum,Trend", false)]
+    [InlineData("Carry", "Carry", true)]
+    [InlineData("Carry,Momentum", "Momentum,Trend", true)]
+    public void GivenTwoFactorDataFrames_WhenFactorsOverlap_ShouldThrow(
+        string factorTypes1,
+        string factorTypes2,
+        bool shouldThrow)
+    {
+        // arrange
+        string[] tickers = ["BTC"];
+        var one = NewFactorDataFrame(factorTypes1);
+        var two = NewFactorDataFrame(factorTypes2);
+
+        // act
+        var func = () => one + two;
+
+        // assert
+        if (shouldThrow)
+        {
+            Assert.Throws<ArgumentException>(func);
+        }
+        else
+        {
+            var res = func();
+            res.ShouldNotBeNull();
+        }
+
+        return;
+
+        FactorDataFrame NewFactorDataFrame(string s)
+        {
+            return FactorDataFrame.NewFrom(
+                tickers,
+                DateTime.Today,
+                [
+                    ..s.Split(',')
+                        .Select(Enum.Parse<FactorType>)
+                        .Select(x => (x, (IReadOnlyList<double>) [0.1]))
+                ]);
+        }
+    }
+
+
     [Fact]
     public void GivenTwoFactorDataFrames_WhenTickersEqual_ShouldAdd()
     {

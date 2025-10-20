@@ -98,9 +98,20 @@ public sealed record FactorDataFrame
     {
         ArgumentNullException.ThrowIfNull(one);
         ArgumentNullException.ThrowIfNull(two);
+        
         if (one.Tickers.Count != two.Tickers.Count ||
             one.Tickers.Except(two.Tickers, StringComparer.OrdinalIgnoreCase).Any())
             throw new ArgumentException("Ticker sets must match.");
+        
+        var sharedCols = one._dataFrame.Columns
+            .Select(c => c.Name)
+            .Intersect(two._dataFrame.Columns.Select(c => c.Name))
+            .Where(name => !string.Equals(name, "Ticker", StringComparison.Ordinal) &&
+                           !string.Equals(name, "Date", StringComparison.Ordinal))
+            .ToArray();
+        if (sharedCols.Length != 0)
+            throw new ArgumentException(
+                $"Cannot merge DataFrames with overlapping Factor columns: {string.Join(", ", sharedCols)}");
 
         var joinedColumns = one._dataFrame.Columns
             .UnionBy(two._dataFrame.Columns, c => c.Name)
