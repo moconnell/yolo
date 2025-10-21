@@ -1,6 +1,4 @@
-﻿using System.Runtime.CompilerServices;
-using MathNet.Numerics.LinearAlgebra;
-using Unravel.Api.Config;
+﻿using Unravel.Api.Config;
 using Unravel.Api.Data;
 using Unravel.Api.Interfaces;
 using YoloAbstractions;
@@ -24,35 +22,6 @@ public class UnravelApiService : IUnravelApiService
         {
             { ApiKeyHeader, _config.ApiKey }
         };
-    }
-
-    public async IAsyncEnumerable<KeyValuePair<FactorType, FactorFrame>> GetFactorsAsync(
-        IEnumerable<string> tickers,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
-    {
-        if (_config.Factors.Length == 0)
-            yield break;
-
-        ArgumentNullException.ThrowIfNull(tickers);
-        var tickersArray = tickers.Select(x => x.ToUpperInvariant()).Distinct().ToArray();
-        if (tickersArray.Length == 0)
-            throw new ArgumentException("Tickers cannot be empty.", nameof(tickers));
-        
-        var baseUrl = $"{_config.ApiBaseUrl}/{_config.UrlPathFactors}";
-        var tickersCsv = tickersArray.ToCsv().ToUpperInvariant();
-        var startDate = DateTime.Today.AddDays(-_config.Lookback).ToString(_config.DateFormat);
-
-        foreach (var fc in _config.Factors)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var url = string.Format(baseUrl, fc.Id, tickersCsv, startDate);
-            var response = await _httpClient.GetAsync<FactorsResponse, double[]>(url, _headers, cancellationToken);
-            var matrix = Matrix<double>.Build.DenseOfRows(response.Data);
-            var frame = new FactorFrame(matrix, response.Index, response.Tickers);
-
-            yield return new(fc.Type, frame);
-        }
     }
 
     public async Task<FactorDataFrame> GetFactorsLiveAsync(
