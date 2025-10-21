@@ -1,7 +1,7 @@
 ﻿using System.Net;
+using Microsoft.Extensions.Configuration;
 using Moq;
 using Moq.Contrib.HttpClient;
-using RobotWealth.Api;
 using Shouldly;
 using RobotWealth.Api.Config;
 
@@ -69,6 +69,70 @@ public class RobotWealthApiServiceTest
         var volBtc = volatilities.FirstOrDefault(x => x.Ticker == BtcUsdt);
         volBtc.ShouldNotBeNull();
         volBtc.EwVol.ShouldBe(0.272582342594688);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task GivenGoodConfig_WhenLiveData_ShouldGetWeights()
+    {
+        // arrange
+        var rwConfig = GetRobotWealthConfigFromAppSettings();
+
+        var cancellationTokenSource = new CancellationTokenSource();
+        cancellationTokenSource.CancelAfter(TimeSpan.FromMinutes(1));
+
+        using var httpClient = new HttpClient();
+
+        var svc = new RobotWealthApiService(httpClient, rwConfig);
+
+        // act
+        var weights = await svc.GetWeightsAsync(cancellationTokenSource.Token);
+
+        // assert
+        weights.ShouldNotBeNull();
+        weights.Count.ShouldBe(10);
+        weights.ShouldAllBe(x => x.Date > DateTime.MinValue);
+        weights.ShouldAllBe(x => !string.IsNullOrEmpty(x.Ticker));
+        weights.ShouldAllBe(x => x.ArrivalPrice != 0);
+        weights.ShouldAllBe(x => x.CarryMegafactor != 0);
+        weights.ShouldAllBe(x => x.MomentumMegafactor != 0);
+        weights.ShouldAllBe(x => x.TrendMegafactor != 0);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task GivenGoodConfig_WhenLiveData_ShouldGetVolatilities()
+    {
+        // arrange
+        var rwConfig = GetRobotWealthConfigFromAppSettings();
+
+        var cancellationTokenSource = new CancellationTokenSource();
+        cancellationTokenSource.CancelAfter(TimeSpan.FromMinutes(1));
+
+        using var httpClient = new HttpClient();
+
+        var svc = new RobotWealthApiService(httpClient, rwConfig);
+
+        // act
+        var weights = await svc.GetVolatilitiesAsync(cancellationTokenSource.Token);
+
+        // assert
+        weights.ShouldNotBeNull();
+        weights.Count.ShouldBe(10);
+        weights.ShouldAllBe(x => x.Date > DateTime.MinValue);
+        weights.ShouldAllBe(x => !string.IsNullOrEmpty(x.Ticker));
+        weights.ShouldAllBe(x => x.EwVol != 0);
+    }
+
+    private static RobotWealthConfig GetRobotWealthConfigFromAppSettings()
+    {
+        var builder = new ConfigurationBuilder()
+            .AddJsonFile("appsettings.json", true, true)
+            .AddJsonFile($"appsettings.local.json", true, true);
+        var config = builder.Build();
+        var rwConfig = config.GetChildren().First().Get<RobotWealthConfig>();
+        rwConfig.ShouldNotBeNull();
+        return rwConfig;
     }
 
     private static void SetupRequest(
