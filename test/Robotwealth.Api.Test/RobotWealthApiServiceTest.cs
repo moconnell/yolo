@@ -127,10 +127,10 @@ public class RobotWealthApiServiceTest
     private static RobotWealthConfig GetRobotWealthConfigFromAppSettings()
     {
         var builder = new ConfigurationBuilder()
-            .AddJsonFile("appsettings.json", true, true)
-            .AddJsonFile($"appsettings.local.json", true, true);
+            .AddJsonFile("appsettings.json")
+            .AddJsonFile($"appsettings.local.json", true);
         var config = builder.Build();
-        var rwConfig = config.GetChildren().First().Get<RobotWealthConfig>();
+        var rwConfig = config.GetRequiredSection("RobotWealth").Get<RobotWealthConfig>();
         rwConfig.ShouldNotBeNull();
         return rwConfig;
     }
