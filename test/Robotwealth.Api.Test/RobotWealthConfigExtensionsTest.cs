@@ -38,11 +38,11 @@ public class RobotWealthConfigExtensionsTest
         var config = builder.Build();
 
         // act
-        var unravelConfig = config.GetRobotWealthConfig();
+        var robotWealthConfig = config.GetRobotWealthConfig();
 
         // assert
-        unravelConfig.ShouldNotBeNull();
-        unravelConfig.VolatilitiesUrlPath.ShouldNotBeNullOrEmpty();
-        unravelConfig.WeightsUrlPath.ShouldNotBeNullOrEmpty();
+        robotWealthConfig.ShouldNotBeNull();
+        robotWealthConfig.VolatilitiesUrlPath.ShouldNotBeNullOrEmpty();
+        robotWealthConfig.WeightsUrlPath.ShouldNotBeNullOrEmpty();
     }
 }
