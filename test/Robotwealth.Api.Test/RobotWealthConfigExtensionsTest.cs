@@ -16,7 +16,6 @@ public class RobotWealthConfigExtensionsTest
         if (hasRwConfig)
         {
             builder.AddJsonFile("appsettings.json");
-            builder.AddJsonFile($"appsettings.local.json");
         }
 
         var config = builder.Build();

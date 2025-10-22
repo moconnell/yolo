@@ -33,8 +33,7 @@ public class UnravelConfigExtensionsTest
     {
         // arrange
         var builder = new ConfigurationBuilder()
-            .AddJsonFile("appsettings.json", true, true)
-            .AddJsonFile($"appsettings.local.json", true, true);
+            .AddJsonFile("appsettings.json");
         var config = builder.Build();
 
         // act
