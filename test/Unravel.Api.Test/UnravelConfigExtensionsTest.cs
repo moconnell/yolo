@@ -16,7 +16,6 @@ public class UnravelConfigExtensionsTest
         if (hasUnravelConfig)
         {
             builder.AddJsonFile("appsettings.json");
-            builder.AddJsonFile($"appsettings.local.json");
         }
 
         var config = builder.Build();
