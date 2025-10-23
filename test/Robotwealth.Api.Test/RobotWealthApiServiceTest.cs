@@ -114,14 +114,14 @@ public class RobotWealthApiServiceTest
         var svc = new RobotWealthApiService(httpClient, rwConfig);
 
         // act
-        var weights = await svc.GetVolatilitiesAsync(cancellationTokenSource.Token);
+        var volatilities = await svc.GetVolatilitiesAsync(cancellationTokenSource.Token);
 
         // assert
-        weights.ShouldNotBeNull();
-        weights.Count.ShouldBe(10);
-        weights.ShouldAllBe(x => x.Date > DateTime.MinValue);
-        weights.ShouldAllBe(x => !string.IsNullOrEmpty(x.Ticker));
-        weights.ShouldAllBe(x => x.EwVol != 0);
+        volatilities.ShouldNotBeNull();
+        volatilities.Count.ShouldBe(10);
+        volatilities.ShouldAllBe(x => x.Date > DateTime.MinValue);
+        volatilities.ShouldAllBe(x => !string.IsNullOrEmpty(x.Ticker));
+        volatilities.ShouldAllBe(x => x.EwVol != 0);
     }
 
     private static RobotWealthConfig GetRobotWealthConfigFromAppSettings()
