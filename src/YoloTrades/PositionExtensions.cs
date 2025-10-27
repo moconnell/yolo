@@ -17,7 +17,7 @@ public static class PositionExtensions
 
             return baseCurrencyToken == symbol
                 ? position.Sum(p => p.Amount)
-                : position.Sum(p => p.GetValue(markets, baseCurrencyToken));
+                : position.Sum(p => p.GetValue(markets));
         }
 
         return positions.Sum(PositionValue);
@@ -25,14 +25,13 @@ public static class PositionExtensions
 
     private static decimal GetValue(
         this Position position,
-        IReadOnlyDictionary<string, IReadOnlyList<MarketInfo>> markets,
-        string baseCurrencyToken)
+        IReadOnlyDictionary<string, IReadOnlyList<MarketInfo>> markets)
     {
         var (_, assetUnderlying, _, amount) = position;
 
         return markets
             .GetMarkets(assetUnderlying)
-            .Select(market => amount * market.Bid.GetValueOrDefault())
+            .Select(market => amount * (amount >= 0 ? market.Bid.GetValueOrDefault() : market.Ask.GetValueOrDefault()))
             .FirstOrDefault();
     }
 }

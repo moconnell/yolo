@@ -3,6 +3,7 @@ using HyperLiquid.Net;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using YoloAbstractions.Exceptions;
+using YoloBroker;
 using YoloBroker.Hyperliquid;
 using YoloBroker.Hyperliquid.Config;
 using YoloBroker.Interface;
@@ -29,6 +30,8 @@ public static class BrokerServiceCollectionExtensions
                     options.Socket.OutputOriginalData = true;
                 }
             });
+            
+            services.AddSingleton<IGetTickerAlias>(new TickerAliasService(hyperliquidConfig.Aliases));
 
             return services.AddSingleton<IYoloBroker, HyperliquidBroker>();
         }

@@ -35,7 +35,7 @@ public static class HttpClientExtensions
         if (!response.IsSuccessStatusCode)
         {
             throw new ApiException(
-                $"Could not fetch from API: {await response.Content.ReadAsStringAsync(cancellationToken)} ({response.StatusCode}: {response.ReasonPhrase})");
+                $"Could not fetch from API ({url}): {await response.Content.ReadAsStringAsync(cancellationToken)} ({response.StatusCode}: {response.ReasonPhrase})");
         }
 
         var apiResponse = await response.Content.ReadFromJsonAsync<TResponse>(cancellationToken: cancellationToken);

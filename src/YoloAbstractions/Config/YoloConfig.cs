@@ -12,6 +12,6 @@ public record YoloConfig
     public decimal SpreadSplit { get; init; } = 0.5m;
     public decimal? MinOrderValue { get; init; }
     public string UnfilledOrderTimeout { get; init; } = "00:05:00"; // Default 5 minutes
-    public double MaxWeightingAbs { get; init; } = 0.25;
+    public double? MaxWeightingAbs { get; init; } 
     public IReadOnlyDictionary<FactorType, decimal> FactorWeights { get; init; } = new Dictionary<FactorType, decimal>();
 }

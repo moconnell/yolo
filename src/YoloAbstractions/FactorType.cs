@@ -8,6 +8,7 @@ public enum FactorType
     Trend,
     Volatility,
     OpenInterestDivergence,
+    RelativeIlliquidity,
     RetailFlow,
     SupplyVelocity,
 }

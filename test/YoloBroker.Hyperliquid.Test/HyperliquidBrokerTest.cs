@@ -11,35 +11,39 @@ using Shouldly;
 using Xunit.Abstractions;
 using YoloAbstractions;
 using YoloBroker.Hyperliquid.Extensions;
+using YoloBroker.Interface;
 using static YoloAbstractions.AssetPermissions;
 using static YoloAbstractions.AssetType;
 using static YoloAbstractions.OrderType;
 
 namespace YoloBroker.Hyperliquid.Test;
 
-public class HyperliquidBrokerTest
+public class HyperliquidBrokerTest(ITestOutputHelper testOutputHelper)
 {
-    private readonly ITestOutputHelper _testOutputHelper;
-
-    public HyperliquidBrokerTest(ITestOutputHelper testOutputHelper)
-    {
-        _testOutputHelper = testOutputHelper;
-    }
-
     [Theory]
     [Trait("Category", "Integration")]
     [InlineData("ETH", PerpetualFutures, "ETH")]
     [InlineData("BTC,ETH", PerpetualFutures, "BTC,ETH")]
+    [InlineData("SHIB", PerpetualFutures, "SHIB", "SHIB:kSHIB")]
     public async Task GivenBaseAsset_ShouldGetMarkets(
         string baseAssetFilterString,
         AssetPermissions assetPermissions,
-        string expectedMarketsString)
+        string expectedMarketsString,
+        params string[] aliasConfig)
     {
         // arrange
         var baseAssetFilter = baseAssetFilterString.Split(',').Select(asset => asset.Trim()).ToHashSet();
         var expectedMarkets = expectedMarketsString.Split(',').Select(market => market.Trim()).ToHashSet();
+        var aliases = aliasConfig.Length > 0
+            ? aliasConfig.Select(alias =>
+                {
+                    var aliasParts = alias.Split(':');
+                    return new KeyValuePair<string, string>(aliasParts[0], aliasParts[1]);
+                })
+                .ToDictionary()
+            : null;
 
-        var broker = GetTestBroker();
+        var broker = GetTestBroker(aliases);
 
         // act
         var results = await broker.GetMarketsAsync(baseAssetFilter, assetPermissions: assetPermissions);
@@ -47,7 +51,10 @@ public class HyperliquidBrokerTest
         // assert
         Assert.NotNull(results);
         Assert.Equal(expectedMarkets.Count, results.Count);
-        Assert.True(results.All(kvp => expectedMarkets.Contains(kvp.Value[0].Name)));
+        Assert.True(expectedMarkets.All(ticker => results.ContainsKey(ticker)));
+        Assert.True(results.All(kvp => kvp.Value.All(info => !string.IsNullOrEmpty(info.BaseAsset))));
+        Assert.True(results.All(kvp => kvp.Value.All(info => !string.IsNullOrEmpty(info.Key))));
+        Assert.True(results.All(kvp => kvp.Value.All(info => !string.IsNullOrEmpty(info.Name))));
         Assert.True(results.All(kvp => kvp.Value.All(info => info.Ask > 0)));
         Assert.True(results.All(kvp => kvp.Value.All(info => info.Bid > 0)));
         Assert.True(results.All(kvp => kvp.Value.All(info => info.Mid > 0)));
@@ -160,13 +167,13 @@ public class HyperliquidBrokerTest
             await foreach (var orderUpdate in orderUpdates)
             {
                 updateCount++;
-                _testOutputHelper.WriteLine($"Update {updateCount}: {orderUpdate.Type} - {orderUpdate.Symbol}");
+                testOutputHelper.WriteLine($"Update {updateCount}: {orderUpdate.Type} - {orderUpdate.Symbol}");
 
                 orderUpdate.ShouldNotBeNull();
 
                 if (orderUpdate.Type == OrderUpdateType.Error)
                 {
-                    _testOutputHelper.WriteLine($"Error: {orderUpdate.Error?.Message}");
+                    testOutputHelper.WriteLine($"Error: {orderUpdate.Error?.Message}");
                     throw orderUpdate.Error ?? new Exception("Unknown error");
                 }
 
@@ -189,7 +196,7 @@ public class HyperliquidBrokerTest
         catch (OperationCanceledException) when (cts.Token.IsCancellationRequested)
         {
             // Expected cancellation
-            _testOutputHelper.WriteLine($"Test completed with {updateCount} updates");
+            testOutputHelper.WriteLine($"Test completed with {updateCount} updates");
         }
         finally
         {
@@ -237,7 +244,7 @@ public class HyperliquidBrokerTest
         var roundingType = isLong ? RoundingType.Down : RoundingType.Up;
         var roundedLimitPrice = rawLimitPrice.Value.RoundToValidPrice(priceStep.Value, roundingType);
 
-        _testOutputHelper.WriteLine(
+        testOutputHelper.WriteLine(
             $"Calculated limit price for {symbol}: {roundedLimitPrice} (raw: {rawLimitPrice.Value}, step: {priceStep.Value})");
 
         return roundedLimitPrice;
@@ -252,13 +259,14 @@ public class HyperliquidBrokerTest
             ClientOrderId: $"0x{RandomNumberGenerator.GetHexString(32, true)}");
 
 
-    private static HyperliquidBroker GetTestBroker()
+    private static HyperliquidBroker GetTestBroker(IReadOnlyDictionary<string, string>? aliases = null)
     {
         var (address, privateKey) = GetConfig();
         address.ShouldNotBeNullOrEmpty();
         privateKey.ShouldNotBeNullOrEmpty();
 
         var apiCredentials = new ApiCredentials(address, privateKey);
+
         var mockLogger = new Mock<ILogger<HyperliquidBroker>>();
 
         var broker = new HyperliquidBroker(
@@ -272,9 +280,23 @@ public class HyperliquidBrokerTest
                 options.ApiCredentials = apiCredentials;
                 options.Environment = HyperLiquidEnvironment.Testnet;
             }),
+            GetTickerAliasService(),
             mockLogger.Object
         );
         return broker;
+
+        IGetTickerAlias GetTickerAliasService()
+        {
+            if (aliases != null)
+            {
+                return new TickerAliasService(aliases);
+            }
+
+            var mockTickerAliasService = new Mock<IGetTickerAlias>();
+            mockTickerAliasService.Setup(x => x.TryGetAlias(It.IsAny<string>(), out It.Ref<string>.IsAny))
+                .Returns(false);
+            return mockTickerAliasService.Object;
+        }
     }
 
     private static (string? Address, string? PrivateKey) GetConfig()

@@ -107,6 +107,7 @@ public class UnravelApiServiceTest
         result.ShouldNotBeNull();
         result.FactorTypes.ShouldBe([FactorType.RetailFlow]);
         result.Tickers.Except(tickers).ShouldBe([]);
+        tickers.All(ticker => result[FactorType.RetailFlow, ticker] != 0).ShouldBe(true);
     }
 
     [Fact]

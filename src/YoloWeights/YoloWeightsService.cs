@@ -9,7 +9,7 @@ public class YoloWeightsService : ICalcWeights
 {
     private readonly IGetFactors[] _inner;
     private readonly IReadOnlyDictionary<FactorType, double> _factorWeights;
-    private readonly double _maxWeightingAbs;
+    private readonly double? _maxWeightingAbs;
 
     public YoloWeightsService(IEnumerable<IGetFactors> inner, YoloConfig config)
     {
