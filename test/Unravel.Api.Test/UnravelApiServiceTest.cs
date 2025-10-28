@@ -152,7 +152,7 @@ public class UnravelApiServiceTest
         };
 
         var exchange = config.Exchange.ToString().ToLowerInvariant();
-        var startDate = DateTime.Today.AddDays(-2).ToString(config.DateFormat);
+        var startDate = DateTime.Today.AddDays(-3).ToString(config.DateFormat);
         var requestUrl =
             $"{config.ApiBaseUrl}/{string.Format(config.UrlPathUniverse, config.UniverseSize, exchange, startDate)}";
         handler.SetupRequest(HttpMethod.Get, requestUrl)
