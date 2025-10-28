@@ -36,11 +36,17 @@ public class YoloWeightsServiceTest
         };
 
         var mockFactorService1 = new Mock<IGetFactors>();
-        mockFactorService1.Setup(x => x.GetFactorsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+        mockFactorService1.Setup(x => x.GetFactorsAsync(
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<ISet<FactorType>>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(FactorDataFrame.NewFrom([btcUsdt], DateTime.Today, (Trend, [Convert.ToDouble(trendValue)])));
 
         var mockFactorService2 = new Mock<IGetFactors>();
-        mockFactorService2.Setup(x => x.GetFactorsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+        mockFactorService2.Setup(x => x.GetFactorsAsync(
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<ISet<FactorType>>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(
                 FactorDataFrame.NewFrom([btcUsdt], DateTime.Today, (RetailFlow, [Convert.ToDouble(retailFlowValue)])));
 

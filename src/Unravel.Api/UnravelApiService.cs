@@ -58,7 +58,7 @@ public class UnravelApiService : IUnravelApiService
     {
         var baseUrl = $"{_config.ApiBaseUrl}/{_config.UrlPathUniverse}";
         var exchange = _config.Exchange.ToString().ToLowerInvariant();
-        var startDate = DateTime.Today.AddDays(-2).ToString(_config.DateFormat);
+        var startDate = DateTime.Today.AddDays(-3).ToString(_config.DateFormat);
         var url = string.Format(baseUrl, _config.UniverseSize, exchange, startDate);
         var response = await _httpClient.GetAsync<UniverseResponse, byte?[]>(url, _headers, cancellationToken);
         if (response.Index.Count == 1 && response.Tickers.Count == _config.UniverseSize)

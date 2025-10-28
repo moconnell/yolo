@@ -3,6 +3,7 @@ using HyperLiquid.Net;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using YoloAbstractions.Exceptions;
+using YoloAbstractions.Interfaces;
 using YoloBroker;
 using YoloBroker.Hyperliquid;
 using YoloBroker.Hyperliquid.Config;
@@ -32,8 +33,10 @@ public static class BrokerServiceCollectionExtensions
             });
             
             services.AddSingleton<IGetTickerAlias>(new TickerAliasService(hyperliquidConfig.Aliases));
+            services.AddSingleton<IYoloBroker, HyperliquidBroker>();
+            services.AddSingleton<IGetFactors, BrokerVolatilityFactorService>();
 
-            return services.AddSingleton<IYoloBroker, HyperliquidBroker>();
+            return services;
         }
 
         throw new ConfigException("No broker configuration!");

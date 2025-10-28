@@ -48,15 +48,18 @@ public class YoloWeightsService : ICalcWeights
         CancellationToken cancellationToken = default)
     {
         var baseAssets = new HashSet<string>(tickers);
+        var factors = new HashSet<FactorType>();
         var result = new List<FactorDataFrame>();
 
         foreach (var svc in _inner
-                     .OrderByDescending(x => x.IsFixedUniverse))
+                     .OrderByDescending(x => x.IsFixedUniverse)
+                     .ThenBy(x => x.Order))
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var df = await svc.GetFactorsAsync(baseAssets, cancellationToken);
+            var df = await svc.GetFactorsAsync(baseAssets, factors, cancellationToken);
             result.Add(df);
+            factors.UnionWith(df.FactorTypes);
 
             foreach (var ticker in df.Tickers)
             {

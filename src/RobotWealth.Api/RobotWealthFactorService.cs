@@ -18,8 +18,11 @@ public class RobotWealthFactorService : IGetFactors
 
     public bool IsFixedUniverse => true;
 
+    public int Order => 0;
+
     public async Task<FactorDataFrame> GetFactorsAsync(
         IEnumerable<string>? tickers = null,
+        ISet<FactorType>? factors = null,
         CancellationToken cancellationToken = default)
     {
         var weights = await _apiService.GetWeightsAsync(cancellationToken);

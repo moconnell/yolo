@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using CryptoExchange.Net.Objects;
 using CryptoExchange.Net.Objects.Sockets;
 using HyperLiquid.Net;
+using HyperLiquid.Net.Enums;
 using HyperLiquid.Net.Interfaces.Clients;
 using HyperLiquid.Net.Objects.Models;
 using Microsoft.Extensions.Logging;
@@ -19,6 +20,7 @@ using YoloBroker.Hyperliquid.Exceptions;
 using YoloBroker.Hyperliquid.Extensions;
 using YoloBroker.Interface;
 using OrderStatus = YoloAbstractions.OrderStatus;
+using OrderType = YoloAbstractions.OrderType;
 
 namespace YoloBroker.Hyperliquid;
 
@@ -179,6 +181,13 @@ public sealed class HyperliquidBroker : IYoloBroker
                     futuresResult.Error?.Message,
                     futuresResult.Error?.Code);
         }
+    }
+
+    public async Task<IReadOnlyList<decimal>> GetDailyClosePricesAsync(string ticker, int periods, CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(ticker, nameof(ticker));
+        var klines = await GetDailyPriceHistoryAsync(ticker, periods, ct);
+        return klines.Select(x => x.ClosePrice).ToArray();
     }
 
     public async IAsyncEnumerable<OrderUpdate> ManageOrdersAsync(
@@ -563,8 +572,9 @@ public sealed class HyperliquidBroker : IYoloBroker
             "Could not get spot balances");
 
         var futuresPositions = GetPositionsFromPositions(futuresAccount.Positions);
-        var spotPositions = GetPositionsFromBalances(spotBalances
-            .Where(x => x.Asset != "USDC" && x.Total != 0));
+        var spotPositions = GetPositionsFromBalances(
+            spotBalances
+                .Where(x => x.Asset != "USDC" && x.Total != 0));
 
         var result = new Dictionary<string, IReadOnlyList<Position>>(futuresPositions);
         foreach (var (key, value) in spotPositions)
@@ -633,7 +643,10 @@ public sealed class HyperliquidBroker : IYoloBroker
             assetPermissions.HasFlag(AssetPermissions.LongSpotAndPerp) ||
             assetPermissions.HasFlag(AssetPermissions.SpotAndPerp))
         {
-            markets = await GetFuturesMarketsAsync(aliasedBaseAssetFilter, effectiveQuoteCurrency, ct);
+            markets = await GetFuturesMarketsAsync(
+                aliasedBaseAssetFilter,
+                effectiveQuoteCurrency,
+                ct);
         }
 
         if (assetPermissions.HasFlag(AssetPermissions.Spot) ||
@@ -641,7 +654,10 @@ public sealed class HyperliquidBroker : IYoloBroker
             assetPermissions.HasFlag(AssetPermissions.ShortSpot) ||
             assetPermissions.HasFlag(AssetPermissions.SpotAndPerp))
         {
-            var spotMarkets = await GetSpotMarketsAsync(aliasedBaseAssetFilter, effectiveQuoteCurrency, ct);
+            var spotMarkets = await GetSpotMarketsAsync(
+                aliasedBaseAssetFilter,
+                effectiveQuoteCurrency,
+                ct);
             foreach (var kvp in spotMarkets)
             {
                 if (markets.TryGetValue(kvp.Key, out var value))
@@ -656,9 +672,9 @@ public sealed class HyperliquidBroker : IYoloBroker
         }
 
         return markets.Select(kvp =>
-            _tickerAliasService.TryGetTicker(kvp.Key, out var ticker)
-                ? new KeyValuePair<string, IReadOnlyList<MarketInfo>>(ticker!, kvp.Value)
-                : kvp)
+                _tickerAliasService.TryGetTicker(kvp.Key, out var ticker)
+                    ? new KeyValuePair<string, IReadOnlyList<MarketInfo>>(ticker!, kvp.Value)
+                    : kvp)
             .ToDictionary();
     }
 
@@ -683,17 +699,23 @@ public sealed class HyperliquidBroker : IYoloBroker
                 .Select(async symbol => (symbol, await GetSpotOrderBookAsync(symbol.Name, ct))));
 
         return tickersAndPrices
-            .ToDictionary<(HyperLiquidSymbol Symbol, HyperLiquidOrderBook OrderBook), string,
+            .ToDictionary<(HyperLiquidSymbol Symbol, HyperLiquidOrderBook OrderBook), string
+                ,
                 IReadOnlyList<MarketInfo>>(
                 tuple => tuple.Symbol.Name,
                 tuple => [ToMarketInfo(tuple.Symbol, tuple.OrderBook)]);
     }
 
-    private static MarketInfo ToMarketInfo(HyperLiquidSymbol symbol, HyperLiquidOrderBook orderBook)
+    private static MarketInfo ToMarketInfo(
+        HyperLiquidSymbol symbol,
+        HyperLiquidOrderBook orderBook)
     {
         var priceStep = Convert.ToDecimal(Math.Pow(10, -6 + symbol.QuoteAsset.PriceDecimals));
         var quantityStep = Convert.ToDecimal(Math.Pow(10, -symbol.QuoteAsset.QuantityDecimals));
         var minProvideSize = Math.Ceiling(10 / orderBook.Levels.Asks[0].Price / quantityStep) * quantityStep;
+        var ask = orderBook.Levels.Asks.ElementAtOrDefault(0)?.Price;
+        var bid = orderBook.Levels.Bids.ElementAtOrDefault(0)?.Price;
+        var mid = (ask + bid) / 2;
 
         return new MarketInfo(
             Name: symbol.Name,
@@ -704,12 +726,9 @@ public sealed class HyperliquidBroker : IYoloBroker
             PriceStep: priceStep,
             QuantityStep: quantityStep,
             MinProvideSize: minProvideSize,
-            Ask: orderBook.Levels.Asks.ElementAtOrDefault(0)?.Price,
-            Bid: orderBook.Levels.Bids.ElementAtOrDefault(0)?.Price,
-            Mid: (orderBook.Levels.Asks.ElementAtOrDefault(0)?.Price +
-                  orderBook.Levels.Bids.ElementAtOrDefault(0)?.Price) /
-                 2
-        );
+            Ask: ask,
+            Bid: bid,
+            Mid: mid);
     }
 
     private async Task<HyperLiquidOrderBook> GetSpotOrderBookAsync(string symbol, CancellationToken ct)
@@ -738,7 +757,8 @@ public sealed class HyperliquidBroker : IYoloBroker
         _logger.LogDebug("Retrieved {Count} tickers and prices", tickersAndPrices.Length);
 
         return tickersAndPrices
-            .ToDictionary<(HyperLiquidFuturesSymbol Symbol, HyperLiquidOrderBook OrderBook), string,
+            .ToDictionary<(HyperLiquidFuturesSymbol Symbol, HyperLiquidOrderBook OrderBook),
+                string,
                 IReadOnlyList<MarketInfo>>(
                 tuple => tuple.Symbol.Name,
                 tuple => [ToMarketInfo(tuple.Symbol, quoteCurrency, tuple.OrderBook)]);
@@ -752,7 +772,9 @@ public sealed class HyperliquidBroker : IYoloBroker
         var baseTickSize = Convert.ToDecimal(Math.Pow(10, -6 + symbol.QuantityDecimals));
         var quantityStep = Convert.ToDecimal(Math.Pow(10, -symbol.QuantityDecimals));
         var priceStep = orderBook.Levels.Bids.ElementAtOrDefault(0)?.Price.CalculateValidTickSize(baseTickSize);
-        var midPrice = (orderBook.Levels.Asks[0].Price + orderBook.Levels.Bids[0].Price) / 2;
+        var ask = orderBook.Levels.Asks.ElementAtOrDefault(0)?.Price;
+        var bid = orderBook.Levels.Bids.ElementAtOrDefault(0)?.Price;
+        var mid = (ask + bid) / 2;
         var minProvideSize = Math.Ceiling(10 / orderBook.Levels.Asks[0].Price / quantityStep) * quantityStep;
 
         return new MarketInfo(
@@ -764,9 +786,9 @@ public sealed class HyperliquidBroker : IYoloBroker
             PriceStep: priceStep,
             QuantityStep: quantityStep,
             MinProvideSize: minProvideSize,
-            Ask: orderBook.Levels.Asks.ElementAtOrDefault(0)?.Price,
-            Bid: orderBook.Levels.Bids.ElementAtOrDefault(0)?.Price,
-            Mid: midPrice);
+            Ask: ask,
+            Bid: bid,
+            Mid: mid);
     }
 
     private async Task<HyperLiquidOrderBook> GetFuturesOrderBookAsync(string symbol, CancellationToken ct)
@@ -776,6 +798,25 @@ public sealed class HyperliquidBroker : IYoloBroker
             $"Could not get order book for {symbol}");
 
         return orderBook;
+    }
+
+    private async Task<HyperLiquidKline[]> GetDailyPriceHistoryAsync(
+        string symbol,
+        int periods,
+        CancellationToken ct = default)
+    {
+        var startTime = DateTime.UtcNow.AddDays(-periods);
+        var endTime = DateTime.UtcNow;
+        var klines = await GetDataAsync(
+            () => _hyperliquidClient.SpotApi.ExchangeData.GetKlinesAsync(
+                symbol,
+                KlineInterval.OneDay,
+                startTime,
+                endTime,
+                ct),
+            $"Could not get prices for {symbol}");
+
+        return klines;
     }
 
     private void Dispose(bool disposing)

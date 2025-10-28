@@ -13,8 +13,11 @@ public class UnravelFactorService : IGetFactors
 
     public bool IsFixedUniverse => false;
 
+    public int Order => 10;
+
     public async Task<FactorDataFrame> GetFactorsAsync(
         IEnumerable<string>? tickers = null,
+        ISet<FactorType>? factors = null,
         CancellationToken cancellationToken = default)
     {
         var tickersArray = await GetTickers(tickers, cancellationToken);
