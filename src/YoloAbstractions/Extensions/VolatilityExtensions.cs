@@ -18,11 +18,14 @@ public static class VolatilityExtensions
         var prices = closes.ToList();
         if (prices.Count < 2)
             throw new ArgumentException("At least two closing prices are required.");
+        if (prices.Any(x => x <= 0))
+            throw new ArgumentException("All closing prices must be positive.");
 
         // Compute log returns
         var logReturns = new List<double>(prices.Count - 1);
-        for (int i = 1; i < prices.Count; i++)
+        for (var i = 1; i < prices.Count; i++)
         {
+
             var r = Math.Log((double) (prices[i] / prices[i - 1]));
             logReturns.Add(r);
         }
