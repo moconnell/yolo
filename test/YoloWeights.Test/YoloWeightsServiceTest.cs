@@ -53,7 +53,7 @@ public class YoloWeightsServiceTest
         var svc = new YoloWeightsService([mockFactorService1.Object, mockFactorService2.Object], config);
 
         // act
-        var weights = await svc.CalculateWeightsAsync([btcUsdt]);
+        var weights = await svc.CalculateWeightsAsync();
 
         // assert
         weights.ShouldNotBeNull();

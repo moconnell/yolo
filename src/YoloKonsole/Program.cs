@@ -111,7 +111,7 @@ __  ______  __    ____  __
 
             var weightsService = serviceProvider.GetService<ICalcWeights>() ??
                                  throw new ConfigException("Weights configuration is missing or invalid");
-            var weights = await weightsService.CalculateWeightsAsync(positions.Keys, cancellationToken);
+            var weights = await weightsService.CalculateWeightsAsync(cancellationToken);
 
             var baseAssetFilter = positions
                 .Keys

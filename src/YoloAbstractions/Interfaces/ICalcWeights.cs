@@ -7,6 +7,5 @@ namespace YoloAbstractions.Interfaces;
 public interface ICalcWeights
 {
     Task<IReadOnlyDictionary<string, decimal>> CalculateWeightsAsync(
-        IEnumerable<string> tickers,
         CancellationToken cancellationToken = default);
 }

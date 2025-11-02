@@ -29,12 +29,9 @@ public class YoloWeightsService : ICalcWeights
     }
 
     public async Task<IReadOnlyDictionary<string, decimal>> CalculateWeightsAsync(
-        IEnumerable<string> tickers,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(tickers);
-
-        var df = await GetFactorsAsync(tickers, cancellationToken);
+        var df = await GetFactorsAsync(cancellationToken);
         var weights = df.ApplyWeights(_factorWeights, _maxWeightingAbs);
         var weightsDict = weights.Rows.ToDictionary(
             r => (string) r["Ticker"],
@@ -44,10 +41,9 @@ public class YoloWeightsService : ICalcWeights
     }
 
     private async Task<FactorDataFrame> GetFactorsAsync(
-        IEnumerable<string> tickers,
         CancellationToken cancellationToken = default)
     {
-        var baseAssets = new HashSet<string>(tickers);
+        var baseAssets = new HashSet<string>();
         var factors = new HashSet<FactorType>();
         var result = new List<FactorDataFrame>();
 
