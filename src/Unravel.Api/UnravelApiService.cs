@@ -32,12 +32,16 @@ public class UnravelApiService : IUnravelApiService
             return FactorDataFrame.Empty;
 
         ArgumentNullException.ThrowIfNull(tickers);
-        var tickersArray = tickers.Select(x => x.ToUpperInvariant()).Distinct().ToArray();
+        var tickersArray = tickers
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Select(s => s.Trim().ToUpperInvariant())
+            .Distinct()
+            .ToArray();
         if (tickersArray.Length == 0)
             throw new ArgumentException("Tickers cannot be empty.", nameof(tickers));
 
         var baseUrl = $"{_config.ApiBaseUrl}/{_config.UrlPathFactorsLive}";
-        var tickersCsv = tickersArray.ToCsv().ToUpperInvariant();
+        var tickersCsv = tickersArray.ToCsv();
         var results = new List<FactorDataFrame>();
 
         foreach (var fc in _config.Factors)
