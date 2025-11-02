@@ -801,20 +801,21 @@ public sealed class HyperliquidBroker : IYoloBroker
     }
 
     private async Task<HyperLiquidKline[]> GetDailyPriceHistoryAsync(
-        string symbol,
+        string ticker,
         int periods,
         CancellationToken ct = default)
     {
+        ticker = _tickerAliasService.TryGetAlias(ticker, out var alias) ? alias! : ticker;
         var startTime = DateTime.UtcNow.AddDays(-periods);
         var endTime = DateTime.UtcNow;
         var klines = await GetDataAsync(
             () => _hyperliquidClient.SpotApi.ExchangeData.GetKlinesAsync(
-                symbol,
+                ticker,
                 KlineInterval.OneDay,
                 startTime,
                 endTime,
                 ct),
-            $"Could not get prices for {symbol}");
+            $"Could not get prices for {ticker}");
 
         return klines;
     }
