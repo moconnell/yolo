@@ -41,7 +41,7 @@ public class UnravelApiService : IUnravelApiService
             throw new ArgumentException("Tickers cannot be empty.", nameof(tickers));
 
         var baseUrl = $"{_config.ApiBaseUrl}/{_config.UrlPathFactorsLive}";
-        var tickersCsv = tickersArray.ToCsv();
+        var tickersCsv = Uri.EscapeDataString(tickersArray.ToCsv());
         var results = new List<FactorDataFrame>();
 
         foreach (var fc in _config.Factors)
