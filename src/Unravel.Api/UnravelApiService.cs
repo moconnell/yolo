@@ -2,6 +2,7 @@
 using Unravel.Api.Data;
 using Unravel.Api.Interfaces;
 using YoloAbstractions;
+using YoloAbstractions.Exceptions;
 using YoloAbstractions.Extensions;
 
 namespace Unravel.Api;
@@ -69,6 +70,10 @@ public class UnravelApiService : IUnravelApiService
             return response.Tickers;
 
         var lastRow = response.Data[^1];
+        if (lastRow.Length != response.Tickers.Count)
+            throw new ApiException(
+                $"Universe response malformed: lastRow length {lastRow.Length} != tickers count {response.Tickers.Count}.");
+
         var tickers = response.Tickers.Where((_, i) => lastRow[i] == 1).ToArray();
         return tickers;
     }
