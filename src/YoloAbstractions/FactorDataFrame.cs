@@ -122,6 +122,102 @@ public sealed record FactorDataFrame
         return new FactorDataFrame(df, joinedFactorTypes);
     }
 
+    public FactorDataFrame Normalize(NormalizationMethod method = NormalizationMethod.CrossSectionalZScore)
+    {
+        var normalizedColumns = new List<DataFrameColumn>
+        {
+            _dataFrame["Date"],
+            _dataFrame["Ticker"]
+        };
+
+        foreach (var factorType in FactorTypes.Except([Volatility]))
+        {
+            var colName = factorType.ToString();
+            var col = (DoubleDataFrameColumn) _dataFrame[colName];
+
+            var normalizedCol = method switch
+            {
+                NormalizationMethod.CrossSectionalZScore => NormalizeZScore(col),
+                NormalizationMethod.MinMax => NormalizeMinMax(col),
+                NormalizationMethod.Rank => NormalizeRank(col),
+                _ => throw new ArgumentException($"Unknown normalization method: {method}")
+            };
+
+            normalizedColumns.Add(new DoubleDataFrameColumn(colName, normalizedCol));
+        }
+
+        // Add volatility column if it exists (don't normalize it)
+        if (_dataFrame.Columns.FirstOrDefault(c => c.Name == nameof(Volatility)) is DoubleDataFrameColumn volCol)
+        {
+            normalizedColumns.Add(volCol);
+        }
+
+        var normalizedDf = new DataFrame(normalizedColumns);
+        return new FactorDataFrame(normalizedDf, [..FactorTypes]);
+    }
+
+    private static IEnumerable<double> NormalizeZScore(DoubleDataFrameColumn col)
+    {
+        var values = col.Where(v => v.HasValue && !double.IsNaN(v.Value)).Select(v => v!.Value).ToArray();
+
+        if (values.Length == 0)
+            return col.Select(v => double.NaN);
+
+        var mean = values.Average();
+        var variance = values.Sum(v => Math.Pow(v - mean, 2)) / values.Length;
+        var stdDev = Math.Sqrt(variance);
+
+        if (stdDev < 1e-10) // Avoid division by zero for constant columns
+            return col.Select(v => 0.0);
+
+        return col.Select(v => v.HasValue && !double.IsNaN(v.Value)
+            ? (v.Value - mean) / stdDev
+            : double.NaN);
+    }
+
+    private static IEnumerable<double> NormalizeMinMax(DoubleDataFrameColumn col)
+    {
+        var values = col.Where(v => v.HasValue && !double.IsNaN(v.Value)).Select(v => v!.Value).ToArray();
+
+        if (values.Length == 0)
+            return col.Select(v => double.NaN);
+
+        var min = values.Min();
+        var max = values.Max();
+        var range = max - min;
+
+        if (range < 1e-10) // Avoid division by zero
+            return col.Select(v => 0.0);
+
+        return col.Select(v => v.HasValue && !double.IsNaN(v.Value)
+            ? 2 * ((v.Value - min) / range) - 1 // Scale to [-1, 1]
+            : double.NaN);
+    }
+
+    private static IEnumerable<double> NormalizeRank(DoubleDataFrameColumn col)
+    {
+        var values = col.Select((v, i) => (Value: v, Index: i)).ToArray();
+        var validValues = values
+            .Where(x => x.Value.HasValue && !double.IsNaN(x.Value.Value))
+            .OrderBy(x => x.Value!.Value)
+            .ToArray();
+
+        if (validValues.Length == 0)
+            return col.Select(v => double.NaN);
+
+        var ranks = new Dictionary<int, double>();
+        for (int i = 0; i < validValues.Length; i++)
+        {
+            // Scale to [-1, 1] range
+            ranks[validValues[i].Index] = validValues.Length > 1
+                ? 2.0 * i / (validValues.Length - 1) - 1
+                : 0.0;
+        }
+
+        return values.Select(x => ranks.TryGetValue(x.Index, out var rank) ? rank : double.NaN);
+    }
+
+
     public DataFrame ApplyWeights(
         IReadOnlyDictionary<FactorType, double> weights,
         double? maxWeightAbs = null,
@@ -226,7 +322,6 @@ public sealed record FactorDataFrame
             return factorCols.Any(c => c.Any(value => value is null or double.NaN));
         }
     }
-
 
     public override string ToString()
     {

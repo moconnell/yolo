@@ -1,4 +1,5 @@
-﻿using YoloAbstractions;
+﻿using Microsoft.Extensions.Logging;
+using YoloAbstractions;
 using YoloAbstractions.Config;
 using YoloAbstractions.Extensions;
 using YoloAbstractions.Interfaces;
@@ -10,9 +11,11 @@ public class YoloWeightsService : ICalcWeights
     private readonly IGetFactors[] _inner;
     private readonly IReadOnlyDictionary<FactorType, double> _factorWeights;
     private readonly double? _maxWeightingAbs;
+    private readonly ILogger<YoloWeightsService> _logger;
 
-    public YoloWeightsService(IEnumerable<IGetFactors> inner, YoloConfig config)
+    public YoloWeightsService(IEnumerable<IGetFactors> inner, YoloConfig config, ILogger<YoloWeightsService> logger)
     {
+        _logger = logger;
         ArgumentNullException.ThrowIfNull(inner);
         ArgumentNullException.ThrowIfNull(config);
 
@@ -31,8 +34,15 @@ public class YoloWeightsService : ICalcWeights
     public async Task<IReadOnlyDictionary<string, decimal>> CalculateWeightsAsync(
         CancellationToken cancellationToken = default)
     {
-        var df = await GetFactorsAsync(cancellationToken);
-        var weights = df.ApplyWeights(_factorWeights, _maxWeightingAbs, true, true);
+        var factorDataFrame = await GetFactorsAsync(cancellationToken);
+        _logger.LogInformation("Factors (raw):\n{Factors}", factorDataFrame);
+        
+        var normalizedFactors = factorDataFrame.Normalize();
+        _logger.LogInformation("Factors (normalised):\n{Factors}", normalizedFactors);
+        
+        var weights = normalizedFactors.ApplyWeights(_factorWeights, _maxWeightingAbs, true, true);
+        _logger.LogInformation("weights: {Weights}", weights);
+        
         var weightsDict = weights.Rows.ToDictionary(
             r => (string) r["Ticker"],
             r => Convert.ToDecimal((double) r["Weight"]));

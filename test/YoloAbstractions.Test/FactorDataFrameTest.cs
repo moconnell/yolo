@@ -271,4 +271,57 @@ public class FactorDataFrameTest
             calculatedWeight.ShouldBe(expectedValue, tolerance);
         }
     }
+
+    [Fact]
+    public void GivenFactorDataFrame_WhenNormalized_ShouldHaveZeroMeanUnitStd()
+    {
+        // arrange
+        string[] tickers = ["BTC", "ETH", "ADA", "BNB"];
+        double[] carryValues = [0.15, 0.10, 0.02, -0.05];
+        double[] momoValues = [0.34, 0.17, 0.08, -0.12];
+
+        var factorDataFrame = FactorDataFrame.NewFrom(
+            tickers,
+            DateTime.Today,
+            (Carry, carryValues),
+            (Momentum, momoValues));
+
+        // act
+        var normalized = factorDataFrame.Normalize();
+
+        // assert - check that each factor has mean ≈ 0 and std ≈ 1
+        foreach (var factorType in normalized.FactorTypes)
+        {
+            var values = tickers.Select(t => normalized[factorType, t]).Where(v => !double.IsNaN(v)).ToArray();
+            var mean = values.Average();
+            var variance = values.Sum(v => Math.Pow(v - mean, 2)) / values.Length;
+            var stdDev = Math.Sqrt(variance);
+
+            mean.ShouldBe(0.0, 1e-10);
+            stdDev.ShouldBe(1.0, 1e-10);
+        }
+    }
+
+    [Fact]
+    public void GivenFactorDataFrameWithMissingValue_WhenNormalized_ShouldPreserveNaN()
+    {
+        // arrange
+        string[] tickers = ["BTC", "ETH", "MNT"];
+        double[] carryValues = [0.15, 0.10, 0.02];
+        double[] momoValues = [0.34, 0.17, double.NaN];
+
+        var factorDataFrame = FactorDataFrame.NewFrom(
+            tickers,
+            DateTime.Today,
+            (Carry, carryValues),
+            (Momentum, momoValues));
+
+        // act
+        var normalized = factorDataFrame.Normalize();
+
+        // assert
+        normalized[Momentum, "MNT"].ShouldBe(double.NaN);
+        double.IsNaN(normalized[Momentum, "BTC"]).ShouldBeFalse();
+        double.IsNaN(normalized[Momentum, "ETH"]).ShouldBeFalse();
+    }
 }
