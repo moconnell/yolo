@@ -285,14 +285,14 @@ public class HyperliquidBrokerTest(ITestOutputHelper testOutputHelper)
         );
         return broker;
 
-        IGetTickerAlias GetTickerAliasService()
+        ITickerAliasService GetTickerAliasService()
         {
             if (aliases != null)
             {
                 return new TickerAliasService(aliases);
             }
 
-            var mockTickerAliasService = new Mock<IGetTickerAlias>();
+            var mockTickerAliasService = new Mock<ITickerAliasService>();
             mockTickerAliasService.Setup(x => x.TryGetAlias(It.IsAny<string>(), out It.Ref<string>.IsAny))
                 .Returns(false);
             return mockTickerAliasService.Object;

@@ -1,6 +1,6 @@
 namespace YoloBroker.Interface;
 
-public interface IGetTickerAlias
+public interface ITickerAliasService
 {
     bool TryGetAlias(string ticker, out string? tickerAlias);
     

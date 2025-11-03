@@ -125,7 +125,8 @@ public sealed record FactorDataFrame
     public DataFrame ApplyWeights(
         IReadOnlyDictionary<FactorType, double> weights,
         double? maxWeightAbs = null,
-        bool volatilityScaling = true)
+        bool volatilityScaling = true,
+        bool normalizePerAsset = false)
     {
         ArgumentNullException.ThrowIfNull(weights);
 
@@ -141,36 +142,89 @@ public sealed record FactorDataFrame
 
         var rows = (int) _dataFrame.Rows.Count;
         var columns = factorCols.Length;
-        var data = factorCols
-            .Select(c => c.Select(x => x ?? 0d).ToArray())
-            .ToArray();
 
-        var m = Matrix<double>.Build.DenseOfColumns(rows, columns, data);
-        var v = Vector<double>.Build.DenseOfArray(alignedWeights);
-
-        var normalizer = alignedWeights.Sum(Math.Abs);
-        if (normalizer <= 0)
-            normalizer = 1;
-        var tickerWeights = m * v / normalizer; // (rows x 1)
-        if (volatilityScaling &&
-            _dataFrame.Columns.FirstOrDefault(c => c.Name == nameof(Volatility)) is DoubleDataFrameColumn volCol)
+        if (normalizePerAsset && HasMissingValues())
         {
-            var vol = Vector<double>.Build.DenseOfArray(
-                volCol.Select(x => x is > 0d ? x.Value : 1d).ToArray());
-            tickerWeights = tickerWeights.PointwiseDivide(vol);
+            // Calculate weight per asset, normalizing only by available factors
+            var tickerWeights = new double[rows];
+            for (var row = 0; row < rows; row++)
+            {
+                double weightSum = 0;
+                double normalizerSum = 0;
+
+                for (var col = 0; col < columns; col++)
+                {
+                    var value = factorCols[col][row];
+                    if (value.HasValue && !double.IsNaN(value.Value))
+                    {
+                        weightSum += value.Value * alignedWeights[col];
+                        normalizerSum += Math.Abs(alignedWeights[col]);
+                    }
+                }
+
+                tickerWeights[row] = normalizerSum > 0 ? weightSum / normalizerSum : 0;
+            }
+
+            var tickerWeightsVector = Vector<double>.Build.DenseOfArray(tickerWeights);
+
+            if (volatilityScaling &&
+                _dataFrame.Columns.FirstOrDefault(c => c.Name == nameof(Volatility)) is DoubleDataFrameColumn volCol)
+            {
+                var vol = Vector<double>.Build.DenseOfArray(
+                    volCol.Select(x => x is > 0d ? x.Value : 1d).ToArray());
+                tickerWeightsVector = tickerWeightsVector.PointwiseDivide(vol);
+            }
+
+            if (maxWeightAbs.HasValue)
+            {
+                tickerWeightsVector.MapInplace(x => Math.Clamp(x, -maxWeightAbs.Value, maxWeightAbs.Value));
+            }
+
+            var resultDf = new DataFrame();
+            resultDf.Columns.Add(_dataFrame["Date"]);
+            resultDf.Columns.Add(_dataFrame["Ticker"]);
+            resultDf.Columns.Add(new DoubleDataFrameColumn("Weight", tickerWeightsVector));
+
+            return resultDf;
+        }
+        else
+        {
+            var data = factorCols
+                .Select(c => c.Select(x => x ?? 0d).ToArray())
+                .ToArray();
+
+            var m = Matrix<double>.Build.DenseOfColumns(rows, columns, data);
+            var v = Vector<double>.Build.DenseOfArray(alignedWeights);
+
+            var normalizer = alignedWeights.Sum(Math.Abs);
+            if (normalizer <= 0)
+                normalizer = 1;
+            var tickerWeights = m * v / normalizer; // (rows x 1)
+            if (volatilityScaling &&
+                _dataFrame.Columns.FirstOrDefault(c => c.Name == nameof(Volatility)) is DoubleDataFrameColumn volCol)
+            {
+                var vol = Vector<double>.Build.DenseOfArray(
+                    volCol.Select(x => x is > 0d ? x.Value : 1d).ToArray());
+                tickerWeights = tickerWeights.PointwiseDivide(vol);
+            }
+
+            if (maxWeightAbs.HasValue)
+            {
+                tickerWeights.MapInplace(x => Math.Clamp(x, -maxWeightAbs.Value, maxWeightAbs.Value));
+            }
+
+            var resultDf = new DataFrame();
+            resultDf.Columns.Add(_dataFrame["Date"]);
+            resultDf.Columns.Add(_dataFrame["Ticker"]);
+            resultDf.Columns.Add(new DoubleDataFrameColumn("Weight", tickerWeights));
+
+            return resultDf;
         }
 
-        if (maxWeightAbs.HasValue)
+        bool HasMissingValues()
         {
-            tickerWeights.MapInplace(x => Math.Clamp(x, -maxWeightAbs.Value, maxWeightAbs.Value));
+            return factorCols.Any(c => c.Any(value => value is null or double.NaN));
         }
-
-        var resultDf = new DataFrame();
-        resultDf.Columns.Add(_dataFrame["Date"]);
-        resultDf.Columns.Add(_dataFrame["Ticker"]);
-        resultDf.Columns.Add(new DoubleDataFrameColumn("Weight", tickerWeights));
-
-        return resultDf;
     }
 
 

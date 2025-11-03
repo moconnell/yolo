@@ -32,7 +32,7 @@ public static class BrokerServiceCollectionExtensions
                 }
             });
             
-            services.AddSingleton<IGetTickerAlias>(new TickerAliasService(hyperliquidConfig.Aliases));
+            services.AddSingleton<ITickerAliasService>(new TickerAliasService(hyperliquidConfig.Aliases));
             services.AddSingleton<IYoloBroker, HyperliquidBroker>();
             services.AddSingleton<IGetFactors, BrokerVolatilityFactorService>();
 

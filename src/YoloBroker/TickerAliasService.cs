@@ -4,7 +4,7 @@ using YoloBroker.Interface;
 
 namespace YoloBroker;
 
-public class TickerAliasService : IGetTickerAlias
+public class TickerAliasService : ITickerAliasService
 {
     private readonly IReadOnlyDictionary<string, string> _aliases;
     private readonly IReadOnlyDictionary<string, string> _tickers;

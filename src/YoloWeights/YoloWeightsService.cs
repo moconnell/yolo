@@ -32,7 +32,7 @@ public class YoloWeightsService : ICalcWeights
         CancellationToken cancellationToken = default)
     {
         var df = await GetFactorsAsync(cancellationToken);
-        var weights = df.ApplyWeights(_factorWeights, _maxWeightingAbs);
+        var weights = df.ApplyWeights(_factorWeights, _maxWeightingAbs, true, true);
         var weightsDict = weights.Rows.ToDictionary(
             r => (string) r["Ticker"],
             r => Convert.ToDecimal((double) r["Weight"]));

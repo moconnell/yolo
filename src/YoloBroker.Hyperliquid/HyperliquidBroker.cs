@@ -37,13 +37,13 @@ public sealed class HyperliquidBroker : IYoloBroker
     private bool _disposed;
     private readonly IHyperLiquidRestClient _hyperliquidClient;
     private readonly IHyperLiquidSocketClient _hyperliquidSocketClient;
-    private readonly IGetTickerAlias _tickerAliasService;
+    private readonly ITickerAliasService _tickerAliasService;
     private readonly ILogger<HyperliquidBroker> _logger;
 
     public HyperliquidBroker(
         IHyperLiquidRestClient hyperliquidClient,
         IHyperLiquidSocketClient hyperliquidSocketClient,
-        IGetTickerAlias tickerAliasService,
+        ITickerAliasService tickerAliasService,
         ILogger<HyperliquidBroker> logger)
     {
         _hyperliquidClient = hyperliquidClient;
@@ -101,13 +101,14 @@ public sealed class HyperliquidBroker : IYoloBroker
     {
         ArgumentNullException.ThrowIfNull(trades);
 
-        if (!trades.Any())
+        var tradeArray = trades as Trade[] ?? trades.ToArray();
+        if (tradeArray.Length == 0)
         {
             yield break;
         }
 
-        var spotTrades = trades.Where(t => t.AssetType == AssetType.Spot).ToList();
-        var futuresTrades = trades.Where(t => t.AssetType == AssetType.Future).ToList();
+        var spotTrades = tradeArray.Where(t => t.AssetType == AssetType.Spot).ToList();
+        var futuresTrades = tradeArray.Where(t => t.AssetType == AssetType.Future).ToList();
 
         var spotTask = spotTrades.Count != 0
             ? PlaceSpotOrdersAsync(spotTrades, ct)
@@ -198,7 +199,8 @@ public sealed class HyperliquidBroker : IYoloBroker
         ArgumentNullException.ThrowIfNull(trades);
         ArgumentNullException.ThrowIfNull(settings);
 
-        if (!trades.Any())
+        var tradeArray = trades as Trade[] ?? trades.ToArray();
+        if (tradeArray.Length == 0)
         {
             yield break;
         }
@@ -225,7 +227,7 @@ public sealed class HyperliquidBroker : IYoloBroker
         try
         {
             // Place initial limit orders
-            await foreach (var result in PlaceTradesAsync(trades, ct))
+            await foreach (var result in PlaceTradesAsync(tradeArray, ct))
             {
                 AddOrderTracker(result);
                 var update = ToOrderUpdate(result);
@@ -252,6 +254,8 @@ public sealed class HyperliquidBroker : IYoloBroker
             _logger.LogDebug("Unsubscribed from spot and futures order updates");
         }
 
+        yield break;
+
         void HandleOrderStatusUpdates(DataEvent<HyperLiquidOrderStatus[]> e)
         {
             if (e.Data == null || e.Data.Length == 0)
@@ -271,7 +275,7 @@ public sealed class HyperliquidBroker : IYoloBroker
                     continue;
                 }
 
-                OrderStatus orderStatus = update.Status.ToYoloOrderStatus();
+                var orderStatus = update.Status.ToYoloOrderStatus();
                 var newOrder = tracker.Order with
                 {
                     Filled = tracker.Order.Amount - update.Order.QuantityRemaining,
@@ -283,7 +287,7 @@ public sealed class HyperliquidBroker : IYoloBroker
                     Order = newOrder
                 };
 
-                string message = update.Status.ToString();
+                var message = update.Status.ToString();
 
                 switch (orderStatus)
                 {
@@ -341,7 +345,7 @@ public sealed class HyperliquidBroker : IYoloBroker
                     return OrderUpdateType.MarketOrderPlaced;
                 }
 
-                Order order = result.Order;
+                var order = result.Order;
                 return order.OrderStatus switch
                 {
                     OrderStatus.Canceled or OrderStatus.MarginCanceled => OrderUpdateType.Cancelled,
@@ -608,7 +612,7 @@ public sealed class HyperliquidBroker : IYoloBroker
         {
             return positions.GroupBy(x => x.Position.Symbol)
                 .ToDictionary(
-                    g => g.Key,
+                    g => _tickerAliasService.TryGetTicker(g.Key, out var ticker) ? ticker! : g.Key,
                     IReadOnlyList<Position> (g) =>
                     [
                         .. g.Select(x => new Position(
