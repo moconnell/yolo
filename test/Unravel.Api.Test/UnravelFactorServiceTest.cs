@@ -22,7 +22,7 @@ public class UnravelFactorServiceTest
         isFixedUniverse.ShouldBeFalse();
     }
 
-    [Fact(Skip = "Fails for now")]
+    [Fact]
     public async Task GivenGoodConfig_WhenTickersSupplied_ShouldReturnFactors()
     {
         // arrange
@@ -31,7 +31,7 @@ public class UnravelFactorServiceTest
         const double retailFlowValueBtc = 0.25;
 
         var mockApiSvc = new Mock<IUnravelApiService>();
-        mockApiSvc.Setup(apiSvc => apiSvc.GetFactorsLiveAsync(tickers, It.IsAny<CancellationToken>()))
+        mockApiSvc.Setup(apiSvc => apiSvc.GetFactorsLiveAsync(tickers, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync(
                 FactorDataFrame.NewFrom(tickers, DateTime.Today, (RetailFlow, [retailFlowValueBtc])));
 
@@ -63,7 +63,7 @@ public class UnravelFactorServiceTest
             .ReturnsAsync(tickers);
 
         mockApiSvc
-            .Setup(apiSvc => apiSvc.GetFactorsLiveAsync(tickers, It.IsAny<CancellationToken>()))
+            .Setup(apiSvc => apiSvc.GetFactorsLiveAsync(tickers, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync(
                 FactorDataFrame.NewFrom(tickers, DateTime.Today, (RetailFlow, [retailFlowValueBtc])));
 
@@ -84,7 +84,7 @@ public class UnravelFactorServiceTest
     }
 
 
-    [Fact(Skip = "Fails for now")]
+    [Fact]
     public async Task GivenDupeTickers_WhenMocked_ShouldReturnFactors()
     {
         // arrange
@@ -94,7 +94,8 @@ public class UnravelFactorServiceTest
         const double retailFlowValueBtc = 0.25;
 
         var mockApiSvc = new Mock<IUnravelApiService>();
-        mockApiSvc.Setup(apiSvc => apiSvc.GetFactorsLiveAsync(tickers, It.IsAny<CancellationToken>()))
+        mockApiSvc
+            .Setup(apiSvc => apiSvc.GetFactorsLiveAsync(tickers, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync(
                 FactorDataFrame.NewFrom(tickers, DateTime.Today, (RetailFlow, [retailFlowValueBtc])));
 

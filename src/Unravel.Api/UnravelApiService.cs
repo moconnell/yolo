@@ -27,22 +27,24 @@ public class UnravelApiService : IUnravelApiService
 
     public async Task<FactorDataFrame> GetFactorsLiveAsync(
         IEnumerable<string> tickers,
+        bool throwOnMissingValue = false,
         CancellationToken cancellationToken = default)
     {
         if (_config.Factors.Length == 0)
             return FactorDataFrame.Empty;
 
         ArgumentNullException.ThrowIfNull(tickers);
-        var tickersArray = tickers
+        var tickerList = tickers
             .Where(s => !string.IsNullOrWhiteSpace(s))
             .Select(s => s.Trim().ToUpperInvariant())
             .Distinct()
-            .ToArray();
-        if (tickersArray.Length == 0)
+            .OrderBy(s => s)
+            .ToList();
+        if (tickerList.Count == 0)
             throw new ArgumentException("Tickers cannot be empty.", nameof(tickers));
 
         var baseUrl = $"{_config.ApiBaseUrl}/{_config.UrlPathFactorsLive}";
-        var tickersCsv = Uri.EscapeDataString(tickersArray.ToCsv());
+        var tickersCsv = Uri.EscapeDataString(tickerList.ToCsv());
         var results = new List<FactorDataFrame>();
 
         foreach (var fc in _config.Factors)
@@ -51,9 +53,37 @@ public class UnravelApiService : IUnravelApiService
 
             var url = string.Format(baseUrl, fc.Id, tickersCsv);
             var response = await _httpClient.GetAsync<FactorsLiveResponse, double>(url, _headers, cancellationToken);
-            var dataFrame = FactorDataFrame.NewFrom(response.Tickers, response.TimeStamp, (fc.Type, response.Data));
 
-            results.Add(dataFrame);
+            if (response.Tickers.SequenceEqual(tickerList, StringComparer.OrdinalIgnoreCase))
+            {
+                var dataFrame = FactorDataFrame.NewFrom(response.Tickers, response.TimeStamp, (fc.Type, response.Data));
+                results.Add(dataFrame);
+                continue;
+            }
+
+            var missingTickers = tickerList.Except(response.Tickers).ToArray();
+            if (missingTickers.Length > 0)
+            {
+                if (throwOnMissingValue)
+                    throw new ApiException(
+                        $"Not all requested tickers were returned for {fc}: {string.Join(", ", missingTickers)}");
+
+                var values = new List<double>(response.Data);
+                foreach (var missingTicker in missingTickers)
+                {
+                    var insertIndex = tickerList.IndexOf(missingTicker);
+                    values.Insert(insertIndex, double.NaN);
+                }
+
+                var dataFrame = FactorDataFrame.NewFrom(tickerList, response.TimeStamp, (fc.Type, values));
+                results.Add(dataFrame);
+            }
+            else
+            {
+                var unexpectedTickers = response.Tickers.Except(tickerList).ToArray();
+                throw new ApiException(
+                    $"Unravel API returned unexpected tickers for factor {fc.Type}: {unexpectedTickers.ToCsv()}");
+            }
         }
 
         return results.Aggregate((one, two) => one + two);

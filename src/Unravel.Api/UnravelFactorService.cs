@@ -28,7 +28,7 @@ public class UnravelFactorService : IGetFactors
 
         var factorsLive = await _unravelApiService.GetFactorsLiveAsync(
             tickersArray,
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         return factorsLive;
     }
@@ -37,7 +37,7 @@ public class UnravelFactorService : IGetFactors
         IEnumerable<string>? tickers,
         CancellationToken cancellationToken = default)
     {
-        var tickerArray = tickers?.ToArray() ?? [];
+        var tickerArray = tickers?.Distinct().ToArray() ?? [];
         return tickerArray.Length > 0 ? tickerArray : await _unravelApiService.GetUniverseAsync(cancellationToken);
     }
 }

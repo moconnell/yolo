@@ -98,11 +98,11 @@ public sealed record FactorDataFrame
     {
         ArgumentNullException.ThrowIfNull(one);
         ArgumentNullException.ThrowIfNull(two);
-        
+
         if (one.Tickers.Count != two.Tickers.Count ||
             one.Tickers.Except(two.Tickers, StringComparer.OrdinalIgnoreCase).Any())
             throw new ArgumentException("Ticker sets must match.");
-        
+
         var sharedCols = one._dataFrame.Columns
             .Select(c => c.Name)
             .Intersect(two._dataFrame.Columns.Select(c => c.Name))
@@ -171,5 +171,85 @@ public sealed record FactorDataFrame
         resultDf.Columns.Add(new DoubleDataFrameColumn("Weight", tickerWeights));
 
         return resultDf;
+    }
+
+
+    public override string ToString()
+    {
+        if (_dataFrame.Rows.Count == 0)
+            return "Empty FactorDataFrame";
+
+        var sb = new System.Text.StringBuilder();
+        var columns = _dataFrame.Columns.ToList();
+        var rowCount = (int) _dataFrame.Rows.Count;
+
+        // Calculate column widths
+        var columnWidths = new int[columns.Count];
+        for (var i = 0; i < columns.Count; i++)
+        {
+            var col = columns[i];
+            columnWidths[i] = col.Name.Length;
+
+            for (var row = 0; row < rowCount; row++)
+            {
+                var value = FormatValue(col[row]);
+                columnWidths[i] = Math.Max(columnWidths[i], value.Length);
+            }
+        }
+
+        // Add row index width
+        var indexWidth = Math.Max(rowCount.ToString().Length, 0) + 2;
+
+        // Header row
+        sb.Append(new string(' ', indexWidth));
+        for (var i = 0; i < columns.Count; i++)
+        {
+            sb.Append(columns[i].Name.PadLeft(columnWidths[i] + 2));
+        }
+
+        sb.AppendLine();
+
+        // Separator line
+        sb.Append(new string(' ', indexWidth));
+        for (var i = 0; i < columns.Count; i++)
+        {
+            sb.Append(new string('-', columnWidths[i] + 2));
+        }
+
+        sb.AppendLine();
+
+        // Data rows
+        for (var row = 0; row < rowCount; row++)
+        {
+            // Row index
+            sb.Append(row.ToString().PadLeft(indexWidth));
+
+            // Column values
+            for (var col = 0; col < columns.Count; col++)
+            {
+                var value = FormatValue(columns[col][row]);
+                sb.Append(value.PadLeft(columnWidths[col] + 2));
+            }
+
+            sb.AppendLine();
+        }
+
+        sb.AppendLine();
+        sb.AppendLine($"[{rowCount} rows x {columns.Count} columns]");
+
+        return sb.ToString();
+    }
+
+    private static string FormatValue(object? value)
+    {
+        return value switch
+        {
+            null => "NaN",
+            double d when double.IsNaN(d) => "NaN",
+            double d => d.ToString("F6"),
+            DateTime dt => dt.ToString("yyyy-MM-dd"),
+            string s => s,
+            _ => value.ToString() ?? "null"
+        };
     }
 }

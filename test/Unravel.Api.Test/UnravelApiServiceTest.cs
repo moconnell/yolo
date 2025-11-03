@@ -4,11 +4,13 @@ using Moq;
 using Moq.Contrib.HttpClient;
 using Shouldly;
 using Unravel.Api.Config;
+using Xunit.Abstractions;
 using YoloAbstractions;
+using YoloAbstractions.Extensions;
 
 namespace Unravel.Api.Test;
 
-public class UnravelApiServiceTest
+public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
 {
     private const string RetailFlow = "retail-flow";
 
@@ -72,6 +74,8 @@ public class UnravelApiServiceTest
 
         // act
         var result = await svc.GetFactorsLiveAsync([btc]);
+        
+        outputHelper.WriteLine(result.ToString());
 
         // assert
         result.ShouldNotBeNull();
@@ -84,7 +88,7 @@ public class UnravelApiServiceTest
     public async Task GivenGoodConfig_WhenLiveData_ShouldReturnFactors()
     {
         // arrange
-        string[] tickers = ["BTC", "ADA", "ETH", "BNB", "TRX", "XRP", "SOL", "LINK", "AVAX", "DOGE"];
+        var tickers = "ADA,AVAX,BCH,BNB,BTC,DOGE,DOT,ETH,HBAR,HYPE,LINK,LTC,MNT,SHIB,SOL,SUI,TON,TRX,XLM,XRP".Split(',');
 
         var builder = new ConfigurationBuilder()
             .AddJsonFile("appsettings.json", true, true)
@@ -101,13 +105,18 @@ public class UnravelApiServiceTest
         var svc = new UnravelApiService(httpClient, unravelConfig);
 
         // act
-        var result = await svc.GetFactorsLiveAsync(tickers, cancellationTokenSource.Token);
+        var result = await svc.GetFactorsLiveAsync(tickers, cancellationToken: cancellationTokenSource.Token);
+        
+        outputHelper.WriteLine(result.ToString());
 
         // assert
         result.ShouldNotBeNull();
-        result.FactorTypes.ShouldBe([FactorType.RetailFlow]);
+        result.FactorTypes.ShouldBe([FactorType.RetailFlow, FactorType.Carry]);
+        result.Tickers.Count.ShouldBe(tickers.Length);
         result.Tickers.Except(tickers).ShouldBe([]);
         tickers.All(ticker => result[FactorType.RetailFlow, ticker] != 0).ShouldBe(true);
+        result[FactorType.RetailFlow, "MNT"].ShouldBe(double.NaN);
+        tickers.All(ticker => result[FactorType.Carry, ticker] != 0).ShouldBe(true);
     }
 
     [Fact]
@@ -131,11 +140,44 @@ public class UnravelApiServiceTest
 
         // act
         var tickers = await svc.GetUniverseAsync(cancellationTokenSource.Token);
+        
+        outputHelper.WriteLine(tickers.ToCsv());
 
         // assert
         tickers.ShouldNotBeNull();
         tickers.Count.ShouldBe(unravelConfig.UniverseSize);
         tickers.ShouldAllBe(x => !string.IsNullOrEmpty(x));
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task GivenTickerUniverse_WhenNotAllReturned_ShouldPopulateNull()
+    {
+        // arrange
+        var builder = new ConfigurationBuilder()
+            .AddJsonFile("appsettings.json", true, true)
+            .AddJsonFile($"appsettings.local.json", true, true);
+        var config = builder.Build();
+        var unravelConfig = config.GetChildren().First().Get<UnravelConfig>();
+        unravelConfig.ShouldNotBeNull();
+
+        var cancellationTokenSource = new CancellationTokenSource();
+        cancellationTokenSource.CancelAfter(TimeSpan.FromMinutes(1));
+
+        using var httpClient = new HttpClient();
+
+        var svc = new UnravelApiService(httpClient, unravelConfig);
+
+        var tickers = "ADA,AVAX,BCH,BNB,BTC,DOGE,DOT,ETH,HBAR,HYPE,LINK,LTC,MNT,SHIB,SOL,SUI,TON,TRX,XLM,XRP".Split(',');
+
+        // act
+        var result = await svc.GetFactorsLiveAsync(tickers, cancellationToken: cancellationTokenSource.Token);
+
+        outputHelper.WriteLine(result.ToString());
+        
+        // assert
+        result.ShouldNotBeNull();
+        result.Tickers.ShouldBe(tickers);
     }
 
     [Fact]
@@ -178,6 +220,8 @@ public class UnravelApiServiceTest
 
         // act
         var tickers = await svc.GetUniverseAsync();
+        
+        outputHelper.WriteLine(tickers.ToCsv());
 
         // assert
         tickers.ShouldNotBeNull();
