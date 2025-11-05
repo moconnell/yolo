@@ -8,7 +8,7 @@ public record YoloConfig
     public decimal TradeBuffer { get; init; } = 0.05m;
     public decimal? NominalCash { get; init; }
     public AssetPermissions AssetPermissions { get; init; } = AssetPermissions.PerpetualFutures;
-    public required string BaseAsset { get; init; } = "USDC";
+    public string BaseAsset { get; init; } = "USDC";
     public decimal SpreadSplit { get; init; } = 0.5m;
     public decimal? MinOrderValue { get; init; } = 10;
     public string UnfilledOrderTimeout { get; init; } = "00:05:00"; // Default 5 minutes
