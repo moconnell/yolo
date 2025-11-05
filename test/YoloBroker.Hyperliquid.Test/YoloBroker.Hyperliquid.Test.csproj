@@ -25,6 +25,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\YoloBroker.Hyperliquid\YoloBroker.Hyperliquid.csproj" />
+    <ProjectReference Include="..\YoloTest.Util\YoloTest.Util.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Update="appsettings.json">

@@ -184,7 +184,7 @@ public sealed class HyperliquidBroker : IYoloBroker
         }
     }
 
-    public async Task<IReadOnlyList<decimal>> GetDailyClosePricesAsync(string ticker, int periods, CancellationToken ct)
+    public async Task<IReadOnlyList<decimal>> GetDailyClosePricesAsync(string ticker, int periods, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrEmpty(ticker, nameof(ticker));
         var klines = await GetDailyPriceHistoryAsync(ticker, periods, ct);
