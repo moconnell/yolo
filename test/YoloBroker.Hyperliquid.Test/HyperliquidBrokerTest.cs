@@ -221,12 +221,12 @@ public class HyperliquidBrokerTest
             }
         }
     }
-    
+
     [Fact]
     public async Task GivenNullTrades_WhenPlaceTradesAsync_ShouldThrowArgumentNullException()
     {
         // arrange
-        var broker = GetTestBroker();
+        var broker = GetTestBroker(skipCredentialValidation: true);
 
         // act & assert
         await Should.ThrowAsync<ArgumentNullException>(async () =>
@@ -242,7 +242,7 @@ public class HyperliquidBrokerTest
     public async Task GivenEmptyTrades_WhenPlaceTradesAsync_ShouldYieldNothing()
     {
         // arrange
-        var broker = GetTestBroker();
+        var broker = GetTestBroker(skipCredentialValidation: true);
         var results = new List<TradeResult>();
 
         // act
@@ -259,7 +259,7 @@ public class HyperliquidBrokerTest
     public async Task GivenNullOrder_WhenCancelOrderAsync_ShouldThrowArgumentNullException()
     {
         // arrange
-        var broker = GetTestBroker();
+        var broker = GetTestBroker(skipCredentialValidation: true);
 
         // act & assert
         await Should.ThrowAsync<ArgumentNullException>(() => broker.CancelOrderAsync(null!));
@@ -269,7 +269,7 @@ public class HyperliquidBrokerTest
     public async Task GivenCompletedOrder_WhenCancelOrderAsync_ShouldSkipCancellation()
     {
         // arrange
-        var broker = GetTestBroker();
+        var broker = GetTestBroker(skipCredentialValidation: true);
         var completedOrder = new Order(
             123,
             "ETH",
@@ -293,7 +293,7 @@ public class HyperliquidBrokerTest
     public void GivenUnsupportedAssetType_WhenPlaceTrade_ShouldThrowArgumentOutOfRangeException()
     {
         // arrange
-        var broker = GetTestBroker();
+        var broker = GetTestBroker(skipCredentialValidation: true);
         var trade = new Trade(
             "BTC",
             (AssetType) 999, // Invalid asset type
@@ -308,7 +308,7 @@ public class HyperliquidBrokerTest
     public void GivenUnsupportedAssetType_WhenCancelOrder_ShouldThrowArgumentOutOfRangeException()
     {
         // arrange
-        var broker = GetTestBroker();
+        var broker = GetTestBroker(skipCredentialValidation: true);
         var order = new Order(
             123,
             "BTC",
@@ -329,7 +329,7 @@ public class HyperliquidBrokerTest
     public async Task GivenNullOrder_WhenEditOrderAsync_ShouldThrowArgumentNullException()
     {
         // arrange
-        var broker = GetTestBroker();
+        var broker = GetTestBroker(skipCredentialValidation: true);
 
         // act & assert
         await Should.ThrowAsync<ArgumentNullException>(() => broker.EditOrderAsync(null!));
@@ -447,7 +447,7 @@ public class HyperliquidBrokerTest
     public async Task GivenNullOrEmptyTicker_WhenGetDailyClosePricesAsync_ShouldThrowArgumentException()
     {
         // arrange
-        var broker = GetTestBroker();
+        var broker = GetTestBroker(skipCredentialValidation: true);
 
         // act & assert
         await Should.ThrowAsync<ArgumentException>(() =>
@@ -460,7 +460,7 @@ public class HyperliquidBrokerTest
     public void GivenBroker_WhenDisposedTwice_ShouldNotThrow()
     {
         // arrange
-        var broker = GetTestBroker();
+        var broker = GetTestBroker(skipCredentialValidation: true);
 
         // act
         broker.Dispose();
@@ -473,7 +473,7 @@ public class HyperliquidBrokerTest
     public async Task GivenNullTrades_WhenManageOrdersAsync_ShouldThrowArgumentNullException()
     {
         // arrange
-        var broker = GetTestBroker();
+        var broker = GetTestBroker(skipCredentialValidation: true);
 
         // act & assert
         await Should.ThrowAsync<ArgumentNullException>(async () =>
@@ -489,7 +489,7 @@ public class HyperliquidBrokerTest
     public async Task GivenNullSettings_WhenManageOrdersAsync_ShouldThrowArgumentNullException()
     {
         // arrange
-        var broker = GetTestBroker();
+        var broker = GetTestBroker(skipCredentialValidation: true);
         var trade = CreateTrade("ETH", Future, 0.01, 2000m);
 
         // act & assert
@@ -506,7 +506,7 @@ public class HyperliquidBrokerTest
     public async Task GivenEmptyTrades_WhenManageOrdersAsync_ShouldYieldNothing()
     {
         // arrange
-        var broker = GetTestBroker();
+        var broker = GetTestBroker(skipCredentialValidation: true);
         var results = new List<OrderUpdate>();
 
         // act
@@ -591,11 +591,22 @@ public class HyperliquidBrokerTest
             await broker.CancelOrderAsync(result.Order!);
         }
     }
-    private HyperliquidBroker GetTestBroker(IReadOnlyDictionary<string, string>? aliases = null)
+
+    private HyperliquidBroker GetTestBroker(
+        IReadOnlyDictionary<string, string>? aliases = null,
+        bool skipCredentialValidation = false)
     {
         var (address, privateKey) = GetConfig();
-        address.ShouldNotBeNullOrEmpty();
-        privateKey.ShouldNotBeNullOrEmpty();
+
+        if (!skipCredentialValidation)
+        {
+            address.ShouldNotBeNullOrEmpty();
+            privateKey.ShouldNotBeNullOrEmpty();
+        }
+
+        // Use dummy credentials if validation is skipped and credentials are missing
+        address ??= "0x0000000000000000000000000000000000000000";
+        privateKey ??= "0000000000000000000000000000000000000000000000000000000000000000";
 
         var apiCredentials = new ApiCredentials(address, privateKey);
 
