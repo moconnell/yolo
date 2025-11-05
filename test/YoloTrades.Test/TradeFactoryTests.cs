@@ -126,6 +126,65 @@ public class TradeFactoryTests
         trades.MatchSnapshot($"ShouldCalculateTrades_{directory}");
     }
 
+    [Theory]
+    [InlineData(RebalanceMode.Center)]
+    [InlineData(RebalanceMode.Edge)]
+    public async Task ShouldCalculateTradesWithRebalanceMode(RebalanceMode rebalanceMode)
+    {
+        // arrange
+        var mockLogger = new Mock<ILogger<TradeFactory>>();
+
+        var config = new YoloConfig
+        {
+            AssetPermissions = AssetPermissions.All,
+            BaseAsset = "USDC",
+            MaxLeverage = 2,
+            NominalCash = 10000,
+            TradeBuffer = 0.04m,
+            RebalanceMode = rebalanceMode
+        };
+        var tradeFactory = new TradeFactory(mockLogger.Object, config);
+
+        var (weights, positions, markets) = await DeserializeInputsAsync("./Data/json/005_EdgeRebalance");
+
+        // act
+        var trades = tradeFactory.CalculateTrades(weights, positions, markets).ToArray();
+
+        // assert
+        Assert.NotNull(trades);
+        
+        // Current position: 0.003 BTC at $50,000 = $150
+        // Current weight = $150 / $10,000 = 0.015 = 1.5%
+        // Target weight = 0.10 = 10%
+        // Trade buffer = 0.04 = 4%
+        // Tolerance band = [6%, 14%]
+        // Current 1.5% is outside (below) the band, so we need to rebalance
+        
+        // For Center mode: rebalance to 10% (ideal weight)
+        //   Target position = 0.10 * 10000 / 50000 = 0.02 BTC
+        //   Trade size = 0.02 - 0.003 = 0.017 BTC
+        
+        // For Edge mode: rebalance to lower edge at 6%
+        //   Target position = 0.06 * 10000 / 50000 = 0.012 BTC
+        //   Trade size = 0.012 - 0.003 = 0.009 BTC
+        
+        Assert.Single(trades);
+        
+        var trade = trades[0];
+        Assert.Equal("BTC", trade.Symbol);
+        
+        if (rebalanceMode == RebalanceMode.Center)
+        {
+            // Should buy to reach center (10% weight = 0.02 BTC)
+            Assert.Equal(0.017m, trade.Amount);
+        }
+        else // RebalanceMode.Edge
+        {
+            // Should buy to reach lower edge (6% weight = 0.012 BTC)
+            Assert.Equal(0.009m, trade.Amount);
+        }
+    }
+
     private static
         (Dictionary<string, decimal> weights,
         Dictionary<string, IReadOnlyList<Position>> positions,

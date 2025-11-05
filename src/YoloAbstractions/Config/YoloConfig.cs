@@ -6,6 +6,7 @@ public record YoloConfig
 {
     public decimal MaxLeverage { get; init; } = 1;
     public decimal TradeBuffer { get; init; } = 0.05m;
+    public RebalanceMode RebalanceMode { get; init; } = RebalanceMode.Center;
     public decimal? NominalCash { get; init; }
     public AssetPermissions AssetPermissions { get; init; } = AssetPermissions.PerpetualFutures;
     public string BaseAsset { get; init; } = "USDC";
