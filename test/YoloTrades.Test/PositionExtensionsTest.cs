@@ -45,7 +45,7 @@ public class PositionExtensionsTest
             ["BTC"] = new List<MarketInfo>
             {
                 new("BTC-USDC", "BTC", "USDC", AssetType.Spot, System.DateTime.UtcNow, Bid: 50000m, Ask: 50100m),
-                new("BTC-USDT", "BTC", "USDC", AssetType.Spot, System.DateTime.UtcNow, Bid: 49900m, Ask: 50000m)
+                new("BTC", "BTC", "USDC", AssetType.Future, System.DateTime.UtcNow, Bid: 49900m, Ask: 50000m)
             }
         };
         var baseCurrency = "USDC";
