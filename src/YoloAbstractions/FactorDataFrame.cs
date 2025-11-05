@@ -25,6 +25,8 @@ public sealed record FactorDataFrame
     public IReadOnlyList<FactorType> FactorTypes { get; init; }
 
     public IReadOnlyList<string> Tickers => ((StringDataFrameColumn) _dataFrame["Ticker"]).ToArray();
+    
+    public bool IsEmpty => _dataFrame.Rows.Count == 0 || FactorTypes.Count == 0 || Tickers.Count == 0;
 
     public static readonly FactorDataFrame Empty = NewFrom([], DateTime.MinValue);
 

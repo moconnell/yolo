@@ -66,6 +66,9 @@ public class YoloWeightsService : ICalcWeights
             cancellationToken.ThrowIfCancellationRequested();
 
             var df = await svc.GetFactorsAsync(baseAssets, factors, cancellationToken);
+            if (df.IsEmpty)
+                continue;
+            
             result.Add(df);
             factors.UnionWith(df.FactorTypes);
 
