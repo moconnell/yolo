@@ -16,11 +16,10 @@ public sealed record FactorDataFrame
     {
         _dataFrame = dataFrame;
         FactorTypes = factorTypes;
-
         var i = 0;
-        var kvps = ((StringDataFrameColumn) dataFrame["Ticker"])
-            .Select(x => KeyValuePair.Create(x, i++));
-        _tickerIndex = new Dictionary<string, int>(kvps);
+        var tickerCol = (StringDataFrameColumn) dataFrame["Ticker"];
+        var kvps = tickerCol.Select(x => KeyValuePair.Create(x, i++));
+        _tickerIndex = new Dictionary<string, int>(kvps, StringComparer.OrdinalIgnoreCase);
     }
 
     public IReadOnlyList<FactorType> FactorTypes { get; init; }
