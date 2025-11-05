@@ -784,7 +784,9 @@ public sealed class HyperliquidBroker : IYoloBroker
         var ask = orderBook.Levels.Asks.ElementAtOrDefault(0)?.Price;
         var bid = orderBook.Levels.Bids.ElementAtOrDefault(0)?.Price;
         var mid = (ask + bid) / 2;
-        var minProvideSize = Math.Ceiling(10 / orderBook.Levels.Asks[0].Price / quantityStep) * quantityStep;
+        var minProvideSize = ask.HasValue
+            ? Math.Ceiling(10 / ask.Value / quantityStep) * quantityStep
+            : quantityStep;
 
         return new MarketInfo(
             Name: symbol.Name,
