@@ -86,6 +86,29 @@ In case your account does not have margin trading or futures enabled, it is poss
     All
 ```
 
+## Yolo/RebalanceMode
+
+This setting determines the target weight when rebalancing positions that are outside the tolerance band (TradeBuffer).
+
+The default setting of `Center` will rebalance to the ideal calculated asset weighting (the center of the tolerance band).
+
+Setting this to `Edge` will rebalance to the nearest edge of the tolerance band instead. This can be optimal depending on broker fee structure, as price is theoretically nearly as likely to reverse away from the ideal weight as it is to continue.
+
+For example, with a target weight of 10% and a TradeBuffer of 4%:
+- The tolerance band is [6%, 14%]
+- If current weight is 2% (below the band):
+  - `Center` mode: rebalance to 10% (ideal weight)
+  - `Edge` mode: rebalance to 6% (lower edge)
+- If current weight is 16% (above the band):
+  - `Center` mode: rebalance to 10% (ideal weight)
+  - `Edge` mode: rebalance to 14% (upper edge)
+
+Possible values:
+```
+Center  (default)
+Edge
+```
+
 ## Yolo/SpreadSplit
 
 This setting determines the placement of the limit price within the bid-ask price spread and can take any value between 0 and 1 (values greater than 1 will be treated as 1).
