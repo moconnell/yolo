@@ -97,6 +97,7 @@ public class TradeFactoryTests
         string path,
         AssetPermissions assetPermissions = AssetPermissions.All,
         string baseCurrency = "USDC",
+        decimal maxLeverage = 2,
         decimal nominalCash = 10000,
         decimal tradeBuffer = 0.04m)
     {
@@ -107,6 +108,7 @@ public class TradeFactoryTests
         {
             AssetPermissions = assetPermissions,
             BaseAsset = baseCurrency,
+            MaxLeverage = maxLeverage,
             NominalCash = nominalCash,
             TradeBuffer = tradeBuffer
         };
