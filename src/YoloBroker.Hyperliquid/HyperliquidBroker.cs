@@ -184,7 +184,10 @@ public sealed class HyperliquidBroker : IYoloBroker
         }
     }
 
-    public async Task<IReadOnlyList<decimal>> GetDailyClosePricesAsync(string ticker, int periods, CancellationToken ct = default)
+    public async Task<IReadOnlyList<decimal>> GetDailyClosePricesAsync(
+        string ticker,
+        int periods,
+        CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrEmpty(ticker, nameof(ticker));
         var klines = await GetDailyPriceHistoryAsync(ticker, periods, ct);
@@ -716,10 +719,12 @@ public sealed class HyperliquidBroker : IYoloBroker
     {
         var priceStep = Convert.ToDecimal(Math.Pow(10, -6 + symbol.QuoteAsset.PriceDecimals));
         var quantityStep = Convert.ToDecimal(Math.Pow(10, -symbol.QuoteAsset.QuantityDecimals));
-        var minProvideSize = Math.Ceiling(10 / orderBook.Levels.Asks[0].Price / quantityStep) * quantityStep;
         var ask = orderBook.Levels.Asks.ElementAtOrDefault(0)?.Price;
         var bid = orderBook.Levels.Bids.ElementAtOrDefault(0)?.Price;
         var mid = (ask + bid) / 2;
+        var minProvideSize = ask.HasValue
+            ? Math.Ceiling(10 / ask.Value / quantityStep) * quantityStep
+            : quantityStep;
 
         return new MarketInfo(
             Name: symbol.Name,
