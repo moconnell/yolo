@@ -49,12 +49,14 @@ public class YoloWeightsServiceTest
             }
         };
 
+        var testDate = new DateTime(2025, 10, 13, 0, 0, 0, DateTimeKind.Utc);
+        
         var mockFactorService1 = new Mock<IGetFactors>();
         mockFactorService1.Setup(x => x.GetFactorsAsync(
                 It.IsAny<IEnumerable<string>>(),
                 It.IsAny<ISet<FactorType>>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(FactorDataFrame.NewFrom([btcUsdt], DateTime.Today, (Trend, [Convert.ToDouble(trendValue)])));
+            .ReturnsAsync(FactorDataFrame.NewFrom([btcUsdt], testDate, (Trend, [Convert.ToDouble(trendValue)])));
 
         var mockFactorService2 = new Mock<IGetFactors>();
         mockFactorService2.Setup(x => x.GetFactorsAsync(
@@ -62,7 +64,7 @@ public class YoloWeightsServiceTest
                 It.IsAny<ISet<FactorType>>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(
-                FactorDataFrame.NewFrom([btcUsdt], DateTime.Today, (RetailFlow, [Convert.ToDouble(retailFlowValue)])));
+                FactorDataFrame.NewFrom([btcUsdt], testDate, (RetailFlow, [Convert.ToDouble(retailFlowValue)])));
 
         var logger = _loggerFactory.CreateLogger<YoloWeightsService>();
 
