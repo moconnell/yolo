@@ -38,13 +38,13 @@ public class YoloWeightsService : ICalcWeights
     {
         var factorDataFrame = await GetFactorsAsync(cancellationToken);
         _logger.LogInformation("Factors (raw):\n{Factors}", factorDataFrame);
-        
+
         var normalizedFactors = factorDataFrame.Normalize(_normalizationMethod);
         _logger.LogInformation("Factors (normalised):\n{Factors}", normalizedFactors);
-        
+
         var weights = normalizedFactors.ApplyWeights(_factorWeights, _maxWeightingAbs);
         _logger.LogInformation("weights:\n{Weights}", weights);
-        
+
         var weightsDict = weights.Rows.ToDictionary(
             r => (string) r["Ticker"],
             r => Convert.ToDecimal((double) r["Weight"]));
@@ -76,6 +76,6 @@ public class YoloWeightsService : ICalcWeights
             }
         }
 
-        return result.Aggregate((one, two) => one + two);
+        return result.Count == 0 ? FactorDataFrame.Empty : result.Aggregate((one, two) => one + two);
     }
 }
