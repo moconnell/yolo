@@ -239,11 +239,21 @@ public class VolatilityExtensionsTest
     [InlineData(30)]
     [InlineData(252)]
     [InlineData(365)]
-    public void AnnualizedVolatility_WithDifferentPeriodsPerYear_ProducesValidResults(int periodsPerYear)
+    [InlineData(-1, true)]
+    [InlineData(0, true)]
+    [InlineData(400, true)]
+    public void AnnualizedVolatility_WithDifferentPeriodsPerYear_ProducesValidResults(int periodsPerYear, bool shouldThrow = false)
     {
         // Arrange
         var closes = new List<decimal> { 100m, 105m, 110m, 115m, 120m, 125m };
 
+        if (shouldThrow)
+        {
+            // Act & Assert
+            Assert.Throws<ArgumentOutOfRangeException>(() => closes.AnnualizedVolatility(periodsPerYear));
+            return;
+        }
+        
         // Act
         var volatility = closes.AnnualizedVolatility(periodsPerYear);
 

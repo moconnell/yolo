@@ -20,6 +20,10 @@ public static class VolatilityExtensions
             throw new ArgumentException("At least two closing prices are required.");
         if (prices.Any(x => x <= 0))
             throw new ArgumentException("All closing prices must be positive.");
+        if (periodsPerYear <= 0)
+            throw new ArgumentOutOfRangeException(nameof(periodsPerYear), periodsPerYear, "Periods per year must be positive.");
+        if (periodsPerYear > 365)
+            throw new ArgumentOutOfRangeException(nameof(periodsPerYear), periodsPerYear, "Periods per year must be less than 366.");
 
         // Compute log returns
         var logReturns = new List<double>(prices.Count - 1);
