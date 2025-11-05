@@ -603,10 +603,14 @@ public class HyperliquidBrokerTest
             address.ShouldNotBeNullOrEmpty();
             privateKey.ShouldNotBeNullOrEmpty();
         }
-
-        // Use dummy credentials if validation is skipped and credentials are missing
-        address ??= "0x0000000000000000000000000000000000000000";
-        privateKey ??= "0000000000000000000000000000000000000000000000000000000000000000";
+        else
+        {
+            // Use dummy credentials if validation is skipped and credentials are missing
+            if (string.IsNullOrEmpty(address))
+                address = "0x0000000000000000000000000000000000000000";
+            if (string.IsNullOrEmpty(privateKey))
+                privateKey = "0000000000000000000000000000000000000000000000000000000000000000";
+        }
 
         var apiCredentials = new ApiCredentials(address, privateKey);
 
