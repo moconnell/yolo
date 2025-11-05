@@ -74,7 +74,7 @@ public class PositionExtensionsTest
             ["ETH"] = new List<MarketInfo>
             {
                 new("ETH-USDC", "ETH", "USDC", AssetType.Spot, System.DateTime.UtcNow, Bid: 3000m, Ask: 3100m),
-                new("ETH-USDT", "ETH", "USDC", AssetType.Spot, System.DateTime.UtcNow, Bid: 2900m, Ask: 3050m)
+                new("ETH", "ETH", "USDC", AssetType.Future, System.DateTime.UtcNow, Bid: 2900m, Ask: 3050m)
             }
         };
 
