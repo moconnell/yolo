@@ -124,6 +124,9 @@ public sealed record FactorDataFrame
 
     public FactorDataFrame Normalize(NormalizationMethod method = NormalizationMethod.CrossSectionalZScore)
     {
+        if (method == NormalizationMethod.None)
+            return this;
+
         var normalizedColumns = new List<DataFrameColumn>
         {
             _dataFrame["Date"],
@@ -140,7 +143,10 @@ public sealed record FactorDataFrame
                 NormalizationMethod.CrossSectionalZScore => NormalizeZScore(col),
                 NormalizationMethod.MinMax => NormalizeMinMax(col),
                 NormalizationMethod.Rank => NormalizeRank(col),
-                _ => throw new ArgumentException($"Unknown normalization method: {method}")
+                _ => throw new ArgumentOutOfRangeException(
+                    nameof(method),
+                    method,
+                    $"Unknown normalization method: {method}")
             };
 
             normalizedColumns.Add(new DoubleDataFrameColumn(colName, normalizedCol));
@@ -206,7 +212,7 @@ public sealed record FactorDataFrame
             return col.Select(v => double.NaN);
 
         var ranks = new Dictionary<int, double>();
-        for (int i = 0; i < validValues.Length; i++)
+        for (var i = 0; i < validValues.Length; i++)
         {
             // Scale to [-1, 1] range
             ranks[validValues[i].Index] = validValues.Length > 1
@@ -217,12 +223,11 @@ public sealed record FactorDataFrame
         return values.Select(x => ranks.TryGetValue(x.Index, out var rank) ? rank : double.NaN);
     }
 
-
     public DataFrame ApplyWeights(
         IReadOnlyDictionary<FactorType, double> weights,
         double? maxWeightAbs = null,
         bool volatilityScaling = true,
-        bool normalizePerAsset = false)
+        bool normalizePerAsset = true)
     {
         ArgumentNullException.ThrowIfNull(weights);
 
@@ -239,82 +244,72 @@ public sealed record FactorDataFrame
         var rows = (int) _dataFrame.Rows.Count;
         var columns = factorCols.Length;
 
-        if (normalizePerAsset && HasMissingValues())
-        {
-            // Calculate weight per asset, normalizing only by available factors
-            var tickerWeights = new double[rows];
-            for (var row = 0; row < rows; row++)
-            {
-                double weightSum = 0;
-                double normalizerSum = 0;
+        var tickerWeightsVector = GetWeights();
 
-                for (var col = 0; col < columns; col++)
+        if (volatilityScaling &&
+            _dataFrame.Columns.FirstOrDefault(c => c.Name == nameof(Volatility)) is DoubleDataFrameColumn volCol)
+        {
+            var vol = Vector<double>.Build.DenseOfArray(
+                volCol.Select(x => x is > 0d ? x.Value : 1d).ToArray());
+            tickerWeightsVector = tickerWeightsVector.PointwiseDivide(vol);
+        }
+
+        if (maxWeightAbs.HasValue)
+        {
+            tickerWeightsVector.MapInplace(x => Math.Clamp(x, -maxWeightAbs.Value, maxWeightAbs.Value));
+        }
+
+        var resultDf = new DataFrame();
+        resultDf.Columns.Add(_dataFrame["Date"]);
+        resultDf.Columns.Add(_dataFrame["Ticker"]);
+        resultDf.Columns.Add(new DoubleDataFrameColumn("Weight", tickerWeightsVector));
+
+        return resultDf;
+
+        Vector<double> GetWeights()
+        {
+            if (normalizePerAsset && HasMissingValues())
+            {
+                // Calculate weight per asset, normalizing only by available factors
+                var tickerWeights = new double[rows];
+                for (var row = 0; row < rows; row++)
                 {
-                    var value = factorCols[col][row];
-                    if (value.HasValue && !double.IsNaN(value.Value))
+                    double weightSum = 0;
+                    double normalizerSum = 0;
+
+                    for (var col = 0; col < columns; col++)
                     {
-                        weightSum += value.Value * alignedWeights[col];
-                        normalizerSum += Math.Abs(alignedWeights[col]);
+                        var value = factorCols[col][row];
+                        if (value.HasValue && !double.IsNaN(value.Value))
+                        {
+                            weightSum += value.Value * alignedWeights[col];
+                            normalizerSum += Math.Abs(alignedWeights[col]);
+                        }
                     }
+
+                    tickerWeights[row] = normalizerSum > 0 ? weightSum / normalizerSum : 0;
                 }
 
-                tickerWeights[row] = normalizerSum > 0 ? weightSum / normalizerSum : 0;
+                var tickerWeightsVector = Vector<double>.Build.DenseOfArray(tickerWeights);
+
+                return tickerWeightsVector;
             }
-
-            var tickerWeightsVector = Vector<double>.Build.DenseOfArray(tickerWeights);
-
-            if (volatilityScaling &&
-                _dataFrame.Columns.FirstOrDefault(c => c.Name == nameof(Volatility)) is DoubleDataFrameColumn volCol)
+            else
             {
-                var vol = Vector<double>.Build.DenseOfArray(
-                    volCol.Select(x => x is > 0d ? x.Value : 1d).ToArray());
-                tickerWeightsVector = tickerWeightsVector.PointwiseDivide(vol);
+                var data = factorCols
+                    .Select(c => c.Select(x => x ?? 0d).ToArray())
+                    .ToArray();
+
+                var m = Matrix<double>.Build.DenseOfColumns(rows, columns, data);
+                var v = Vector<double>.Build.DenseOfArray(alignedWeights);
+
+                var normalizer = alignedWeights.Sum(Math.Abs);
+                if (normalizer <= 0)
+                    normalizer = 1;
+                var tickerWeights = m * v / normalizer; // (rows x 1)
+
+                return tickerWeights;
             }
-
-            if (maxWeightAbs.HasValue)
-            {
-                tickerWeightsVector.MapInplace(x => Math.Clamp(x, -maxWeightAbs.Value, maxWeightAbs.Value));
-            }
-
-            var resultDf = new DataFrame();
-            resultDf.Columns.Add(_dataFrame["Date"]);
-            resultDf.Columns.Add(_dataFrame["Ticker"]);
-            resultDf.Columns.Add(new DoubleDataFrameColumn("Weight", tickerWeightsVector));
-
-            return resultDf;
-        }
-        else
-        {
-            var data = factorCols
-                .Select(c => c.Select(x => x ?? 0d).ToArray())
-                .ToArray();
-
-            var m = Matrix<double>.Build.DenseOfColumns(rows, columns, data);
-            var v = Vector<double>.Build.DenseOfArray(alignedWeights);
-
-            var normalizer = alignedWeights.Sum(Math.Abs);
-            if (normalizer <= 0)
-                normalizer = 1;
-            var tickerWeights = m * v / normalizer; // (rows x 1)
-            if (volatilityScaling &&
-                _dataFrame.Columns.FirstOrDefault(c => c.Name == nameof(Volatility)) is DoubleDataFrameColumn volCol)
-            {
-                var vol = Vector<double>.Build.DenseOfArray(
-                    volCol.Select(x => x is > 0d ? x.Value : 1d).ToArray());
-                tickerWeights = tickerWeights.PointwiseDivide(vol);
-            }
-
-            if (maxWeightAbs.HasValue)
-            {
-                tickerWeights.MapInplace(x => Math.Clamp(x, -maxWeightAbs.Value, maxWeightAbs.Value));
-            }
-
-            var resultDf = new DataFrame();
-            resultDf.Columns.Add(_dataFrame["Date"]);
-            resultDf.Columns.Add(_dataFrame["Ticker"]);
-            resultDf.Columns.Add(new DoubleDataFrameColumn("Weight", tickerWeights));
-
-            return resultDf;
         }
 
         bool HasMissingValues()
@@ -394,9 +389,11 @@ public sealed record FactorDataFrame
         return value switch
         {
             null => "NaN",
-            double d when double.IsNaN(d) => "NaN",
+            double.NaN => "NaN",
             double d => d.ToString("F6"),
-            DateTime dt => dt.ToString("yyyy-MM-dd"),
+            DateOnly date => date.ToString("yyyy-MM-dd"),
+            DateTime { Hour: 0, Minute: 0, Second: 0, Millisecond: 0, Microsecond: 0 } dt => dt.ToString("yyyy-MM-dd"),
+            DateTime dt => dt.ToString("yyyy-MM-dd hh:mm:ss"),
             string s => s,
             _ => value.ToString() ?? "null"
         };
