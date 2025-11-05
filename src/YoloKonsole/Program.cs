@@ -42,7 +42,8 @@ internal class Program
 
         Arguments.Populate();
 
-        ConsoleWrite(@"
+        ConsoleWrite(
+            @"
 __  ______  __    ____  __
 \ \/ / __ \/ /   / __ \/ /
  \  / / / / /   / / / / / 
@@ -84,7 +85,8 @@ __  ______  __    ____  __
                 .CreateLogger<Program>();
             _logger.LogInformation("************ YOLO started ************");
 
-            var yoloConfig = config.GetYoloConfig() ?? throw new ConfigException("YOLO configuration is missing or invalid");
+            var yoloConfig = config.GetYoloConfig() ??
+                             throw new ConfigException("YOLO configuration is missing or invalid");
 
             using var broker = serviceProvider.GetService<IYoloBroker>()!;
             var orders = await broker.GetOpenOrdersAsync(cancellationToken);
@@ -107,8 +109,9 @@ __  ______  __    ____  __
 
             var positions = await broker.GetPositionsAsync(cancellationToken);
 
-            var weightsService = serviceProvider.GetService<ICalcWeights>() ?? throw new ConfigException("Weights configuration is missing or invalid");
-            var weights = await weightsService.CalculateWeightsAsync(positions.Keys, cancellationToken);
+            var weightsService = serviceProvider.GetService<ICalcWeights>() ??
+                                 throw new ConfigException("Weights configuration is missing or invalid");
+            var weights = await weightsService.CalculateWeightsAsync(cancellationToken);
 
             var baseAssetFilter = positions
                 .Keys
@@ -145,7 +148,8 @@ __  ______  __    ____  __
                 Console.WriteLine();
                 Console.Write("Proceed? (y/n): ");
 
-                if (Console.Read() != 'y') return Success;
+                if (Console.Read() != 'y')
+                    return Success;
             }
 
             var returnCode = Success;
@@ -160,8 +164,8 @@ __  ______  __    ____  __
                     var settings = OrderManagementSettings.Default with
                     {
                         UnfilledOrderTimeout = TimeSpan.TryParse(yoloConfig.UnfilledOrderTimeout, out var timeout)
-                                        ? timeout
-                                        : OrderManagementSettings.Default.UnfilledOrderTimeout
+                            ? timeout
+                            : OrderManagementSettings.Default.UnfilledOrderTimeout
                     };
 
                     _logger.LogInformation("Managing orders for {TradeCount} trades", trades.Length);
@@ -190,7 +194,6 @@ __  ______  __    ____  __
                     {
                         // Expected cancellation, we can ignore this
                     }
-
                 });
 
             return returnCode;
@@ -282,7 +285,8 @@ __  ______  __    ____  __
         }
     }
 
-    private static int FindRowByAsset(ConcurrentDictionary<string, int> index, string assetName) => index.GetValueOrDefault(assetName, -1);
+    private static int FindRowByAsset(ConcurrentDictionary<string, int> index, string assetName) =>
+        index.GetValueOrDefault(assetName, -1);
 
     private static string GetStatusMarkup(OrderUpdateType type)
     {

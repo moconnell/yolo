@@ -11,12 +11,12 @@ namespace YoloAbstractions.Extensions;
 
 public static class HttpClientExtensions
 {
-    public static async Task<T> GetAsync<T, TData>(
+    public static async Task<TResponse> GetAsync<TResponse, TData>(
         this HttpClient httpClient,
         string url,
         IReadOnlyDictionary<string, string>? headers = null,
         CancellationToken cancellationToken = default)
-        where T : IApiResponse<TData>
+        where TResponse : IApiResponse<TData>
     {
         ArgumentNullException.ThrowIfNull(httpClient, nameof(httpClient));
         ArgumentException.ThrowIfNullOrEmpty(url, nameof(url));
@@ -35,14 +35,14 @@ public static class HttpClientExtensions
         if (!response.IsSuccessStatusCode)
         {
             throw new ApiException(
-                $"Could not fetch from API: {await response.Content.ReadAsStringAsync(cancellationToken)} ({response.StatusCode}: {response.ReasonPhrase})");
+                $"Could not fetch from API ({url}): {response.ReasonPhrase} ({response.StatusCode})");
         }
 
-        var apiResponse = await response.Content.ReadFromJsonAsync<T>(cancellationToken: cancellationToken);
+        var apiResponse = await response.Content.ReadFromJsonAsync<TResponse>(cancellationToken: cancellationToken);
 
         if (apiResponse is null || apiResponse.Data is null || apiResponse.Data.Count == 0)
         {
-            throw new ApiException("Invalid response");
+            throw new ApiException($"No data returned from API ({url})");
         }
 
         return apiResponse;

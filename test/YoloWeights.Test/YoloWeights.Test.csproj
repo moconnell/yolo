@@ -23,6 +23,7 @@
     <ItemGroup>
       <ProjectReference Include="..\..\src\YoloAbstractions\YoloAbstractions.csproj" />
       <ProjectReference Include="..\..\src\YoloWeights\YoloWeights.csproj" />
+      <ProjectReference Include="..\YoloTest.Util\YoloTest.Util.csproj" />
     </ItemGroup>
 
 </Project>

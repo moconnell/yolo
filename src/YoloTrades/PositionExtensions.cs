@@ -11,6 +11,8 @@ public static class PositionExtensions
         IReadOnlyDictionary<string, IReadOnlyList<MarketInfo>> markets,
         string baseCurrencyToken)
     {
+        return positions.Sum(PositionValue);
+
         decimal PositionValue(KeyValuePair<string, IReadOnlyList<Position>> kvp)
         {
             var (symbol, position) = kvp;
@@ -19,8 +21,6 @@ public static class PositionExtensions
                 ? position.Sum(p => p.Amount)
                 : position.Sum(p => p.GetValue(markets, baseCurrencyToken));
         }
-
-        return positions.Sum(PositionValue);
     }
 
     private static decimal GetValue(
@@ -30,9 +30,19 @@ public static class PositionExtensions
     {
         var (_, assetUnderlying, _, amount) = position;
 
-        return markets
-            .GetMarkets(assetUnderlying)
-            .Select(market => amount * market.Bid.GetValueOrDefault())
-            .FirstOrDefault();
+        var tokenMarkets = markets.GetMarkets(assetUnderlying);
+
+        var isLong = amount >= 0;
+        var sidePricesInBase = tokenMarkets
+            .Where(m => string.Equals(m.QuoteAsset, baseCurrencyToken, System.StringComparison.OrdinalIgnoreCase))
+            .Select(m => isLong ? m.Bid : m.Ask)
+            .Where(p => p.HasValue)
+            .Select(p => p!.Value);
+
+        var price = isLong
+            ? sidePricesInBase.DefaultIfEmpty(0m).Max()
+            : sidePricesInBase.DefaultIfEmpty(0m).Min();
+
+        return amount * price;
     }
 }

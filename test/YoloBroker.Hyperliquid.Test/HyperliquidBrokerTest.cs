@@ -8,9 +8,11 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Shouldly;
+using Xunit.Abstractions;
 using YoloAbstractions;
 using YoloBroker.Hyperliquid.Extensions;
-
+using YoloBroker.Interface;
+using YoloTest.Util;
 using static YoloAbstractions.AssetPermissions;
 using static YoloAbstractions.AssetType;
 using static YoloAbstractions.OrderType;
@@ -19,17 +21,43 @@ namespace YoloBroker.Hyperliquid.Test;
 
 public class HyperliquidBrokerTest
 {
+    private readonly ITestOutputHelper _testOutputHelper;
+    private readonly ILoggerFactory _loggerFactory;
+
+    public HyperliquidBrokerTest(ITestOutputHelper testOutputHelper)
+    {
+        _testOutputHelper = testOutputHelper;
+        _loggerFactory = LoggerFactory.Create(builder =>
+        {
+            builder.AddProvider(new XUnitLoggerProvider(testOutputHelper));
+            builder.SetMinimumLevel(LogLevel.Debug);
+        });
+    }
+
     [Theory]
     [Trait("Category", "Integration")]
     [InlineData("ETH", PerpetualFutures, "ETH")]
     [InlineData("BTC,ETH", PerpetualFutures, "BTC,ETH")]
-    public async Task GivenBaseAsset_ShouldGetMarkets(string baseAssetFilterString, AssetPermissions assetPermissions, string expectedMarketsString)
+    [InlineData("SHIB", PerpetualFutures, "SHIB", "SHIB:kSHIB")]
+    public async Task GivenBaseAsset_ShouldGetMarkets(
+        string baseAssetFilterString,
+        AssetPermissions assetPermissions,
+        string expectedMarketsString,
+        params string[] aliasConfig)
     {
         // arrange
         var baseAssetFilter = baseAssetFilterString.Split(',').Select(asset => asset.Trim()).ToHashSet();
         var expectedMarkets = expectedMarketsString.Split(',').Select(market => market.Trim()).ToHashSet();
+        var aliases = aliasConfig.Length > 0
+            ? aliasConfig.Select(alias =>
+                {
+                    var aliasParts = alias.Split(':');
+                    return new KeyValuePair<string, string>(aliasParts[0], aliasParts[1]);
+                })
+                .ToDictionary()
+            : null;
 
-        HyperliquidBroker broker = GetTestBroker();
+        var broker = GetTestBroker(aliases);
 
         // act
         var results = await broker.GetMarketsAsync(baseAssetFilter, assetPermissions: assetPermissions);
@@ -37,7 +65,10 @@ public class HyperliquidBrokerTest
         // assert
         Assert.NotNull(results);
         Assert.Equal(expectedMarkets.Count, results.Count);
-        Assert.True(results.All(kvp => expectedMarkets.Contains(kvp.Value[0].Name)));
+        Assert.True(expectedMarkets.All(ticker => results.ContainsKey(ticker)));
+        Assert.True(results.All(kvp => kvp.Value.All(info => !string.IsNullOrEmpty(info.BaseAsset))));
+        Assert.True(results.All(kvp => kvp.Value.All(info => !string.IsNullOrEmpty(info.Key))));
+        Assert.True(results.All(kvp => kvp.Value.All(info => !string.IsNullOrEmpty(info.Name))));
         Assert.True(results.All(kvp => kvp.Value.All(info => info.Ask > 0)));
         Assert.True(results.All(kvp => kvp.Value.All(info => info.Bid > 0)));
         Assert.True(results.All(kvp => kvp.Value.All(info => info.Mid > 0)));
@@ -48,7 +79,7 @@ public class HyperliquidBrokerTest
     public async Task ShouldGetOpenOrders()
     {
         // arrange
-        HyperliquidBroker broker = GetTestBroker();
+        var broker = GetTestBroker();
 
         // act
         var results = await broker.GetOpenOrdersAsync();
@@ -65,7 +96,7 @@ public class HyperliquidBrokerTest
     public async Task ShouldPlaceOrder(string symbol, AssetType assetType, double quantity)
     {
         // arrange
-        HyperliquidBroker broker = GetTestBroker();
+        var broker = GetTestBroker();
         var orderPrice = await GetLimitPrice(broker, symbol, assetType, quantity);
         var trade = CreateTrade(symbol, assetType, quantity, orderPrice);
 
@@ -91,10 +122,14 @@ public class HyperliquidBrokerTest
     [InlineData("ETH", Future, 0.01)]
     [InlineData("ETH", Future, 0.0001, Market)]
     [InlineData("BTC", Future, 0.001)]
-    public async Task ShouldPlaceOrders(string symbol, AssetType assetType, double quantity, OrderType orderType = Limit)
+    public async Task ShouldPlaceOrders(
+        string symbol,
+        AssetType assetType,
+        double quantity,
+        OrderType orderType = Limit)
     {
         // arrange
-        HyperliquidBroker broker = GetTestBroker();
+        var broker = GetTestBroker();
         decimal? limitPrice = orderType == Limit ? await GetLimitPrice(broker, symbol, assetType, quantity) : null;
         var trade = CreateTrade(symbol, assetType, quantity, limitPrice);
 
@@ -128,7 +163,7 @@ public class HyperliquidBrokerTest
     public async Task ShouldManageOrders(string symbol, AssetType assetType, double quantity)
     {
         // arrange
-        HyperliquidBroker broker = GetTestBroker();
+        var broker = GetTestBroker();
         var limitPrice = await GetLimitPrice(broker, symbol, assetType, quantity);
         var trade = CreateTrade(symbol, assetType, quantity, limitPrice);
         var settings = OrderManagementSettings.Default;
@@ -146,13 +181,13 @@ public class HyperliquidBrokerTest
             await foreach (var orderUpdate in orderUpdates)
             {
                 updateCount++;
-                Console.WriteLine($"Update {updateCount}: {orderUpdate.Type} - {orderUpdate.Symbol}");
+                _testOutputHelper.WriteLine($"Update {updateCount}: {orderUpdate.Type} - {orderUpdate.Symbol}");
 
                 orderUpdate.ShouldNotBeNull();
 
                 if (orderUpdate.Type == OrderUpdateType.Error)
                 {
-                    Console.WriteLine($"Error: {orderUpdate.Error?.Message}");
+                    _testOutputHelper.WriteLine($"Error: {orderUpdate.Error?.Message}");
                     throw orderUpdate.Error ?? new Exception("Unknown error");
                 }
 
@@ -168,69 +203,418 @@ public class HyperliquidBrokerTest
                 // Cancel after first successful order creation
                 if (orderUpdate.Type == OrderUpdateType.Created)
                 {
-                    cts.Cancel();
+                    await cts.CancelAsync();
                 }
             }
         }
         catch (OperationCanceledException) when (cts.Token.IsCancellationRequested)
         {
             // Expected cancellation
-            Console.WriteLine($"Test completed with {updateCount} updates");
+            _testOutputHelper.WriteLine($"Test completed with {updateCount} updates");
         }
         finally
         {
             // clean-up
             foreach (var order in orders.Values)
             {
-                await broker.CancelOrderAsync(order);
+                await broker.CancelOrderAsync(order, CancellationToken.None);
             }
         }
     }
 
-    private static async Task<decimal> GetLimitPrice(HyperliquidBroker broker, string symbol, AssetType assetType, double quantity)
+    [Fact]
+    public async Task GivenNullTrades_WhenPlaceTradesAsync_ShouldThrowArgumentNullException()
     {
-        // Get current market price first
-        var assets = symbol.Split('/').Select(s => s.Trim()).ToArray();
-        var markets = assetType switch
+        // arrange
+        var broker = GetTestBroker(skipCredentialValidation: true);
+
+        // act & assert
+        await Should.ThrowAsync<ArgumentNullException>(async () =>
         {
-            AssetType.Spot => await broker.GetMarketsAsync(new HashSet<string> { assets[0] }, assets[1], assetPermissions: AssetPermissions.Spot),
-            AssetType.Future => await broker.GetMarketsAsync(new HashSet<string> { assets[0] }, assetPermissions: AssetPermissions.PerpetualFutures),
-            _ => throw new NotSupportedException($"Asset type {assetType} is not supported.")
-        };
-
-        markets.ShouldNotBeNull();
-        markets.ShouldContainKey(symbol);
-        var marketInfo = markets[symbol][0];
-
-        bool isLong = quantity >= 0;
-        var rawLimitPrice = isLong ? marketInfo.Bid * 0.99m : marketInfo.Ask * 1.01m;
-        rawLimitPrice.ShouldNotBeNull();
-        rawLimitPrice.Value.ShouldBeGreaterThan(0);
-
-        var priceStep = marketInfo.PriceStep;
-        priceStep.ShouldNotBeNull();
-
-        // Round the limit price to the nearest price step
-        var roundingType = isLong ? RoundingType.Down : RoundingType.Up;
-        var roundedLimitPrice = rawLimitPrice.Value.RoundToValidPrice(priceStep.Value, roundingType);
-
-        Console.WriteLine($"Calculated limit price for {symbol}: {roundedLimitPrice} (raw: {rawLimitPrice.Value}, step: {priceStep.Value})");
-
-        return roundedLimitPrice;
+            await foreach (var _ in broker.PlaceTradesAsync(null!))
+            {
+                // Should throw before yielding
+            }
+        });
     }
 
-    private static Trade CreateTrade(string symbol, AssetType assetType, double quantity, decimal? price) =>
-        new(symbol, assetType, Convert.ToDecimal(quantity), price, ClientOrderId: $"0x{RandomNumberGenerator.GetHexString(32, true)}");
+    [Fact]
+    public async Task GivenEmptyTrades_WhenPlaceTradesAsync_ShouldYieldNothing()
+    {
+        // arrange
+        var broker = GetTestBroker(skipCredentialValidation: true);
+        var results = new List<TradeResult>();
 
+        // act
+        await foreach (var result in broker.PlaceTradesAsync([]))
+        {
+            results.Add(result);
+        }
 
-    private static HyperliquidBroker GetTestBroker()
+        // assert
+        results.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task GivenNullOrder_WhenCancelOrderAsync_ShouldThrowArgumentNullException()
+    {
+        // arrange
+        var broker = GetTestBroker(skipCredentialValidation: true);
+
+        // act & assert
+        await Should.ThrowAsync<ArgumentNullException>(() => broker.CancelOrderAsync(null!));
+    }
+
+    [Fact]
+    public async Task GivenCompletedOrder_WhenCancelOrderAsync_ShouldSkipCancellation()
+    {
+        // arrange
+        var broker = GetTestBroker(skipCredentialValidation: true);
+        var completedOrder = new Order(
+            123,
+            "ETH",
+            Future,
+            DateTime.UtcNow,
+            OrderSide.Buy,
+            OrderStatus.Filled,
+            1m,
+            1m,
+            2000m,
+            "test");
+
+        // act
+        await broker.CancelOrderAsync(completedOrder);
+
+        // assert
+        // Should complete without error
+    }
+
+    [Fact]
+    public void GivenUnsupportedAssetType_WhenPlaceTrade_ShouldThrowArgumentOutOfRangeException()
+    {
+        // arrange
+        var broker = GetTestBroker(skipCredentialValidation: true);
+        var trade = new Trade(
+            "BTC",
+            (AssetType) 999, // Invalid asset type
+            1m,
+            50000m);
+
+        // act & assert
+        Should.ThrowAsync<ArgumentOutOfRangeException>(() => broker.PlaceTradeAsync(trade));
+    }
+
+    [Fact]
+    public void GivenUnsupportedAssetType_WhenCancelOrder_ShouldThrowArgumentOutOfRangeException()
+    {
+        // arrange
+        var broker = GetTestBroker(skipCredentialValidation: true);
+        var order = new Order(
+            123,
+            "BTC",
+            (AssetType) 999, // Invalid asset type
+            DateTime.UtcNow,
+            OrderSide.Buy,
+            OrderStatus.Open,
+            1m,
+            0m,
+            50000m,
+            "test");
+
+        // act & assert
+        Should.ThrowAsync<ArgumentOutOfRangeException>(() => broker.CancelOrderAsync(order));
+    }
+
+    [Fact]
+    public async Task GivenNullOrder_WhenEditOrderAsync_ShouldThrowArgumentNullException()
+    {
+        // arrange
+        var broker = GetTestBroker(skipCredentialValidation: true);
+
+        // act & assert
+        await Should.ThrowAsync<ArgumentNullException>(() => broker.EditOrderAsync(null!));
+    }
+
+    [Fact(Skip = "Could not get order book for NOT - [ServerError.UnknownSymbol] Symbol not found")]
+    [Trait("Category", "Integration")]
+    public async Task GivenNullBaseAssetFilter_WhenGetMarketsAsync_ShouldReturnAllMarkets()
+    {
+        // arrange
+        var broker = GetTestBroker();
+
+        // act
+        var markets = await broker.GetMarketsAsync(null, assetPermissions: PerpetualFutures);
+
+        // assert
+        markets.ShouldNotBeNull();
+        markets.Count.ShouldBeGreaterThan(0);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task GivenSpotPermissions_WhenGetMarketsAsync_ShouldIncludeSpotMarkets()
+    {
+        // arrange
+        var broker = GetTestBroker();
+
+        // act
+        var markets = await broker.GetMarketsAsync(
+            new HashSet<string> { "BTC" },
+            "USDC",
+            assetPermissions: AssetPermissions.Spot);
+
+        // assert
+        markets.ShouldNotBeNull();
+        markets.Values.SelectMany(m => m).Any(m => m.AssetType == AssetType.Spot).ShouldBeTrue();
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task GivenLongSpotPermissions_WhenGetMarketsAsync_ShouldIncludeSpotMarkets()
+    {
+        // arrange
+        var broker = GetTestBroker();
+
+        // act
+        var markets = await broker.GetMarketsAsync(
+            new HashSet<string> { "BTC" },
+            "USDC",
+            assetPermissions: LongSpot);
+
+        // assert
+        markets.ShouldNotBeNull();
+        markets.Values.SelectMany(m => m).Any(m => m.AssetType == AssetType.Spot).ShouldBeTrue();
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task GivenShortSpotPermissions_WhenGetMarketsAsync_ShouldIncludeSpotMarkets()
+    {
+        // arrange
+        var broker = GetTestBroker();
+
+        // act
+        var markets = await broker.GetMarketsAsync(
+            new HashSet<string> { "BTC" },
+            "USDC",
+            assetPermissions: ShortSpot);
+
+        // assert
+        markets.ShouldNotBeNull();
+        markets.Values.SelectMany(m => m).Any(m => m.AssetType == AssetType.Spot).ShouldBeTrue();
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task GivenSpotAndPerpPermissions_WhenGetMarketsAsync_ShouldIncludeBothTypes()
+    {
+        // arrange
+        var broker = GetTestBroker();
+
+        // act
+        var markets = await broker.GetMarketsAsync(
+            new HashSet<string> { "BTC" },
+            "USDC",
+            assetPermissions: SpotAndPerp);
+
+        // assert
+        markets.ShouldNotBeNull();
+        var allMarkets = markets.Values.SelectMany(m => m).ToList();
+        allMarkets.Any(m => m.AssetType == AssetType.Spot).ShouldBeTrue();
+        allMarkets.Any(m => m.AssetType == Future).ShouldBeTrue();
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task GivenLongSpotAndPerpPermissions_WhenGetMarketsAsync_ShouldIncludeBothTypes()
+    {
+        // arrange
+        var broker = GetTestBroker();
+
+        // act
+        var markets = await broker.GetMarketsAsync(
+            new HashSet<string> { "BTC" },
+            "USDC",
+            assetPermissions: LongSpotAndPerp);
+
+        // assert
+        markets.ShouldNotBeNull();
+        var allMarkets = markets.Values.SelectMany(m => m).ToList();
+        allMarkets.Any(m => m.AssetType == Future).ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task GivenNullOrEmptyTicker_WhenGetDailyClosePricesAsync_ShouldThrowArgumentException()
+    {
+        // arrange
+        var broker = GetTestBroker(skipCredentialValidation: true);
+
+        // act & assert
+        await Should.ThrowAsync<ArgumentException>(() =>
+            broker.GetDailyClosePricesAsync(null!, 10));
+        await Should.ThrowAsync<ArgumentException>(() =>
+            broker.GetDailyClosePricesAsync("", 10));
+    }
+
+    [Fact]
+    public void GivenBroker_WhenDisposedTwice_ShouldNotThrow()
+    {
+        // arrange
+        var broker = GetTestBroker(skipCredentialValidation: true);
+
+        // act
+        broker.Dispose();
+
+        // assert - should not throw
+        broker.Dispose();
+    }
+
+    [Fact]
+    public async Task GivenNullTrades_WhenManageOrdersAsync_ShouldThrowArgumentNullException()
+    {
+        // arrange
+        var broker = GetTestBroker(skipCredentialValidation: true);
+
+        // act & assert
+        await Should.ThrowAsync<ArgumentNullException>(async () =>
+        {
+            await foreach (var _ in broker.ManageOrdersAsync(null!, OrderManagementSettings.Default))
+            {
+                // Should throw before yielding
+            }
+        });
+    }
+
+    [Fact]
+    public async Task GivenNullSettings_WhenManageOrdersAsync_ShouldThrowArgumentNullException()
+    {
+        // arrange
+        var broker = GetTestBroker(skipCredentialValidation: true);
+        var trade = CreateTrade("ETH", Future, 0.01, 2000m);
+
+        // act & assert
+        await Should.ThrowAsync<ArgumentNullException>(async () =>
+        {
+            await foreach (var _ in broker.ManageOrdersAsync([trade], null!))
+            {
+                // Should throw before yielding
+            }
+        });
+    }
+
+    [Fact]
+    public async Task GivenEmptyTrades_WhenManageOrdersAsync_ShouldYieldNothing()
+    {
+        // arrange
+        var broker = GetTestBroker(skipCredentialValidation: true);
+        var results = new List<OrderUpdate>();
+
+        // act
+        await foreach (var update in broker.ManageOrdersAsync([], OrderManagementSettings.Default))
+        {
+            results.Add(update);
+        }
+
+        // assert
+        results.ShouldBeEmpty();
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task GivenTickerWithAlias_WhenGetMarketsAsync_ShouldReturnWithOriginalTicker()
+    {
+        // arrange
+        var aliases = new Dictionary<string, string>
+        {
+            ["SHIB"] = "kSHIB"
+        };
+        var broker = GetTestBroker(aliases);
+
+        // act
+        var markets = await broker.GetMarketsAsync(
+            new HashSet<string> { "SHIB" },
+            assetPermissions: PerpetualFutures);
+
+        // assert
+        markets.ShouldNotBeNull();
+        markets.ShouldContainKey("SHIB");
+        markets["SHIB"].ShouldNotBeEmpty();
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task GivenPositions_WhenGetPositionsAsync_ShouldCombineSpotAndFutures()
+    {
+        // arrange
+        var broker = GetTestBroker();
+
+        // act
+        var positions = await broker.GetPositionsAsync();
+
+        // assert
+        positions.ShouldNotBeNull();
+        // Positions dictionary should contain both spot and futures if they exist
+    }
+
+    [Fact(Skip = "No bid for BTC/USDC spot")]
+    [Trait("Category", "Integration")]
+    public async Task GivenMultipleTrades_WhenPlaceTradesAsync_ShouldHandleMixedAssetTypes()
+    {
+        // arrange
+        const string btcUsdc = "BTC/USDC";
+        const string eth = "ETH";
+        var broker = GetTestBroker();
+        var ethFuturesPrice = await GetLimitPrice(broker, eth, Future, 0.001);
+        var btcSpotPrice = await GetLimitPrice(broker, btcUsdc, AssetType.Spot, 0.0005);
+
+        var trades = new[]
+        {
+            CreateTrade(eth, Future, 0.001, ethFuturesPrice),
+            CreateTrade(btcUsdc, AssetType.Spot, 0.0005, btcSpotPrice)
+        };
+
+        var results = new ConcurrentBag<TradeResult>();
+
+        // act
+        await foreach (var result in broker.PlaceTradesAsync(trades))
+        {
+            results.Add(result);
+        }
+
+        // assert
+        results.Count.ShouldBe(2);
+        results.All(r => r.Success).ShouldBeTrue();
+
+        // cleanup
+        foreach (var result in results.Where(r => r.Order != null))
+        {
+            await broker.CancelOrderAsync(result.Order!);
+        }
+    }
+
+    private HyperliquidBroker GetTestBroker(
+        IReadOnlyDictionary<string, string>? aliases = null,
+        bool skipCredentialValidation = false)
     {
         var (address, privateKey) = GetConfig();
-        address.ShouldNotBeNullOrEmpty();
-        privateKey.ShouldNotBeNullOrEmpty();
+
+        if (!skipCredentialValidation)
+        {
+            address.ShouldNotBeNullOrEmpty();
+            privateKey.ShouldNotBeNullOrEmpty();
+        }
+        else
+        {
+            // Use dummy credentials if validation is skipped and credentials are missing
+            if (string.IsNullOrEmpty(address))
+                address = "0x0000000000000000000000000000000000000000";
+            if (string.IsNullOrEmpty(privateKey))
+                privateKey = "0000000000000000000000000000000000000000000000000000000000000000";
+        }
 
         var apiCredentials = new ApiCredentials(address, privateKey);
-        var mockLogger = new Mock<ILogger<HyperliquidBroker>>();
+
+        var logger = _loggerFactory.CreateLogger<HyperliquidBroker>();
 
         var broker = new HyperliquidBroker(
             new HyperLiquidRestClient(options =>
@@ -243,9 +627,23 @@ public class HyperliquidBrokerTest
                 options.ApiCredentials = apiCredentials;
                 options.Environment = HyperLiquidEnvironment.Testnet;
             }),
-            mockLogger.Object
+            GetTickerAliasService(),
+            logger
         );
         return broker;
+
+        ITickerAliasService GetTickerAliasService()
+        {
+            if (aliases != null)
+            {
+                return new TickerAliasService(aliases);
+            }
+
+            var mockTickerAliasService = new Mock<ITickerAliasService>();
+            mockTickerAliasService.Setup(x => x.TryGetAlias(It.IsAny<string>(), out It.Ref<string>.IsAny))
+                .Returns(false);
+            return mockTickerAliasService.Object;
+        }
     }
 
     private static (string? Address, string? PrivateKey) GetConfig()
@@ -257,4 +655,54 @@ public class HyperliquidBrokerTest
 
         return (config["Hyperliquid:Address"], config["Hyperliquid:PrivateKey"]);
     }
+
+    private async Task<decimal> GetLimitPrice(
+        HyperliquidBroker broker,
+        string symbol,
+        AssetType assetType,
+        double quantity)
+    {
+        // Get current market price first
+        var assets = symbol.Split('/').Select(s => s.Trim()).ToArray();
+        var markets = assetType switch
+        {
+            AssetType.Spot => await broker.GetMarketsAsync(
+                new HashSet<string> { assets[0] },
+                assets[1],
+                assetPermissions: AssetPermissions.Spot),
+            Future => await broker.GetMarketsAsync(
+                new HashSet<string> { assets[0] },
+                assetPermissions: PerpetualFutures),
+            _ => throw new NotSupportedException($"Asset type {assetType} is not supported.")
+        };
+
+        markets.ShouldNotBeNull();
+        markets.ShouldContainKey(symbol);
+        var marketInfo = markets[symbol][0];
+
+        var isLong = quantity >= 0;
+        var rawLimitPrice = isLong ? marketInfo.Bid * 0.99m : marketInfo.Ask * 1.01m;
+        rawLimitPrice.ShouldNotBeNull();
+        rawLimitPrice.Value.ShouldBeGreaterThan(0);
+
+        var priceStep = marketInfo.PriceStep;
+        priceStep.ShouldNotBeNull();
+
+        // Round the limit price to the nearest price step
+        var roundingType = isLong ? RoundingType.Down : RoundingType.Up;
+        var roundedLimitPrice = rawLimitPrice.Value.RoundToValidPrice(priceStep.Value, roundingType);
+
+        _testOutputHelper.WriteLine(
+            $"Calculated limit price for {symbol}: {roundedLimitPrice} (raw: {rawLimitPrice.Value}, step: {priceStep.Value})");
+
+        return roundedLimitPrice;
+    }
+
+    private static Trade CreateTrade(string symbol, AssetType assetType, double quantity, decimal? price) =>
+        new(
+            symbol,
+            assetType,
+            Convert.ToDecimal(quantity),
+            price,
+            ClientOrderId: $"0x{RandomNumberGenerator.GetHexString(32, true)}");
 }

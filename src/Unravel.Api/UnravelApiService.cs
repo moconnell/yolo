@@ -1,15 +1,14 @@
-﻿using System.Runtime.CompilerServices;
-using Unravel.Api.Config;
+﻿using Unravel.Api.Config;
 using Unravel.Api.Data;
+using Unravel.Api.Interfaces;
 using YoloAbstractions;
+using YoloAbstractions.Exceptions;
 using YoloAbstractions.Extensions;
-using YoloAbstractions.Interfaces;
 
 namespace Unravel.Api;
 
-public class UnravelApiService : IGetFactors
+public class UnravelApiService : IUnravelApiService
 {
-    private const string Ur = nameof(Ur);
     private const string ApiKeyHeader = "X-API-KEY";
 
     private readonly HttpClient _httpClient;
@@ -26,69 +25,86 @@ public class UnravelApiService : IGetFactors
         };
     }
 
-    public bool RequireTickers => true;
-
-    public async Task<IReadOnlyDictionary<string, Dictionary<FactorType, Factor>>> GetFactorsAsync(
+    public async Task<FactorDataFrame> GetFactorsLiveAsync(
         IEnumerable<string> tickers,
+        bool throwOnMissingValue = false,
         CancellationToken cancellationToken = default)
     {
+        if (_config.Factors.Length == 0)
+            return FactorDataFrame.Empty;
+
         ArgumentNullException.ThrowIfNull(tickers);
-        var tickersArray = tickers as string[] ?? tickers.ToArray();
-        if (tickersArray.Length == 0)
-        {
-            throw new ArgumentException("No tickers provided", nameof(tickers));
-        }
+        var tickerList = tickers
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Select(s => s.Trim().ToUpperInvariant())
+            .Distinct()
+            .OrderBy(s => s)
+            .ToList();
+        if (tickerList.Count == 0)
+            throw new ArgumentException("Tickers cannot be empty.", nameof(tickers));
 
-        var values = new Dictionary<string, Dictionary<FactorType, Factor>>();
-        await foreach (var factorKvp in GetFactorsImplAsync(tickersArray, cancellationToken))
-        {
-            foreach (var factor in factorKvp.Value)
-            {
-                if (values.TryGetValue(factor.Ticker, out var factors))
-                {
-                    factors[factor.Type] = factor;
-                }
-                else
-                {
-                    values.Add(factor.Ticker, new Dictionary<FactorType, Factor> { { factor.Type, factor } });
-                }
-            }
-        }
-
-        return values;
-    }
-
-    private async IAsyncEnumerable<KeyValuePair<FactorType, IEnumerable<Factor>>> GetFactorsImplAsync(
-        IEnumerable<string> tickers,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
-    {
-        var baseUrl = $"{_config.ApiBaseUrl}/{_config.FactorsUrlPath}";
-        var tickersCsv = tickers.ToCsv().ToUpperInvariant();
+        var baseUrl = $"{_config.ApiBaseUrl}/{_config.UrlPathFactorsLive}";
+        var tickersCsv = Uri.EscapeDataString(tickerList.ToCsv());
+        var results = new List<FactorDataFrame>();
 
         foreach (var fc in _config.Factors)
         {
-            var factorUrl = string.Format(baseUrl, fc.Id, tickersCsv);
-            var factorResponse = await _httpClient
-                .GetAsync<FactorResponse, decimal>(factorUrl, _headers, cancellationToken);
-            var factors = ToFactors(factorResponse, fc.Type);
+            cancellationToken.ThrowIfCancellationRequested();
 
-            yield return new KeyValuePair<FactorType, IEnumerable<Factor>>(fc.Type, factors);
+            var url = string.Format(baseUrl, fc.Id, tickersCsv);
+            var response = await _httpClient.GetAsync<FactorsLiveResponse, double>(url, _headers, cancellationToken);
+
+            if (response.Tickers.SequenceEqual(tickerList, StringComparer.OrdinalIgnoreCase))
+            {
+                var dataFrame = FactorDataFrame.NewFrom(response.Tickers, response.TimeStamp, (fc.Type, response.Data));
+                results.Add(dataFrame);
+                continue;
+            }
+
+            var missingTickers = tickerList.Except(response.Tickers).ToArray();
+            if (missingTickers.Length > 0)
+            {
+                if (throwOnMissingValue)
+                    throw new ApiException(
+                        $"Not all requested tickers were returned for {fc}: {string.Join(", ", missingTickers)}");
+
+                var values = new List<double>(response.Data);
+                foreach (var missingTicker in missingTickers)
+                {
+                    var insertIndex = tickerList.IndexOf(missingTicker);
+                    values.Insert(insertIndex, double.NaN);
+                }
+
+                var dataFrame = FactorDataFrame.NewFrom(tickerList, response.TimeStamp, (fc.Type, values));
+                results.Add(dataFrame);
+            }
+            else
+            {
+                var unexpectedTickers = response.Tickers.Except(tickerList).ToArray();
+                throw new ApiException(
+                    $"Unravel API returned unexpected tickers for factor {fc.Type}: {unexpectedTickers.ToCsv()}");
+            }
         }
+
+        return results.Aggregate((one, two) => one + two);
     }
 
-    private static IEnumerable<Factor> ToFactors(FactorResponse response, FactorType factorType)
+    public async Task<IReadOnlyList<string>> GetUniverseAsync(CancellationToken cancellationToken = default)
     {
-        if (response.Data.Count != response.Tickers.Count)
-        {
-            throw new InvalidOperationException(
-                $"{nameof(response.Data)} count ({response.Data.Count}) does not match {nameof(response.Tickers)} count ({response.Tickers.Count})");
-        }
+        var baseUrl = $"{_config.ApiBaseUrl}/{_config.UrlPathUniverse}";
+        var exchange = _config.Exchange.ToString().ToLowerInvariant();
+        var startDate = DateTime.Today.AddDays(-3).ToString(_config.DateFormat);
+        var url = string.Format(baseUrl, _config.UniverseSize, exchange, startDate);
+        var response = await _httpClient.GetAsync<UniverseResponse, byte?[]>(url, _headers, cancellationToken);
+        if (response.Index.Count == 1 && response.Tickers.Count == _config.UniverseSize)
+            return response.Tickers;
 
-        for (var i = 0; i < response.Data.Count; i++)
-        {
-            var ticker = response.Tickers[i];
-            var value = response.Data[i];
-            yield return new Factor($"{Ur}.{factorType}", factorType, ticker, null, value, response.TimeStamp);
-        }
+        var lastRow = response.Data[^1];
+        if (lastRow.Length != response.Tickers.Count)
+            throw new ApiException(
+                $"Universe response malformed: lastRow length {lastRow.Length} != tickers count {response.Tickers.Count}.");
+
+        var tickers = response.Tickers.Where((_, i) => lastRow[i] == 1).ToArray();
+        return tickers;
     }
 }

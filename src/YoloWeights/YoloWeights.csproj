@@ -9,4 +9,8 @@
   <ItemGroup>
     <ProjectReference Include="..\YoloAbstractions\YoloAbstractions.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
 </Project>

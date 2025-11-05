@@ -1,4 +1,5 @@
-﻿using YoloAbstractions;
+﻿using Microsoft.Extensions.Logging;
+using YoloAbstractions;
 using YoloAbstractions.Config;
 using YoloAbstractions.Extensions;
 using YoloAbstractions.Interfaces;
@@ -7,112 +8,77 @@ namespace YoloWeights;
 
 public class YoloWeightsService : ICalcWeights
 {
-    private readonly IReadOnlyDictionary<FactorType, decimal> _factorWeights;
-    private readonly decimal _maxWeightingAbs;
-    private readonly IReadOnlyList<IGetFactors> _inner;
+    private readonly IGetFactors[] _inner;
+    private readonly IReadOnlyDictionary<FactorType, double> _factorWeights;
+    private readonly double? _maxWeightingAbs;
+    private readonly NormalizationMethod _normalizationMethod;
+    private readonly ILogger<YoloWeightsService> _logger;
 
-    public YoloWeightsService(IEnumerable<IGetFactors> inner, YoloConfig config)
+    public YoloWeightsService(IEnumerable<IGetFactors> inner, YoloConfig config, ILogger<YoloWeightsService> logger)
     {
+        _logger = logger;
         ArgumentNullException.ThrowIfNull(inner);
         ArgumentNullException.ThrowIfNull(config);
 
         _inner = inner.ToArray();
-        if (_inner.Count == 0)
+        if (_inner.Length == 0)
         {
             throw new ArgumentException($"{nameof(inner)}: must have at least one factor provider");
         }
 
-        _factorWeights = config.FactorWeights;
+        _factorWeights = new Dictionary<FactorType, double>(
+            config.FactorWeights.Select(kvp =>
+                new KeyValuePair<FactorType, double>(kvp.Key, Convert.ToDouble(kvp.Value))));
         _maxWeightingAbs = config.MaxWeightingAbs;
+        _normalizationMethod = config.FactorNormalizationMethod;
     }
 
-    public async Task<IReadOnlyDictionary<string, Weight>> CalculateWeightsAsync(
-        IEnumerable<string> tickers,
+    public async Task<IReadOnlyDictionary<string, decimal>> CalculateWeightsAsync(
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(tickers);
+        var factorDataFrame = await GetFactorsAsync(cancellationToken);
+        _logger.LogInformation("Factors (raw):\n{Factors}", factorDataFrame);
 
-        var factors = await GetFactorsAsync(tickers, cancellationToken);
+        var normalizedFactors = factorDataFrame.Normalize(_normalizationMethod);
+        _logger.LogInformation("Factors (normalised):\n{Factors}", normalizedFactors);
 
-        var weights = new Dictionary<string, Weight>();
+        var weights = normalizedFactors.ApplyWeights(_factorWeights, _maxWeightingAbs);
+        _logger.LogInformation("weights:\n{Weights}", weights);
 
-        foreach (var (ticker, factorDict) in factors)
-        {
-            var timeStamp = DateTime.UtcNow;
+        var weightsDict = weights.Rows.ToDictionary(
+            r => (string) r["Ticker"],
+            r => Convert.ToDecimal((double) r["Weight"]));
 
-            var volatilityFactor = factorDict.TryGetValue(FactorType.Volatility, out var fac) && fac.Value > 0
-                ? fac.Value
-                : 1;
-
-            var weightNumerator = 0m;
-            var weightDenominator = 0;
-
-            foreach (var (factorType, factor) in factorDict)
-            {
-                if (!_factorWeights.TryGetValue(factorType, out var factorWeight) || factorWeight == 0)
-                {
-                    continue;
-                }
-
-                weightNumerator += factor.Value * factorWeight;
-                weightDenominator++;
-
-                if (factor.TimeStamp < timeStamp)
-                {
-                    timeStamp = factor.TimeStamp;
-                }
-            }
-
-            if (weightDenominator <= 0)
-                continue;
-
-            var rawWeightValue = weightNumerator / weightDenominator;
-
-            var volAdjustedWeight = Math.Clamp(
-                rawWeightValue / volatilityFactor,
-                -_maxWeightingAbs,
-                _maxWeightingAbs);
-
-            weights[ticker] = new Weight(ticker, volAdjustedWeight, timeStamp);
-        }
-
-        return weights;
+        return weightsDict;
     }
 
-    private async Task<IReadOnlyDictionary<string, IReadOnlyDictionary<FactorType, Factor>>> GetFactorsAsync(
-        IEnumerable<string> tickers,
+    private async Task<FactorDataFrame> GetFactorsAsync(
         CancellationToken cancellationToken = default)
     {
-        var baseAssets = new HashSet<string>(tickers);
-        var result = new Dictionary<string, Dictionary<FactorType, Factor>>();
+        var baseAssets = new HashSet<string>();
+        var factors = new HashSet<FactorType>();
+        var result = new List<FactorDataFrame>();
 
         foreach (var svc in _inner
-                     .OrderBy(x => x.RequireTickers))
+                     .OrderByDescending(x => x.IsFixedUniverse)
+                     .ThenBy(x => x.Order))
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var dict = await svc.GetFactorsAsync(baseAssets, cancellationToken);
+            var df = await svc.GetFactorsAsync(baseAssets, factors, cancellationToken);
+            if (df.IsEmpty)
+                continue;
+            
+            result.Add(df);
+            factors.UnionWith(df.FactorTypes);
 
-            foreach (var (ticker, factors) in dict)
+            foreach (var ticker in df.Tickers)
             {
                 var (baseAsset, _) = ticker.GetBaseAndQuoteAssets();
                 baseAssets.Add(baseAsset);
-
-                if (!result.TryGetValue(ticker, out var factorsByType))
-                {
-                    factorsByType = [];
-                    result[ticker] = factorsByType;
-                }
-
-                foreach (var factorKvp in factors)
-                {
-                    factorsByType[factorKvp.Key] = factorKvp.Value;
-                }
             }
         }
 
-        return result.ToDictionary(
-            kvp => kvp.Key,
-            IReadOnlyDictionary<FactorType, Factor> (kvp) => kvp.Value);
+        return result.Count == 0 ? FactorDataFrame.Empty : result.Aggregate((one, two) => one + two);
     }
 }

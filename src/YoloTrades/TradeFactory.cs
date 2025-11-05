@@ -34,7 +34,7 @@ public class TradeFactory : ITradeFactory
     private decimal SpreadSplit { get; }
 
     public IEnumerable<Trade> CalculateTrades(
-        IReadOnlyDictionary<string, Weight> weights,
+        IReadOnlyDictionary<string, decimal> weights,
         IReadOnlyDictionary<string, IReadOnlyList<Position>> positions,
         IReadOnlyDictionary<string, IReadOnlyList<MarketInfo>> markets)
     {
@@ -48,7 +48,7 @@ public class TradeFactory : ITradeFactory
 
         var unconstrainedTargetLeverage = factorsDict
             .Values
-            .Select(w => Math.Abs(w.Weight.Value))
+            .Select(w => Math.Abs(w.Weight))
             .Sum();
 
         var weightConstraint = unconstrainedTargetLeverage < MaxLeverage
@@ -58,14 +58,14 @@ public class TradeFactory : ITradeFactory
         var droppedTokens = positions.Keys.Except(factorsDict.Keys.Union([BaseAsset]));
         foreach (var token in droppedTokens)
         {
-            factorsDict[token] = (Weight.Empty, false);
+            factorsDict[token] = (0m, false);
         }
 
         return factorsDict
             .Select(RebalancePosition)
             .SelectMany(CombineOrders);
 
-        IEnumerable<Trade> RebalancePosition(KeyValuePair<string, (Weight, bool)> kvp)
+        IEnumerable<Trade> RebalancePosition(KeyValuePair<string, (decimal, bool)> kvp)
         {
             var (token, (weight, isInUniverse)) = kvp;
 
@@ -74,7 +74,7 @@ public class TradeFactory : ITradeFactory
             var tokenPositions = positions.TryGetValue(token, out var pos)
                 ? pos.ToArray()
                 : [];
-            var constrainedTargetWeight = weightConstraint * weight.Value;
+            var constrainedTargetWeight = weightConstraint * weight;
 
             var projectedPositions = markets.GetMarkets(token)
                 .ToDictionary(
@@ -158,7 +158,8 @@ public class TradeFactory : ITradeFactory
             .Select(g => g.Sum());
     }
 
-    private IEnumerable<(Trade trade, decimal remainingDelta)> CalcTrades(string token,
+    private IEnumerable<(Trade trade, decimal remainingDelta)> CalcTrades(
+        string token,
         IReadOnlyList<ProjectedPosition> projectedPositions,
         decimal bufferedTargetWeight,
         decimal remainingDelta)
@@ -216,8 +217,20 @@ public class TradeFactory : ITradeFactory
 
             var trade = market.MinProvideSize switch
             {
-                _ when Math.Abs(size) >= market.MinProvideSize.GetValueOrDefault() => new Trade(market.Name, market.AssetType, size, CalcLimitPrice(), OrderType.Limit, true),
-                _ => new Trade(market.Name, market.AssetType, size, isBuy ? market.Ask!.Value : market.Bid!.Value, OrderType.Market, false)
+                _ when Math.Abs(size) >= market.MinProvideSize.GetValueOrDefault() => new Trade(
+                    market.Name,
+                    market.AssetType,
+                    size,
+                    CalcLimitPrice(),
+                    OrderType.Limit,
+                    true),
+                _ => new Trade(
+                    market.Name,
+                    market.AssetType,
+                    size,
+                    isBuy ? market.Ask!.Value : market.Bid!.Value,
+                    OrderType.Market,
+                    false)
             };
 
             if (trade.IsTradable())
@@ -227,7 +240,8 @@ public class TradeFactory : ITradeFactory
 
             yield return (trade, remainingDelta);
 
-            if (restart || remainingDelta == 0) break;
+            if (restart || remainingDelta == 0)
+                break;
             continue;
 
             decimal? CalcLimitPrice()

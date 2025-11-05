@@ -97,6 +97,7 @@ public class TradeFactoryTests
         string path,
         AssetPermissions assetPermissions = AssetPermissions.All,
         string baseCurrency = "USDC",
+        decimal maxLeverage = 2,
         decimal nominalCash = 10000,
         decimal tradeBuffer = 0.04m)
     {
@@ -107,6 +108,7 @@ public class TradeFactoryTests
         {
             AssetPermissions = assetPermissions,
             BaseAsset = baseCurrency,
+            MaxLeverage = maxLeverage,
             NominalCash = nominalCash,
             TradeBuffer = tradeBuffer
         };
@@ -125,7 +127,7 @@ public class TradeFactoryTests
     }
 
     private static
-        (Dictionary<string, Weight> weights,
+        (Dictionary<string, decimal> weights,
         Dictionary<string, IReadOnlyList<Position>> positions,
         Dictionary<string, IReadOnlyList<MarketInfo>> markets,
         Dictionary<string, decimal> expectedTrades)
@@ -190,7 +192,7 @@ public class TradeFactoryTests
 
         return (weights, positions, markets, expectedTrades);
 
-        Weight ToWeight(YoloCsvRow row)
+        decimal ToWeight(YoloCsvRow row)
         {
             var divisor = (carryMultiplier > 0 ? 1 : 0) +
                           (momentumMultiplier > 0 ? 1 : 0) +
@@ -198,7 +200,7 @@ public class TradeFactoryTests
 
             if (divisor == 0)
             {
-                return new Weight(row.Ticker, 0m, DateTime.UtcNow);
+                return 0m;
             }
 
             var volatility = row.Volatility > 0 ? row.Volatility : 1;
@@ -208,18 +210,18 @@ public class TradeFactoryTests
                                     (divisor * volatility);
             var clampedWeight = Math.Clamp(volAdjustedWeight, -maxWeightingAbs, maxWeightingAbs);
 
-            return new Weight(row.Ticker, clampedWeight, DateTime.UtcNow);
+            return clampedWeight;
         }
     }
 
     private static async
-        Task<(Dictionary<string, Weight>,
+        Task<(Dictionary<string, decimal>,
             Dictionary<string, IReadOnlyList<Position>>,
             Dictionary<string, IReadOnlyList<MarketInfo>>)>
         DeserializeInputsAsync(
             string path)
     {
-        var weights = await DeserializeAsync<Dictionary<string, Weight>>($"{path}/weights.json");
+        var weights = await DeserializeAsync<Dictionary<string, decimal>>($"{path}/weights.json");
 
         var positions =
             ToEnumerableDictionary(await DeserializeAsync<Dictionary<string, Position[]>>($"{path}/positions.json"));

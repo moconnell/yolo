@@ -4,14 +4,15 @@ namespace YoloAbstractions.Config;
 
 public record YoloConfig
 {
-    public decimal MaxLeverage { get; init; } = 2;
-    public decimal TradeBuffer { get; init; }
+    public decimal MaxLeverage { get; init; } = 1;
+    public decimal TradeBuffer { get; init; } = 0.05m;
     public decimal? NominalCash { get; init; }
-    public AssetPermissions AssetPermissions { get; init; } = AssetPermissions.SpotAndPerp;
-    public required string BaseAsset { get; init; }
+    public AssetPermissions AssetPermissions { get; init; } = AssetPermissions.PerpetualFutures;
+    public string BaseAsset { get; init; } = "USDC";
     public decimal SpreadSplit { get; init; } = 0.5m;
-    public decimal? MinOrderValue { get; init; }
+    public decimal? MinOrderValue { get; init; } = 10;
     public string UnfilledOrderTimeout { get; init; } = "00:05:00"; // Default 5 minutes
-    public decimal MaxWeightingAbs { get; init; } = 0.25m;
+    public double? MaxWeightingAbs { get; init; } 
     public IReadOnlyDictionary<FactorType, decimal> FactorWeights { get; init; } = new Dictionary<FactorType, decimal>();
+    public NormalizationMethod FactorNormalizationMethod { get; init; } = NormalizationMethod.None;
 }

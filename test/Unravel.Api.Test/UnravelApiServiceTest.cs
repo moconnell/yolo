@@ -6,33 +6,31 @@ using Shouldly;
 using Unravel.Api.Config;
 using Xunit.Abstractions;
 using YoloAbstractions;
+using YoloAbstractions.Extensions;
 
 namespace Unravel.Api.Test;
 
-public class UnravelApiServiceTest
+public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
 {
-    private readonly ITestOutputHelper _testOutputHelper;
-
-    public UnravelApiServiceTest(ITestOutputHelper testOutputHelper) => _testOutputHelper = testOutputHelper;
+    private const string RetailFlow = "retail-flow";
 
     [Fact]
     public async Task GivenGoodConfig_WhenMocked_ShouldReturnFactors()
     {
         // arrange
         const string btc = "BTC";
-        const string retailFlow = "retail-flow";
 
         var handler = new Mock<HttpMessageHandler>();
         var httpClient = handler.CreateClient();
         var config = new UnravelConfig
         {
             ApiBaseUrl = "http://foo.org/api",
-            Factors = [new FactorConfig { Id = retailFlow, Type = FactorType.RetailFlow }],
-            FactorsUrlPath = "/factors?id={0}&tickers={1}"
+            Factors = [new FactorConfig { Id = RetailFlow, Type = FactorType.RetailFlow }],
+            UrlPathFactorsLive = "/factors?id={0}&tickers={1}"
         };
         handler.SetupRequest(
                 HttpMethod.Get,
-                $"{config.ApiBaseUrl}/{string.Format(config.FactorsUrlPath, retailFlow, btc)}")
+                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, RetailFlow, btc)}")
             .ReturnsAsync(
                 new HttpResponseMessage
                 {
@@ -54,17 +52,35 @@ public class UnravelApiServiceTest
         var svc = new UnravelApiService(httpClient, config);
 
         // act
-        var factors = await svc.GetFactorsAsync([btc]);
+        var result = await svc.GetFactorsLiveAsync([btc]);
 
         // assert
-        factors.ShouldNotBeNull();
-        factors.ShouldNotBeEmpty();
-        factors[btc].ShouldNotBeNull();
-        factors[btc].Count.ShouldBe(1);
-        var keyValuePair = factors[btc].First();
-        keyValuePair.Key.ShouldBe(FactorType.RetailFlow);
-        keyValuePair.Value.ShouldBe(
-            new Factor("Ur.RetailFlow", FactorType.RetailFlow, btc, null, 0.25m, new DateTime(2023, 6, 30)));
+        result.ShouldNotBeNull();
+        result.FactorTypes.ShouldBe([FactorType.RetailFlow]);
+        result.Tickers.ShouldBe([btc]);
+        result[FactorType.RetailFlow, btc].ShouldBe(0.25, 0.000000001);
+    }
+
+    [Fact]
+    public async Task GivenEmptyConfig_WhenMocked_ShouldReturnEmpty()
+    {
+        // arrange
+        const string btc = "BTC";
+
+        var handler = new Mock<HttpMessageHandler>();
+        var httpClient = handler.CreateClient();
+        var config = new UnravelConfig();
+        var svc = new UnravelApiService(httpClient, config);
+
+        // act
+        var result = await svc.GetFactorsLiveAsync([btc]);
+        
+        outputHelper.WriteLine(result.ToString());
+
+        // assert
+        result.ShouldNotBeNull();
+        result.FactorTypes.ShouldBe([]);
+        result.Tickers.ShouldBe([]);
     }
 
     [Fact]
@@ -72,7 +88,7 @@ public class UnravelApiServiceTest
     public async Task GivenGoodConfig_WhenLiveData_ShouldReturnFactors()
     {
         // arrange
-        string[] tickers = ["BTC", "ADA", "ETH", "BNB", "TRX", "XRP", "SOL", "LINK", "AVAX", "DOGE"];
+        var tickers = "ADA,AVAX,BCH,BNB,BTC,DOGE,DOT,ETH,HBAR,HYPE,LINK,LTC,MNT,SHIB,SOL,SUI,TON,TRX,XLM,XRP".Split(',');
 
         var builder = new ConfigurationBuilder()
             .AddJsonFile("appsettings.json", true, true)
@@ -89,26 +105,127 @@ public class UnravelApiServiceTest
         var svc = new UnravelApiService(httpClient, unravelConfig);
 
         // act
-        var factors = await svc.GetFactorsAsync(tickers, cancellationTokenSource.Token);
+        var result = await svc.GetFactorsLiveAsync(tickers, cancellationToken: cancellationTokenSource.Token);
+        
+        outputHelper.WriteLine(result.ToString());
 
         // assert
-        factors.ShouldNotBeNull();
-        factors.ShouldNotBeEmpty();
-        factors.Count.ShouldBe(tickers.Length);
+        result.ShouldNotBeNull();
+        result.FactorTypes.ShouldBe([FactorType.RetailFlow, FactorType.Carry]);
+        result.Tickers.Count.ShouldBe(tickers.Length);
+        result.Tickers.Except(tickers).ShouldBe([]);
+        tickers.All(ticker => result[FactorType.RetailFlow, ticker] != 0).ShouldBe(true);
+        result[FactorType.RetailFlow, "MNT"].ShouldBe(double.NaN);
+        tickers.All(ticker => result[FactorType.Carry, ticker] != 0).ShouldBe(true);
+    }
 
-        foreach (var ticker in tickers)
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task GivenGoodConfig_WhenLiveData_ShouldGetUniverse()
+    {
+        // arrange
+        var builder = new ConfigurationBuilder()
+            .AddJsonFile("appsettings.json", true, true)
+            .AddJsonFile($"appsettings.local.json", true, true);
+        var config = builder.Build();
+        var unravelConfig = config.GetChildren().First().Get<UnravelConfig>();
+        unravelConfig.ShouldNotBeNull();
+
+        var cancellationTokenSource = new CancellationTokenSource();
+        cancellationTokenSource.CancelAfter(TimeSpan.FromMinutes(1));
+
+        using var httpClient = new HttpClient();
+
+        var svc = new UnravelApiService(httpClient, unravelConfig);
+
+        // act
+        var tickers = await svc.GetUniverseAsync(cancellationTokenSource.Token);
+        
+        outputHelper.WriteLine(tickers.ToCsv());
+
+        // assert
+        tickers.ShouldNotBeNull();
+        tickers.Count.ShouldBe(unravelConfig.UniverseSize);
+        tickers.ShouldAllBe(x => !string.IsNullOrEmpty(x));
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task GivenTickerUniverse_WhenNotAllReturned_ShouldPopulateNull()
+    {
+        // arrange
+        var builder = new ConfigurationBuilder()
+            .AddJsonFile("appsettings.json", true, true)
+            .AddJsonFile($"appsettings.local.json", true, true);
+        var config = builder.Build();
+        var unravelConfig = config.GetChildren().First().Get<UnravelConfig>();
+        unravelConfig.ShouldNotBeNull();
+
+        var cancellationTokenSource = new CancellationTokenSource();
+        cancellationTokenSource.CancelAfter(TimeSpan.FromMinutes(1));
+
+        using var httpClient = new HttpClient();
+
+        var svc = new UnravelApiService(httpClient, unravelConfig);
+
+        var tickers = "ADA,AVAX,BCH,BNB,BTC,DOGE,DOT,ETH,HBAR,HYPE,LINK,LTC,MNT,SHIB,SOL,SUI,TON,TRX,XLM,XRP".Split(',');
+
+        // act
+        var result = await svc.GetFactorsLiveAsync(tickers, cancellationToken: cancellationTokenSource.Token);
+
+        outputHelper.WriteLine(result.ToString());
+        
+        // assert
+        result.ShouldNotBeNull();
+        result.Tickers.ShouldBe(tickers);
+    }
+
+    [Fact]
+    public async Task GivenGoodConfig_WhenMocked_ShouldGetUniverse()
+    {
+        // arrange
+        var handler = new Mock<HttpMessageHandler>();
+        var httpClient = handler.CreateClient();
+        var config = new UnravelConfig
         {
-            factors[ticker].ShouldNotBeNull();
-            factors[ticker].Count.ShouldBe(1);
-            var (factorType, factor) = factors[ticker].First();
+            ApiBaseUrl = "http://foo.org/api",
+            Factors = [new FactorConfig { Id = RetailFlow, Type = FactorType.RetailFlow }],
+            UniverseSize = 10
+        };
 
-            _testOutputHelper.WriteLine(factor.ToString());
+        var exchange = config.Exchange.ToString().ToLowerInvariant();
+        var startDate = DateTime.Today.AddDays(-3).ToString(config.DateFormat);
+        var requestUrl =
+            $"{config.ApiBaseUrl}/{string.Format(config.UrlPathUniverse, config.UniverseSize, exchange, startDate)}";
+        handler.SetupRequest(HttpMethod.Get, requestUrl)
+            .ReturnsAsync(
+                new HttpResponseMessage
+                {
+                    Content = new StringContent(
+                        $$"""
+                          {
+                              "data": [
+                                  [1,1,1,1,1,1,1,1,1,1]
+                              ],
+                              "index": ["{{startDate}}"],
+                              "columns": [
+                                  "BTC", "ADA", "ETH", "BNB", "TRX", "XRP", "SOL", "LINK", "AVAX", "DOGE"
+                              ]
+                          }
+                          """),
+                    StatusCode = HttpStatusCode.OK
+                });
 
-            factorType.ShouldBe(FactorType.RetailFlow);
-            factor.Id.ShouldBe("Ur.RetailFlow");
-            factor.Ticker.ShouldBe(ticker);
-            factor.Value.ShouldNotBe(0m);
-            (DateTime.Today - factor.TimeStamp).ShouldBeLessThanOrEqualTo(TimeSpan.FromDays(1));
-        }
+        var svc = new UnravelApiService(httpClient, config);
+
+        // act
+        var tickers = await svc.GetUniverseAsync();
+        
+        outputHelper.WriteLine(tickers.ToCsv());
+
+        // assert
+        tickers.ShouldNotBeNull();
+        tickers.Count.ShouldBe(config.UniverseSize);
+        tickers.ShouldAllBe(x => !string.IsNullOrEmpty(x));
     }
 }
