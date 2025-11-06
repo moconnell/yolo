@@ -10,15 +10,19 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="coverlet.collector" />
-        <PackageReference Include="Microsoft.Extensions.Configuration" />
-        <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
-        <PackageReference Include="Microsoft.NET.Test.Sdk" />
-        <PackageReference Include="Moq" />
-        <PackageReference Include="Moq.Contrib.HttpClient" />
-        <PackageReference Include="Shouldly" />
-        <PackageReference Include="xunit" />
-        <PackageReference Include="xunit.runner.visualstudio" />
+        <PackageReference Include="coverlet.msbuild">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="coverlet.collector"/>
+        <PackageReference Include="Microsoft.Extensions.Configuration"/>
+        <PackageReference Include="Microsoft.Extensions.Configuration.Json"/>
+        <PackageReference Include="Microsoft.NET.Test.Sdk"/>
+        <PackageReference Include="Moq"/>
+        <PackageReference Include="Moq.Contrib.HttpClient"/>
+        <PackageReference Include="Shouldly"/>
+        <PackageReference Include="xunit"/>
+        <PackageReference Include="xunit.runner.visualstudio"/>
     </ItemGroup>
 
     <ItemGroup>
@@ -26,22 +30,22 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\RobotWealth.Api\RobotWealth.Api.csproj" />
+        <ProjectReference Include="..\..\src\RobotWealth.Api\RobotWealth.Api.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
-      <None Update="Data\volatilities.json">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
-      <None Update="Data\weights.json">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </None>
-      <None Update="appsettings.json">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="appsettings.local.json">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
+        <None Update="Data\volatilities.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="Data\weights.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="appsettings.json">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Update="appsettings.local.json">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
     </ItemGroup>
 
 </Project>

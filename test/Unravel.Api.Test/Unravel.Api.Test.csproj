@@ -8,32 +8,36 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="coverlet.collector" />
-        <PackageReference Include="Microsoft.Extensions.Configuration" />
-        <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
-        <PackageReference Include="Microsoft.NET.Test.Sdk" />
-        <PackageReference Include="Moq" />
-        <PackageReference Include="Moq.Contrib.HttpClient" />
-        <PackageReference Include="Shouldly" />
-        <PackageReference Include="xunit" />
-        <PackageReference Include="xunit.runner.visualstudio" />
+        <PackageReference Include="coverlet.msbuild">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="coverlet.collector"/>
+        <PackageReference Include="Microsoft.Extensions.Configuration"/>
+        <PackageReference Include="Microsoft.Extensions.Configuration.Json"/>
+        <PackageReference Include="Microsoft.NET.Test.Sdk"/>
+        <PackageReference Include="Moq"/>
+        <PackageReference Include="Moq.Contrib.HttpClient"/>
+        <PackageReference Include="Shouldly"/>
+        <PackageReference Include="xunit"/>
+        <PackageReference Include="xunit.runner.visualstudio"/>
     </ItemGroup>
 
     <ItemGroup>
-        <Using Include="Xunit" />
+        <Using Include="Xunit"/>
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\src\Unravel.Api\Unravel.Api.csproj" />
+        <ProjectReference Include="..\..\src\Unravel.Api\Unravel.Api.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
-      <None Update="appsettings.json">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
-      <None Update="appsettings.local.json">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
+        <None Update="appsettings.json">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Update="appsettings.local.json">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
     </ItemGroup>
 
 </Project>
