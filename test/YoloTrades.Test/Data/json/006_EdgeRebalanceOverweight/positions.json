@@ -1,0 +1,10 @@
+{
+  "BTC": [
+    {
+      "AssetName": "BTC",
+      "BaseAsset": "BTC",
+      "AssetType": "Future",
+      "Amount": 0.04
+    }
+  ]
+}

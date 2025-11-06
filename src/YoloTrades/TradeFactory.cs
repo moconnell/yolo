@@ -22,6 +22,7 @@ public class TradeFactory : ITradeFactory
         NominalCash = yoloConfig.NominalCash;
         MaxLeverage = yoloConfig.MaxLeverage;
         TradeBuffer = yoloConfig.TradeBuffer;
+        RebalanceMode = yoloConfig.RebalanceMode;
         SpreadSplit = Math.Max(0, Math.Min(1, yoloConfig.SpreadSplit));
     }
 
@@ -31,6 +32,7 @@ public class TradeFactory : ITradeFactory
     private decimal? NominalCash { get; }
     private decimal MaxLeverage { get; }
     private decimal TradeBuffer { get; }
+    private RebalanceMode RebalanceMode { get; }
     private decimal SpreadSplit { get; }
 
     public IEnumerable<Trade> CalculateTrades(
@@ -127,7 +129,13 @@ public class TradeFactory : ITradeFactory
                 yield break;
             }
 
-            var remainingDelta = constrainedTargetWeight - currentWeight.Value;
+            var rebalanceTarget = RebalanceMode switch
+            {
+                RebalanceMode.Edge => CalculateEdgeTarget(currentWeight.Value, constrainedTargetWeight, TradeBuffer),
+                _ => constrainedTargetWeight
+            };
+
+            var remainingDelta = rebalanceTarget - currentWeight.Value;
 
             while (remainingDelta != 0)
             {
@@ -275,5 +283,15 @@ public class TradeFactory : ITradeFactory
         }
 
         return isBuy ? LogNull(market.Ask, _logger.NoAsk) : LogNull(market.Bid, _logger.NoBid);
+    }
+
+    private static decimal CalculateEdgeTarget(decimal currentWeight, decimal idealWeight, decimal tradeBuffer)
+    {
+        // Calculate the nearest edge of the tolerance band
+        // If current weight is above ideal, rebalance to upper edge: idealWeight + tradeBuffer
+        // If current weight is below ideal, rebalance to lower edge: idealWeight - tradeBuffer
+        return currentWeight > idealWeight
+            ? idealWeight + tradeBuffer
+            : idealWeight - tradeBuffer;
     }
 }
