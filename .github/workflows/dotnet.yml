@@ -21,10 +21,10 @@ jobs:
           dotnet test --filter "Category!=Integration" --no-build --verbosity normal
           /p:CollectCoverage=true
           /p:CoverletOutput=../results/
-          /p:MergeWith=../results/coverage.info
-          /p:CoverletOutputFormat=lcov
+          /p:MergeWith=../results/coverage.json
+          /p:CoverletOutputFormat=coveralls
       - name: Publish coverage report to coveralls.io
-        uses: coverallsapp/github-action@master
+        uses: coverallsapp/github-action@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          path-to-lcov: test/results/coverage.info
+          file: test/results/coverage.info
