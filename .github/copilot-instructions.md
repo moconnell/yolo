@@ -31,7 +31,7 @@ This is a .NET 9 C# application that automates RobotWealth cryptocurrency YOLO (
 
 ### Code Style
 
-- Use C# 9+ features including nullable reference types (`Nullable` is enabled)
+- Use C# 12+ features including nullable reference types (`Nullable` is enabled)
 - Follow implicit usings pattern (`ImplicitUsings` is enabled)
 - Maintain existing code style and conventions
 - Avoid adding comments unless they explain complex logic or match existing comment patterns
