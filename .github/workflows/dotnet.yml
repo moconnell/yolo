@@ -21,7 +21,7 @@ jobs:
       - name: Merge coverage reports
         run: |
           dotnet tool install -g dotnet-reportgenerator-globaltool
-          reportgenerator -reports:./coverage/*/coverage.cobertura.xml -targetdir:./coverage/merged -reporttypes:Cobertura
+          reportgenerator -reports:./coverage/*/coverage.cobertura.xml -targetdir:./coverage/merged -reporttypes:Cobertura -classfilters:"+*" -filefilters:"+**/src/**;-**/test/**"
       - name: Publish coverage report to coveralls.io
         uses: coverallsapp/github-action@v2
         with:
