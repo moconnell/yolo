@@ -23,4 +23,4 @@ jobs:
         uses: coverallsapp/github-action@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          files: ./test/**/coverage.cobertura.xml
+          files: ./test/*.Test/TestResults/*/coverage.cobertura.xml
