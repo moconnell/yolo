@@ -73,7 +73,6 @@ __  ______  __    ____  __
 
             var serviceProvider = new ServiceCollection()
                 .AddLogging(loggingBuilder => loggingBuilder
-                    .AddConsole()
                     .AddFile(config.GetSection("Logging:File")))
                 .AddBroker(config)
                 .AddWeightsServices(config)
