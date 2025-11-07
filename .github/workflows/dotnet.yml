@@ -18,8 +18,9 @@ jobs:
         run: dotnet build --no-restore
       - name: Test
         run:
-          dotnet test --filter "Category!=Integration" --no-build --verbosity normal --collect:"XPlat Code Coverage"
+          dotnet test --filter "Category!=Integration" --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory ../coverage
       - name: Publish coverage report to coveralls.io
         uses: coverallsapp/github-action@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          files: ./coverage/**/coverage.cobertura.xml
