@@ -63,8 +63,8 @@ __  ______  __    ____  __
                 .AddEnvironmentVariables();
 
             // add file-based secrets
-            var secretsPath = Environment.GetEnvironmentVariable("YOLO_SECRETS_PATH");
-            if (secretsPath != null && Directory.Exists(secretsPath))
+            var secretsPath = Path.Combine(Directory.GetCurrentDirectory(), "secrets");
+            if (Directory.Exists(secretsPath))
             {
                 builder.AddKeyPerFile(secretsPath, optional: true);
             }

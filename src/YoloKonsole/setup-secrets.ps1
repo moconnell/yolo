@@ -1,6 +1,5 @@
 # Create secrets directory
 $secretsPath = Join-Path $PWD "secrets"
-$env:YOLO_SECRETS_PATH = $secretsPath
 New-Item -Path $secretsPath -ItemType Directory -Force
 
 # Prompt for secrets securely
