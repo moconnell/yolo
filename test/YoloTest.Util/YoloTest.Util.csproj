@@ -16,6 +16,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <PackageReference Include="Newtonsoft.Json" />
         <Using Include="Xunit"/>
     </ItemGroup>
 
