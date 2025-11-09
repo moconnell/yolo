@@ -6,6 +6,7 @@ using Shouldly;
 using Unravel.Api.Config;
 using Xunit.Abstractions;
 using YoloAbstractions;
+using YoloAbstractions.Exceptions;
 using YoloAbstractions.Extensions;
 
 namespace Unravel.Api.Test;
@@ -74,7 +75,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
 
         // act
         var result = await svc.GetFactorsLiveAsync([btc]);
-        
+
         outputHelper.WriteLine(result.ToString());
 
         // assert
@@ -106,7 +107,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
 
         // act
         var result = await svc.GetFactorsLiveAsync(tickers, cancellationToken: cancellationTokenSource.Token);
-        
+
         outputHelper.WriteLine(result.ToString());
 
         // assert
@@ -140,7 +141,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
 
         // act
         var tickers = await svc.GetUniverseAsync(cancellationTokenSource.Token);
-        
+
         outputHelper.WriteLine(tickers.ToCsv());
 
         // assert
@@ -174,7 +175,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         var result = await svc.GetFactorsLiveAsync(tickers, cancellationToken: cancellationTokenSource.Token);
 
         outputHelper.WriteLine(result.ToString());
-        
+
         // assert
         result.ShouldNotBeNull();
         result.Tickers.ShouldBe(tickers);
@@ -220,12 +221,370 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
 
         // act
         var tickers = await svc.GetUniverseAsync();
-        
+
         outputHelper.WriteLine(tickers.ToCsv());
 
         // assert
         tickers.ShouldNotBeNull();
         tickers.Count.ShouldBe(config.UniverseSize);
         tickers.ShouldAllBe(x => !string.IsNullOrEmpty(x));
+    }
+
+    [Fact]
+    public async Task GivenMissingTickers_WhenThrowOnMissingValueFalse_ShouldPopulateNaN()
+    {
+        // arrange
+        var handler = new Mock<HttpMessageHandler>();
+        var httpClient = handler.CreateClient();
+        var config = new UnravelConfig
+        {
+            ApiBaseUrl = "http://foo.org/api",
+            Factors = [new FactorConfig { Id = RetailFlow, Type = FactorType.RetailFlow }],
+            UrlPathFactorsLive = "/factors?id={0}&tickers={1}"
+        };
+
+        var requestedTickers = new[] { "ADA", "BTC", "ETH" };
+        var returnedTickers = new[] { "BTC", "ETH" }; // Missing ADA
+        var tickersCsv = Uri.EscapeDataString(string.Join(",", requestedTickers));
+
+        handler.SetupRequest(
+                HttpMethod.Get,
+                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, RetailFlow, tickersCsv)}")
+            .ReturnsAsync(
+                new HttpResponseMessage
+                {
+                    Content = new StringContent(
+                        """
+                        {
+                            "data": [0.5, 0.7],
+                            "index": "2023-06-30",
+                            "columns": ["BTC", "ETH"]
+                        }
+                        """),
+                    StatusCode = HttpStatusCode.OK
+                });
+
+        var svc = new UnravelApiService(httpClient, config);
+
+        // act
+        var result = await svc.GetFactorsLiveAsync(requestedTickers, throwOnMissingValue: false);
+
+        // assert
+        result.ShouldNotBeNull();
+        result.Tickers.ShouldBe(requestedTickers);
+        result[FactorType.RetailFlow, "ADA"].ShouldBe(double.NaN);
+        result[FactorType.RetailFlow, "BTC"].ShouldBe(0.5, 0.000000001);
+        result[FactorType.RetailFlow, "ETH"].ShouldBe(0.7, 0.000000001);
+    }
+
+    [Fact]
+    public async Task GivenMissingTickers_WhenThrowOnMissingValueTrue_ShouldThrow()
+    {
+        // arrange
+        var handler = new Mock<HttpMessageHandler>();
+        var httpClient = handler.CreateClient();
+        var config = new UnravelConfig
+        {
+            ApiBaseUrl = "http://foo.org/api",
+            Factors = [new FactorConfig { Id = RetailFlow, Type = FactorType.RetailFlow }],
+            UrlPathFactorsLive = "/factors?id={0}&tickers={1}"
+        };
+
+        var requestedTickers = new[] { "ADA", "BTC", "ETH" };
+        var returnedTickers = new[] { "BTC", "ETH" }; // Missing ADA
+        var tickersCsv = Uri.EscapeDataString(string.Join(",", requestedTickers));
+
+        handler.SetupRequest(
+                HttpMethod.Get,
+                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, RetailFlow, tickersCsv)}")
+            .ReturnsAsync(
+                new HttpResponseMessage
+                {
+                    Content = new StringContent(
+                        """
+                        {
+                            "data": [0.5, 0.7],
+                            "index": "2023-06-30",
+                            "columns": ["BTC", "ETH"]
+                        }
+                        """),
+                    StatusCode = HttpStatusCode.OK
+                });
+
+        var svc = new UnravelApiService(httpClient, config);
+
+        // act & assert
+        var ex = await Should.ThrowAsync<ApiException>(async () =>
+            await svc.GetFactorsLiveAsync(requestedTickers, throwOnMissingValue: true));
+
+        ex.Message.ShouldContain("Not all requested tickers were returned");
+        ex.Message.ShouldContain("ADA");
+    }
+
+    [Fact]
+    public async Task GivenMultipleMissingTickers_WhenThrowOnMissingValueFalse_ShouldPopulateAllNaN()
+    {
+        // arrange
+        var handler = new Mock<HttpMessageHandler>();
+        var httpClient = handler.CreateClient();
+        var config = new UnravelConfig
+        {
+            ApiBaseUrl = "http://foo.org/api",
+            Factors = [new FactorConfig { Id = RetailFlow, Type = FactorType.RetailFlow }],
+            UrlPathFactorsLive = "/factors?id={0}&tickers={1}"
+        };
+
+        var requestedTickers = new[] { "ADA", "BTC", "ETH", "SOL", "XRP" };
+        var returnedTickers = new[] { "BTC", "ETH" }; // Missing ADA, SOL, XRP
+        var tickersCsv = Uri.EscapeDataString(string.Join(",", requestedTickers));
+
+        handler.SetupRequest(
+                HttpMethod.Get,
+                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, RetailFlow, tickersCsv)}")
+            .ReturnsAsync(
+                new HttpResponseMessage
+                {
+                    Content = new StringContent(
+                        """
+                        {
+                            "data": [0.5, 0.7],
+                            "index": "2023-06-30",
+                            "columns": ["BTC", "ETH"]
+                        }
+                        """),
+                    StatusCode = HttpStatusCode.OK
+                });
+
+        var svc = new UnravelApiService(httpClient, config);
+
+        // act
+        var result = await svc.GetFactorsLiveAsync(requestedTickers, throwOnMissingValue: false);
+
+        // assert
+        result.ShouldNotBeNull();
+        result.Tickers.ShouldBe(requestedTickers);
+        result[FactorType.RetailFlow, "ADA"].ShouldBe(double.NaN);
+        result[FactorType.RetailFlow, "BTC"].ShouldBe(0.5, 0.000000001);
+        result[FactorType.RetailFlow, "ETH"].ShouldBe(0.7, 0.000000001);
+        result[FactorType.RetailFlow, "SOL"].ShouldBe(double.NaN);
+        result[FactorType.RetailFlow, "XRP"].ShouldBe(double.NaN);
+    }
+
+    [Fact]
+    public async Task GivenUnexpectedTickers_WhenReturned_ShouldThrow()
+    {
+        // arrange
+        var handler = new Mock<HttpMessageHandler>();
+        var httpClient = handler.CreateClient();
+        var config = new UnravelConfig
+        {
+            ApiBaseUrl = "http://foo.org/api",
+            Factors = [new FactorConfig { Id = RetailFlow, Type = FactorType.RetailFlow }],
+            UrlPathFactorsLive = "/factors?id={0}&tickers={1}"
+        };
+
+        var requestedTickers = new[] { "BTC", "ETH" };
+        var tickersCsv = Uri.EscapeDataString(string.Join(",", requestedTickers));
+
+        handler.SetupRequest(
+                HttpMethod.Get,
+                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, RetailFlow, tickersCsv)}")
+            .ReturnsAsync(
+                new HttpResponseMessage
+                {
+                    Content = new StringContent(
+                        """
+                        {
+                            "data": [0.3, 0.5, 0.7],
+                            "index": "2023-06-30",
+                            "columns": ["ADA", "BTC", "ETH"]
+                        }
+                        """),
+                    StatusCode = HttpStatusCode.OK
+                });
+
+        var svc = new UnravelApiService(httpClient, config);
+
+        // act & assert
+        var ex = await Should.ThrowAsync<ApiException>(async () =>
+            await svc.GetFactorsLiveAsync(requestedTickers, throwOnMissingValue: false));
+
+        ex.Message.ShouldContain("unexpected tickers");
+        ex.Message.ShouldContain("ADA");
+    }
+
+    [Fact]
+    public async Task GivenMissingTickerInMiddle_WhenReturned_ShouldInsertNaNAtCorrectPosition()
+    {
+        // arrange
+        var handler = new Mock<HttpMessageHandler>();
+        var httpClient = handler.CreateClient();
+        var config = new UnravelConfig
+        {
+            ApiBaseUrl = "http://foo.org/api",
+            Factors = [new FactorConfig { Id = RetailFlow, Type = FactorType.RetailFlow }],
+            UrlPathFactorsLive = "/factors?id={0}&tickers={1}"
+        };
+
+        var requestedTickers = new[] { "ADA", "BTC", "ETH", "SOL" };
+        var tickersCsv = Uri.EscapeDataString(string.Join(",", requestedTickers));
+
+        handler.SetupRequest(
+                HttpMethod.Get,
+                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, RetailFlow, tickersCsv)}")
+            .ReturnsAsync(
+                new HttpResponseMessage
+                {
+                    Content = new StringContent(
+                        """
+                        {
+                            "data": [0.3, 0.7, 0.9],
+                            "index": "2023-06-30",
+                            "columns": ["ADA", "ETH", "SOL"]
+                        }
+                        """),
+                    StatusCode = HttpStatusCode.OK
+                });
+
+        var svc = new UnravelApiService(httpClient, config);
+
+        // act
+        var result = await svc.GetFactorsLiveAsync(requestedTickers, throwOnMissingValue: false);
+
+        // assert
+        result.ShouldNotBeNull();
+        result.Tickers.ShouldBe(requestedTickers);
+        result[FactorType.RetailFlow, "ADA"].ShouldBe(0.3, 0.000000001);
+        result[FactorType.RetailFlow, "BTC"].ShouldBe(double.NaN); // Missing, should be NaN
+        result[FactorType.RetailFlow, "ETH"].ShouldBe(0.7, 0.000000001);
+        result[FactorType.RetailFlow, "SOL"].ShouldBe(0.9, 0.000000001);
+    }
+
+    [Fact]
+    public async Task GivenEmptyTickers_WhenCalled_ShouldThrowArgumentException()
+    {
+        // arrange
+        var handler = new Mock<HttpMessageHandler>();
+        var httpClient = handler.CreateClient();
+        var config = new UnravelConfig
+        {
+            ApiBaseUrl = "http://foo.org/api",
+            Factors = [new FactorConfig { Id = RetailFlow, Type = FactorType.RetailFlow }],
+            UrlPathFactorsLive = "/factors?id={0}&tickers={1}"
+        };
+
+        var svc = new UnravelApiService(httpClient, config);
+
+        // act & assert
+        await Should.ThrowAsync<ArgumentException>(async () =>
+            await svc.GetFactorsLiveAsync(Array.Empty<string>()));
+    }
+
+    [Fact]
+    public async Task GivenWhitespaceOnlyTickers_WhenCalled_ShouldThrowArgumentException()
+    {
+        // arrange
+        var handler = new Mock<HttpMessageHandler>();
+        var httpClient = handler.CreateClient();
+        var config = new UnravelConfig
+        {
+            ApiBaseUrl = "http://foo.org/api",
+            Factors = [new FactorConfig { Id = RetailFlow, Type = FactorType.RetailFlow }],
+            UrlPathFactorsLive = "/factors?id={0}&tickers={1}"
+        };
+
+        var svc = new UnravelApiService(httpClient, config);
+
+        // act & assert
+        await Should.ThrowAsync<ArgumentException>(async () =>
+            await svc.GetFactorsLiveAsync(new[] { "  ", "\t", "" }));
+    }
+
+    [Fact]
+    public async Task GivenTickersWithWhitespace_WhenCalled_ShouldTrimAndNormalize()
+    {
+        // arrange
+        var handler = new Mock<HttpMessageHandler>();
+        var httpClient = handler.CreateClient();
+        var config = new UnravelConfig
+        {
+            ApiBaseUrl = "http://foo.org/api",
+            Factors = [new FactorConfig { Id = RetailFlow, Type = FactorType.RetailFlow }],
+            UrlPathFactorsLive = "/factors?id={0}&tickers={1}"
+        };
+
+        var requestedTickers = new[] { "  btc  ", "ETH\t", " ada " };
+        var normalizedTickers = new[] { "ADA", "BTC", "ETH" }; // Sorted and uppercase
+        var tickersCsv = Uri.EscapeDataString(string.Join(",", normalizedTickers));
+
+        handler.SetupRequest(
+                HttpMethod.Get,
+                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, RetailFlow, tickersCsv)}")
+            .ReturnsAsync(
+                new HttpResponseMessage
+                {
+                    Content = new StringContent(
+                        """
+                        {
+                            "data": [0.3, 0.5, 0.7],
+                            "index": "2023-06-30",
+                            "columns": ["ADA", "BTC", "ETH"]
+                        }
+                        """),
+                    StatusCode = HttpStatusCode.OK
+                });
+
+        var svc = new UnravelApiService(httpClient, config);
+
+        // act
+        var result = await svc.GetFactorsLiveAsync(requestedTickers);
+
+        // assert
+        result.ShouldNotBeNull();
+        result.Tickers.ShouldBe(normalizedTickers);
+    }
+
+    [Fact]
+    public async Task GivenDuplicateTickers_WhenCalled_ShouldDeduplicateAndSort()
+    {
+        // arrange
+        var handler = new Mock<HttpMessageHandler>();
+        var httpClient = handler.CreateClient();
+        var config = new UnravelConfig
+        {
+            ApiBaseUrl = "http://foo.org/api",
+            Factors = [new FactorConfig { Id = RetailFlow, Type = FactorType.RetailFlow }],
+            UrlPathFactorsLive = "/factors?id={0}&tickers={1}"
+        };
+
+        var requestedTickers = new[] { "BTC", "eth", "BTC", "ADA", "ETH" };
+        var normalizedTickers = new[] { "ADA", "BTC", "ETH" }; // Deduplicated, sorted, uppercase
+        var tickersCsv = Uri.EscapeDataString(string.Join(",", normalizedTickers));
+
+        handler.SetupRequest(
+                HttpMethod.Get,
+                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, RetailFlow, tickersCsv)}")
+            .ReturnsAsync(
+                new HttpResponseMessage
+                {
+                    Content = new StringContent(
+                        """
+                        {
+                            "data": [0.3, 0.5, 0.7],
+                            "index": "2023-06-30",
+                            "columns": ["ADA", "BTC", "ETH"]
+                        }
+                        """),
+                    StatusCode = HttpStatusCode.OK
+                });
+
+        var svc = new UnravelApiService(httpClient, config);
+
+        // act
+        var result = await svc.GetFactorsLiveAsync(requestedTickers);
+
+        // assert
+        result.ShouldNotBeNull();
+        result.Tickers.ShouldBe(normalizedTickers);
     }
 }

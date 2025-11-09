@@ -5,6 +5,9 @@
     <LanguageVersion>latest</LanguageVersion>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="YoloBroker.Hyperliquid.Test" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\YoloBroker\YoloBroker.csproj" />
   </ItemGroup>
   <ItemGroup>

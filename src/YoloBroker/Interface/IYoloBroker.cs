@@ -29,5 +29,9 @@ public interface IYoloBroker : IDisposable
 
     IAsyncEnumerable<TradeResult> PlaceTradesAsync(IEnumerable<Trade> trades, CancellationToken ct);
     
-    Task<IReadOnlyList<decimal>> GetDailyClosePricesAsync(string ticker, int periods, CancellationToken ct);
+    Task<IReadOnlyList<decimal>> GetDailyClosePricesAsync(
+        string ticker,
+        int periods,
+        bool includeToday = false,
+        CancellationToken ct = default);
 }

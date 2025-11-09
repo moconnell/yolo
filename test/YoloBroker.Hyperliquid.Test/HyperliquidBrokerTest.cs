@@ -1,32 +1,34 @@
-﻿using System.Collections.Concurrent;
-using System.Security.Cryptography;
-using CryptoExchange.Net.Authentication;
+﻿using System.Net;
 using CryptoExchange.Net.Objects;
-using HyperLiquid.Net;
-using HyperLiquid.Net.Clients;
-using Microsoft.Extensions.Configuration;
+using CryptoExchange.Net.Objects.Errors;
+using HyperLiquid.Net.Enums;
+using HyperLiquid.Net.Interfaces.Clients;
+using HyperLiquid.Net.Interfaces.Clients.FuturesApi;
+using HyperLiquid.Net.Interfaces.Clients.SpotApi;
+using HyperLiquid.Net.Objects.Models;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Shouldly;
 using Xunit.Abstractions;
 using YoloAbstractions;
-using YoloBroker.Hyperliquid.Extensions;
-using YoloBroker.Interface;
+using YoloBroker.Hyperliquid.Exceptions;
 using YoloTest.Util;
-using static YoloAbstractions.AssetPermissions;
 using static YoloAbstractions.AssetType;
-using static YoloAbstractions.OrderType;
+using static YoloBroker.Hyperliquid.Test.TickerAliasUtil;
+using static YoloBroker.Hyperliquid.Test.TradeUtil;
+using OrderSide = YoloAbstractions.OrderSide;
+using OrderStatus = YoloAbstractions.OrderStatus;
+using HlOrderSide = HyperLiquid.Net.Enums.OrderSide;
+using HlOrderStatus = HyperLiquid.Net.Enums.OrderStatus;
 
 namespace YoloBroker.Hyperliquid.Test;
 
 public class HyperliquidBrokerTest
 {
-    private readonly ITestOutputHelper _testOutputHelper;
     private readonly ILoggerFactory _loggerFactory;
 
     public HyperliquidBrokerTest(ITestOutputHelper testOutputHelper)
     {
-        _testOutputHelper = testOutputHelper;
         _loggerFactory = LoggerFactory.Create(builder =>
         {
             builder.AddProvider(new XUnitLoggerProvider(testOutputHelper));
@@ -34,199 +36,11 @@ public class HyperliquidBrokerTest
         });
     }
 
-    [Theory]
-    [Trait("Category", "Integration")]
-    [InlineData("ETH", PerpetualFutures, "ETH")]
-    [InlineData("BTC,ETH", PerpetualFutures, "BTC,ETH")]
-    [InlineData("SHIB", PerpetualFutures, "SHIB", "SHIB:kSHIB")]
-    public async Task GivenBaseAsset_ShouldGetMarkets(
-        string baseAssetFilterString,
-        AssetPermissions assetPermissions,
-        string expectedMarketsString,
-        params string[] aliasConfig)
-    {
-        // arrange
-        var baseAssetFilter = baseAssetFilterString.Split(',').Select(asset => asset.Trim()).ToHashSet();
-        var expectedMarkets = expectedMarketsString.Split(',').Select(market => market.Trim()).ToHashSet();
-        var aliases = aliasConfig.Length > 0
-            ? aliasConfig.Select(alias =>
-                {
-                    var aliasParts = alias.Split(':');
-                    return new KeyValuePair<string, string>(aliasParts[0], aliasParts[1]);
-                })
-                .ToDictionary()
-            : null;
-
-        var broker = GetTestBroker(aliases);
-
-        // act
-        var results = await broker.GetMarketsAsync(baseAssetFilter, assetPermissions: assetPermissions);
-
-        // assert
-        Assert.NotNull(results);
-        Assert.Equal(expectedMarkets.Count, results.Count);
-        Assert.True(expectedMarkets.All(ticker => results.ContainsKey(ticker)));
-        Assert.True(results.All(kvp => kvp.Value.All(info => !string.IsNullOrEmpty(info.BaseAsset))));
-        Assert.True(results.All(kvp => kvp.Value.All(info => !string.IsNullOrEmpty(info.Key))));
-        Assert.True(results.All(kvp => kvp.Value.All(info => !string.IsNullOrEmpty(info.Name))));
-        Assert.True(results.All(kvp => kvp.Value.All(info => info.Ask > 0)));
-        Assert.True(results.All(kvp => kvp.Value.All(info => info.Bid > 0)));
-        Assert.True(results.All(kvp => kvp.Value.All(info => info.Mid > 0)));
-    }
-
-    [Fact]
-    [Trait("Category", "Integration")]
-    public async Task ShouldGetOpenOrders()
-    {
-        // arrange
-        var broker = GetTestBroker();
-
-        // act
-        var results = await broker.GetOpenOrdersAsync();
-
-        // assert
-        Assert.NotNull(results);
-    }
-
-    [Theory]
-    [Trait("Category", "Integration")]
-    // [InlineData("HYPE/USDC", Spot, 1)]
-    [InlineData("ETH", Future, 0.01)]
-    [InlineData("BTC", Future, 0.01)]
-    public async Task ShouldPlaceOrder(string symbol, AssetType assetType, double quantity)
-    {
-        // arrange
-        var broker = GetTestBroker();
-        var orderPrice = await GetLimitPrice(broker, symbol, assetType, quantity);
-        var trade = CreateTrade(symbol, assetType, quantity, orderPrice);
-
-        // act
-        var tradeResult = await broker.PlaceTradeAsync(trade);
-
-        // assert
-        tradeResult.ShouldNotBeNull();
-        tradeResult.Success.ShouldBeTrue(tradeResult.Error);
-        var order = tradeResult.Order;
-        order.ShouldNotBeNull();
-        order.Id.ShouldBeGreaterThan(0);
-        order.ClientId.ShouldBe(trade.ClientOrderId);
-        order.Symbol.ShouldBe(symbol);
-        order.Amount.ShouldBe(trade.Amount);
-
-        await broker.CancelOrderAsync(order);
-    }
-
-    [Theory]
-    [Trait("Category", "Integration")]
-    // [InlineData("HYPE/USDC", Spot, 1)]
-    [InlineData("ETH", Future, 0.01)]
-    [InlineData("ETH", Future, 0.0001, Market)]
-    [InlineData("BTC", Future, 0.001)]
-    public async Task ShouldPlaceOrders(
-        string symbol,
-        AssetType assetType,
-        double quantity,
-        OrderType orderType = Limit)
-    {
-        // arrange
-        var broker = GetTestBroker();
-        decimal? limitPrice = orderType == Limit ? await GetLimitPrice(broker, symbol, assetType, quantity) : null;
-        var trade = CreateTrade(symbol, assetType, quantity, limitPrice);
-
-        // act
-        var tradeResults = broker.PlaceTradesAsync([trade]);
-
-        // assert
-        await foreach (var tradeResult in tradeResults)
-        {
-            tradeResult.ShouldNotBeNull();
-            tradeResult.Success.ShouldBeTrue(tradeResult.Error);
-            var order = tradeResult.Order;
-            order.ShouldNotBeNull();
-            order.Id.ShouldBeGreaterThan(0);
-            order.ClientId.ShouldBe(trade.ClientOrderId);
-            order.Symbol.ShouldBe(symbol);
-            order.Amount.ShouldBe(trade.Amount);
-
-            if (orderType == Limit)
-            {
-                await broker.CancelOrderAsync(order);
-            }
-        }
-    }
-
-    [Theory]
-    [Trait("Category", "Integration")]
-    // [InlineData("HYPE/USDC", Spot, 1)]
-    // [InlineData("ETH", Future, 0.01)]
-    [InlineData("BTC", Future, 0.0005)]
-    public async Task ShouldManageOrders(string symbol, AssetType assetType, double quantity)
-    {
-        // arrange
-        var broker = GetTestBroker();
-        var limitPrice = await GetLimitPrice(broker, symbol, assetType, quantity);
-        var trade = CreateTrade(symbol, assetType, quantity, limitPrice);
-        var settings = OrderManagementSettings.Default;
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var orders = new ConcurrentDictionary<long, Order>();
-
-        // act
-        var orderUpdates = broker.ManageOrdersAsync([trade], settings, cts.Token);
-
-        // assert
-        var updateCount = 0;
-
-        try
-        {
-            await foreach (var orderUpdate in orderUpdates)
-            {
-                updateCount++;
-                _testOutputHelper.WriteLine($"Update {updateCount}: {orderUpdate.Type} - {orderUpdate.Symbol}");
-
-                orderUpdate.ShouldNotBeNull();
-
-                if (orderUpdate.Type == OrderUpdateType.Error)
-                {
-                    _testOutputHelper.WriteLine($"Error: {orderUpdate.Error?.Message}");
-                    throw orderUpdate.Error ?? new Exception("Unknown error");
-                }
-
-                var order = orderUpdate.Order;
-                order.ShouldNotBeNull();
-                orders.TryAdd(order.Id, order);
-                order.Id.ShouldBeGreaterThan(0);
-                order.ClientId.ShouldBe(trade.ClientOrderId);
-                order.Symbol.ShouldBe(symbol);
-                order.Amount.ShouldBe(trade.Amount);
-                order.OrderStatus.ShouldBe(OrderStatus.Open);
-
-                // Cancel after first successful order creation
-                if (orderUpdate.Type == OrderUpdateType.Created)
-                {
-                    await cts.CancelAsync();
-                }
-            }
-        }
-        catch (OperationCanceledException) when (cts.Token.IsCancellationRequested)
-        {
-            // Expected cancellation
-            _testOutputHelper.WriteLine($"Test completed with {updateCount} updates");
-        }
-        finally
-        {
-            // clean-up
-            foreach (var order in orders.Values)
-            {
-                await broker.CancelOrderAsync(order, CancellationToken.None);
-            }
-        }
-    }
-
     [Fact]
     public async Task GivenNullTrades_WhenPlaceTradesAsync_ShouldThrowArgumentNullException()
     {
         // arrange
-        var broker = GetTestBroker(skipCredentialValidation: true);
+        var broker = GetBrokerWithMockedClient();
 
         // act & assert
         await Should.ThrowAsync<ArgumentNullException>(async () =>
@@ -242,7 +56,7 @@ public class HyperliquidBrokerTest
     public async Task GivenEmptyTrades_WhenPlaceTradesAsync_ShouldYieldNothing()
     {
         // arrange
-        var broker = GetTestBroker(skipCredentialValidation: true);
+        var broker = GetBrokerWithMockedClient();
         var results = new List<TradeResult>();
 
         // act
@@ -259,7 +73,7 @@ public class HyperliquidBrokerTest
     public async Task GivenNullOrder_WhenCancelOrderAsync_ShouldThrowArgumentNullException()
     {
         // arrange
-        var broker = GetTestBroker(skipCredentialValidation: true);
+        var broker = GetBrokerWithMockedClient();
 
         // act & assert
         await Should.ThrowAsync<ArgumentNullException>(() => broker.CancelOrderAsync(null!));
@@ -269,7 +83,7 @@ public class HyperliquidBrokerTest
     public async Task GivenCompletedOrder_WhenCancelOrderAsync_ShouldSkipCancellation()
     {
         // arrange
-        var broker = GetTestBroker(skipCredentialValidation: true);
+        var broker = GetBrokerWithMockedClient();
         var completedOrder = new Order(
             123,
             "ETH",
@@ -293,10 +107,10 @@ public class HyperliquidBrokerTest
     public void GivenUnsupportedAssetType_WhenPlaceTrade_ShouldThrowArgumentOutOfRangeException()
     {
         // arrange
-        var broker = GetTestBroker(skipCredentialValidation: true);
+        var broker = GetBrokerWithMockedClient();
         var trade = new Trade(
             "BTC",
-            (AssetType) 999, // Invalid asset type
+            (AssetType)999, // Invalid asset type
             1m,
             50000m);
 
@@ -308,11 +122,11 @@ public class HyperliquidBrokerTest
     public void GivenUnsupportedAssetType_WhenCancelOrder_ShouldThrowArgumentOutOfRangeException()
     {
         // arrange
-        var broker = GetTestBroker(skipCredentialValidation: true);
+        var broker = GetBrokerWithMockedClient();
         var order = new Order(
             123,
             "BTC",
-            (AssetType) 999, // Invalid asset type
+            (AssetType)999, // Invalid asset type
             DateTime.UtcNow,
             OrderSide.Buy,
             OrderStatus.Open,
@@ -329,125 +143,17 @@ public class HyperliquidBrokerTest
     public async Task GivenNullOrder_WhenEditOrderAsync_ShouldThrowArgumentNullException()
     {
         // arrange
-        var broker = GetTestBroker(skipCredentialValidation: true);
+        var broker = GetBrokerWithMockedClient();
 
         // act & assert
         await Should.ThrowAsync<ArgumentNullException>(() => broker.EditOrderAsync(null!));
-    }
-
-    [Fact(Skip = "Could not get order book for NOT - [ServerError.UnknownSymbol] Symbol not found")]
-    [Trait("Category", "Integration")]
-    public async Task GivenNullBaseAssetFilter_WhenGetMarketsAsync_ShouldReturnAllMarkets()
-    {
-        // arrange
-        var broker = GetTestBroker();
-
-        // act
-        var markets = await broker.GetMarketsAsync(null, assetPermissions: PerpetualFutures);
-
-        // assert
-        markets.ShouldNotBeNull();
-        markets.Count.ShouldBeGreaterThan(0);
-    }
-
-    [Fact]
-    [Trait("Category", "Integration")]
-    public async Task GivenSpotPermissions_WhenGetMarketsAsync_ShouldIncludeSpotMarkets()
-    {
-        // arrange
-        var broker = GetTestBroker();
-
-        // act
-        var markets = await broker.GetMarketsAsync(
-            new HashSet<string> { "BTC" },
-            "USDC",
-            assetPermissions: AssetPermissions.Spot);
-
-        // assert
-        markets.ShouldNotBeNull();
-        markets.Values.SelectMany(m => m).Any(m => m.AssetType == AssetType.Spot).ShouldBeTrue();
-    }
-
-    [Fact]
-    [Trait("Category", "Integration")]
-    public async Task GivenLongSpotPermissions_WhenGetMarketsAsync_ShouldIncludeSpotMarkets()
-    {
-        // arrange
-        var broker = GetTestBroker();
-
-        // act
-        var markets = await broker.GetMarketsAsync(
-            new HashSet<string> { "BTC" },
-            "USDC",
-            assetPermissions: LongSpot);
-
-        // assert
-        markets.ShouldNotBeNull();
-        markets.Values.SelectMany(m => m).Any(m => m.AssetType == AssetType.Spot).ShouldBeTrue();
-    }
-
-    [Fact]
-    [Trait("Category", "Integration")]
-    public async Task GivenShortSpotPermissions_WhenGetMarketsAsync_ShouldIncludeSpotMarkets()
-    {
-        // arrange
-        var broker = GetTestBroker();
-
-        // act
-        var markets = await broker.GetMarketsAsync(
-            new HashSet<string> { "BTC" },
-            "USDC",
-            assetPermissions: ShortSpot);
-
-        // assert
-        markets.ShouldNotBeNull();
-        markets.Values.SelectMany(m => m).Any(m => m.AssetType == AssetType.Spot).ShouldBeTrue();
-    }
-
-    [Fact]
-    [Trait("Category", "Integration")]
-    public async Task GivenSpotAndPerpPermissions_WhenGetMarketsAsync_ShouldIncludeBothTypes()
-    {
-        // arrange
-        var broker = GetTestBroker();
-
-        // act
-        var markets = await broker.GetMarketsAsync(
-            new HashSet<string> { "BTC" },
-            "USDC",
-            assetPermissions: SpotAndPerp);
-
-        // assert
-        markets.ShouldNotBeNull();
-        var allMarkets = markets.Values.SelectMany(m => m).ToList();
-        allMarkets.Any(m => m.AssetType == AssetType.Spot).ShouldBeTrue();
-        allMarkets.Any(m => m.AssetType == Future).ShouldBeTrue();
-    }
-
-    [Fact]
-    [Trait("Category", "Integration")]
-    public async Task GivenLongSpotAndPerpPermissions_WhenGetMarketsAsync_ShouldIncludeBothTypes()
-    {
-        // arrange
-        var broker = GetTestBroker();
-
-        // act
-        var markets = await broker.GetMarketsAsync(
-            new HashSet<string> { "BTC" },
-            "USDC",
-            assetPermissions: LongSpotAndPerp);
-
-        // assert
-        markets.ShouldNotBeNull();
-        var allMarkets = markets.Values.SelectMany(m => m).ToList();
-        allMarkets.Any(m => m.AssetType == Future).ShouldBeTrue();
     }
 
     [Fact]
     public async Task GivenNullOrEmptyTicker_WhenGetDailyClosePricesAsync_ShouldThrowArgumentException()
     {
         // arrange
-        var broker = GetTestBroker(skipCredentialValidation: true);
+        var broker = GetBrokerWithMockedClient();
 
         // act & assert
         await Should.ThrowAsync<ArgumentException>(() =>
@@ -457,10 +163,125 @@ public class HyperliquidBrokerTest
     }
 
     [Fact]
+    public async Task GivenValidTicker_WhenGetDailyClosePricesAsync_ShouldReturnClosePrices()
+    {
+        // arrange
+        var mockRestClient = new Mock<IHyperLiquidRestClient>();
+        var mockSpotApi = new Mock<IHyperLiquidRestClientSpotApi>();
+        var mockSpotExchangeData = new Mock<IHyperLiquidRestClientSpotApiExchangeData>();
+
+        mockRestClient.Setup(x => x.SpotApi).Returns(mockSpotApi.Object);
+        mockSpotApi.Setup(x => x.ExchangeData).Returns(mockSpotExchangeData.Object);
+
+        var klines = new[]
+        {
+            new HyperLiquidKline
+            {
+                OpenTime = DateTime.UtcNow.AddDays(-3),
+                ClosePrice = 1900m,
+                OpenPrice = 1850m,
+                HighPrice = 1950m,
+                LowPrice = 1800m,
+                Volume = 1000m
+            },
+            new HyperLiquidKline
+            {
+                OpenTime = DateTime.UtcNow.AddDays(-2),
+                ClosePrice = 2000m,
+                OpenPrice = 1900m,
+                HighPrice = 2050m,
+                LowPrice = 1850m,
+                Volume = 1200m
+            },
+            new HyperLiquidKline
+            {
+                OpenTime = DateTime.UtcNow.AddDays(-1),
+                ClosePrice = 2100m,
+                OpenPrice = 2000m,
+                HighPrice = 2150m,
+                LowPrice = 1950m,
+                Volume = 1500m
+            }
+        };
+
+        mockSpotExchangeData
+            .Setup(x => x.GetKlinesAsync(
+                It.IsAny<string>(),
+                KlineInterval.OneDay,
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(klines));
+
+        var broker = GetBrokerWithMockedClient(mockRestClient.Object);
+
+        // act
+        var closePrices = await broker.GetDailyClosePricesAsync("ETH", 3);
+
+        // assert
+        closePrices.Count.ShouldBe(3);
+        closePrices[0].ShouldBe(1900m);
+        closePrices[1].ShouldBe(2000m);
+        closePrices[2].ShouldBe(2100m);
+    }
+
+    [Fact]
+    public async Task GivenTickerWithAlias_WhenGetDailyClosePricesAsync_ShouldUseAlias()
+    {
+        // arrange
+        var mockRestClient = new Mock<IHyperLiquidRestClient>();
+        var mockSpotApi = new Mock<IHyperLiquidRestClientSpotApi>();
+        var mockSpotExchangeData = new Mock<IHyperLiquidRestClientSpotApiExchangeData>();
+
+        mockRestClient.Setup(x => x.SpotApi).Returns(mockSpotApi.Object);
+        mockSpotApi.Setup(x => x.ExchangeData).Returns(mockSpotExchangeData.Object);
+
+        var klines = new[]
+        {
+            new HyperLiquidKline
+            {
+                OpenTime = DateTime.UtcNow.AddDays(-1),
+                ClosePrice = 50000m,
+                OpenPrice = 49000m,
+                HighPrice = 51000m,
+                LowPrice = 48000m,
+                Volume = 500m
+            }
+        };
+
+        mockSpotExchangeData
+            .Setup(x => x.GetKlinesAsync(
+                "BTC-PERP", // The alias
+                KlineInterval.OneDay,
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(klines));
+
+        var aliases = new Dictionary<string, string> { { "BTC", "BTC-PERP" } };
+        var broker = GetBrokerWithMockedClient(mockRestClient.Object, aliases);
+
+        // act
+        var closePrices = await broker.GetDailyClosePricesAsync("BTC", 1);
+
+        // assert
+        closePrices.Count.ShouldBe(1);
+        closePrices[0].ShouldBe(50000m);
+        mockSpotExchangeData.Verify(
+            x => x.GetKlinesAsync(
+                "BTC-PERP",
+                KlineInterval.OneDay,
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public void GivenBroker_WhenDisposedTwice_ShouldNotThrow()
     {
         // arrange
-        var broker = GetTestBroker(skipCredentialValidation: true);
+        var broker = GetBrokerWithMockedClient();
 
         // act
         broker.Dispose();
@@ -473,7 +294,7 @@ public class HyperliquidBrokerTest
     public async Task GivenNullTrades_WhenManageOrdersAsync_ShouldThrowArgumentNullException()
     {
         // arrange
-        var broker = GetTestBroker(skipCredentialValidation: true);
+        var broker = GetBrokerWithMockedClient();
 
         // act & assert
         await Should.ThrowAsync<ArgumentNullException>(async () =>
@@ -489,7 +310,7 @@ public class HyperliquidBrokerTest
     public async Task GivenNullSettings_WhenManageOrdersAsync_ShouldThrowArgumentNullException()
     {
         // arrange
-        var broker = GetTestBroker(skipCredentialValidation: true);
+        var broker = GetBrokerWithMockedClient();
         var trade = CreateTrade("ETH", Future, 0.01, 2000m);
 
         // act & assert
@@ -506,7 +327,7 @@ public class HyperliquidBrokerTest
     public async Task GivenEmptyTrades_WhenManageOrdersAsync_ShouldYieldNothing()
     {
         // arrange
-        var broker = GetTestBroker(skipCredentialValidation: true);
+        var broker = GetBrokerWithMockedClient();
         var results = new List<OrderUpdate>();
 
         // act
@@ -519,63 +340,222 @@ public class HyperliquidBrokerTest
         results.ShouldBeEmpty();
     }
 
+    #region PlaceTradeAsync Tests
+
     [Fact]
-    [Trait("Category", "Integration")]
-    public async Task GivenTickerWithAlias_WhenGetMarketsAsync_ShouldReturnWithOriginalTicker()
+    public async Task GivenSuccessfulSpotTrade_WhenPlaceTradeAsync_ShouldReturnSuccessResult()
     {
         // arrange
-        var aliases = new Dictionary<string, string>
+        var mockRestClient = new Mock<IHyperLiquidRestClient>();
+        var mockSpotApi = new Mock<IHyperLiquidRestClientSpotApi>();
+        var mockSpotTrading = new Mock<IHyperLiquidRestClientSpotApiTrading>();
+
+        mockRestClient.Setup(x => x.SpotApi).Returns(mockSpotApi.Object);
+        mockSpotApi.Setup(x => x.Trading).Returns(mockSpotTrading.Object);
+
+        var trade = CreateTrade("ETH", Spot, 0.5, 2000m);
+        var orderResult = new HyperLiquidOrderResult
         {
-            ["SHIB"] = "kSHIB"
+            OrderId = 12345,
+            Status = HlOrderStatus.Filled,
+            AveragePrice = 2000m,
+            FilledQuantity = 0.5m
         };
-        var broker = GetTestBroker(aliases);
+
+        mockSpotTrading
+            .Setup(x => x.PlaceOrderAsync(
+                trade.Symbol,
+                It.IsAny<HlOrderSide>(),
+                It.IsAny<HyperLiquid.Net.Enums.OrderType>(),
+                trade.AbsoluteAmount,
+                trade.LimitPrice!.Value,
+                null,
+                null,
+                trade.ClientOrderId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(orderResult));
+
+        var broker = GetBrokerWithMockedClient(mockRestClient.Object);
 
         // act
-        var markets = await broker.GetMarketsAsync(
-            new HashSet<string> { "SHIB" },
-            assetPermissions: PerpetualFutures);
+        var result = await broker.PlaceTradeAsync(trade);
 
         // assert
-        markets.ShouldNotBeNull();
-        markets.ShouldContainKey("SHIB");
-        markets["SHIB"].ShouldNotBeEmpty();
+        result.Success.ShouldBeTrue();
+        result.Order.ShouldNotBeNull();
+        result.Order!.Id.ShouldBe(12345);
+        result.Order.Symbol.ShouldBe("ETH");
+        result.Order.AssetType.ShouldBe(Spot);
+        result.Order.OrderStatus.ShouldBe(OrderStatus.Filled);
+        result.Order.Amount.ShouldBe(0.5m);
+        result.Order.Filled.ShouldBe(0.5m);
     }
 
     [Fact]
-    [Trait("Category", "Integration")]
-    public async Task GivenPositions_WhenGetPositionsAsync_ShouldCombineSpotAndFutures()
+    public async Task GivenSuccessfulFuturesTrade_WhenPlaceTradeAsync_ShouldReturnSuccessResult()
     {
         // arrange
-        var broker = GetTestBroker();
+        var mockRestClient = new Mock<IHyperLiquidRestClient>();
+        var mockFuturesApi = new Mock<IHyperLiquidRestClientFuturesApi>();
+        var mockFuturesTrading = new Mock<IHyperLiquidRestClientFuturesApiTrading>();
+
+        mockRestClient.Setup(x => x.FuturesApi).Returns(mockFuturesApi.Object);
+        mockFuturesApi.Setup(x => x.Trading).Returns(mockFuturesTrading.Object);
+
+        var trade = CreateTrade("BTC", Future, 1.0, 50000m);
+        var orderResult = new HyperLiquidOrderResult
+        {
+            OrderId = 67890,
+            Status = HlOrderStatus.Open,
+            AveragePrice = null,
+            FilledQuantity = 0m
+        };
+
+        mockFuturesTrading
+            .Setup(x => x.PlaceOrderAsync(
+                trade.Symbol,
+                It.IsAny<HlOrderSide>(),
+                It.IsAny<HyperLiquid.Net.Enums.OrderType>(),
+                trade.AbsoluteAmount,
+                trade.LimitPrice!.Value,
+                null,
+                null,
+                trade.ClientOrderId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(orderResult));
+
+        var broker = GetBrokerWithMockedClient(mockRestClient.Object);
 
         // act
-        var positions = await broker.GetPositionsAsync();
+        var result = await broker.PlaceTradeAsync(trade);
 
         // assert
-        positions.ShouldNotBeNull();
-        // Positions dictionary should contain both spot and futures if they exist
+        result.Success.ShouldBeTrue();
+        result.Order.ShouldNotBeNull();
+        result.Order!.Id.ShouldBe(67890);
+        result.Order.Symbol.ShouldBe("BTC");
+        result.Order.AssetType.ShouldBe(Future);
+        result.Order.OrderStatus.ShouldBe(OrderStatus.Open);
+        result.Order.Amount.ShouldBe(1.0m);
+        result.Order.Filled.ShouldBe(0m);
     }
 
-    [Fact(Skip = "No bid for BTC/USDC spot")]
-    [Trait("Category", "Integration")]
-    public async Task GivenMultipleTrades_WhenPlaceTradesAsync_ShouldHandleMixedAssetTypes()
+    [Fact]
+    public async Task GivenFailedSpotTrade_WhenPlaceTradeAsync_ShouldReturnFailureResult()
     {
         // arrange
-        const string btcUsdc = "BTC/USDC";
-        const string eth = "ETH";
-        var broker = GetTestBroker();
-        var ethFuturesPrice = await GetLimitPrice(broker, eth, Future, 0.001);
-        var btcSpotPrice = await GetLimitPrice(broker, btcUsdc, AssetType.Spot, 0.0005);
+        const int errorCode = 400;
+        const string insufficientBalance = "Insufficient balance";
+
+        var mockRestClient = new Mock<IHyperLiquidRestClient>();
+        var mockSpotApi = new Mock<IHyperLiquidRestClientSpotApi>();
+        var mockSpotTrading = new Mock<IHyperLiquidRestClientSpotApiTrading>();
+
+        mockRestClient.Setup(x => x.SpotApi).Returns(mockSpotApi.Object);
+        mockSpotApi.Setup(x => x.Trading).Returns(mockSpotTrading.Object);
+
+        var trade = CreateTrade("ETH", Spot, 0.5, 2000m);
+        var error = new TestError(
+            errorCode.ToString(),
+            new ErrorInfo(ErrorType.InsufficientBalance, insufficientBalance) { Message = insufficientBalance },
+            new Exception(insufficientBalance));
+
+        mockSpotTrading
+            .Setup(x => x.PlaceOrderAsync(
+                It.IsAny<string>(),
+                It.IsAny<HlOrderSide>(),
+                It.IsAny<HyperLiquid.Net.Enums.OrderType>(),
+                It.IsAny<decimal>(),
+                It.IsAny<decimal>(),
+                null,
+                null,
+                It.IsAny<string?>(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                WebCallResult<HyperLiquidOrderResult>(
+                    null,
+                    HttpStatusCode.BadRequest,
+                    error));
+
+        var broker = GetBrokerWithMockedClient(mockRestClient.Object);
+
+        // act
+        var result = await broker.PlaceTradeAsync(trade);
+
+        // assert
+        result.Success.ShouldBeFalse();
+        result.Order.ShouldBeNull();
+        result.Error.ShouldBe(insufficientBalance);
+        result.ErrorCode.ShouldBe(errorCode);
+    }
+
+    #endregion
+
+    #region PlaceTradesAsync Tests
+
+    [Fact]
+    public async Task GivenMultipleSpotTrades_WhenPlaceTradesAsync_ShouldReturnAllResults()
+    {
+        // arrange
+        var mockRestClient = new Mock<IHyperLiquidRestClient>();
+        var mockSpotApi = new Mock<IHyperLiquidRestClientSpotApi>();
+        var mockSpotTrading = new Mock<IHyperLiquidRestClientSpotApiTrading>();
+
+        mockRestClient.Setup(x => x.SpotApi).Returns(mockSpotApi.Object);
+        mockSpotApi.Setup(x => x.Trading).Returns(mockSpotTrading.Object);
 
         var trades = new[]
         {
-            CreateTrade(eth, Future, 0.001, ethFuturesPrice),
-            CreateTrade(btcUsdc, AssetType.Spot, 0.0005, btcSpotPrice)
+            CreateTrade("ETH", Spot, 0.5, 2000m),
+            CreateTrade("BTC", Spot, 0.1, 50000m)
         };
 
-        var results = new ConcurrentBag<TradeResult>();
+        var orderResults = new[]
+        {
+            new CallResult<HyperLiquidOrderResult>(
+                new HyperLiquidOrderResult
+                {
+                    OrderId = 111,
+                    Status = HlOrderStatus.Filled,
+                    FilledQuantity = 0.5m
+                }),
+            new CallResult<HyperLiquidOrderResult>(
+                new HyperLiquidOrderResult
+                {
+                    OrderId = 222,
+                    Status = HlOrderStatus.Open,
+                    FilledQuantity = 0m
+                })
+        };
+
+        mockSpotTrading
+            .Setup(x => x.PlaceMultipleOrdersAsync(
+                It.IsAny<IEnumerable<HyperLiquidOrderRequest>>(),
+                null,
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(orderResults));
+
+        var broker = GetBrokerWithMockedClient(mockRestClient.Object);
 
         // act
+        var results = new List<TradeResult>();
         await foreach (var result in broker.PlaceTradesAsync(trades))
         {
             results.Add(result);
@@ -583,126 +563,487 @@ public class HyperliquidBrokerTest
 
         // assert
         results.Count.ShouldBe(2);
-        results.All(r => r.Success).ShouldBeTrue();
-
-        // cleanup
-        foreach (var result in results.Where(r => r.Order != null))
-        {
-            await broker.CancelOrderAsync(result.Order!);
-        }
+        results[0].Success.ShouldBeTrue();
+        results[0].Order!.Id.ShouldBe(111);
+        results[1].Success.ShouldBeTrue();
+        results[1].Order!.Id.ShouldBe(222);
     }
 
-    private HyperliquidBroker GetTestBroker(
-        IReadOnlyDictionary<string, string>? aliases = null,
-        bool skipCredentialValidation = false)
+    [Fact]
+    public async Task GivenMultipleFuturesTrades_WhenPlaceTradesAsync_ShouldReturnAllResults()
     {
-        var (address, privateKey) = GetConfig();
+        // arrange
+        var mockRestClient = new Mock<IHyperLiquidRestClient>();
+        var mockFuturesApi = new Mock<IHyperLiquidRestClientFuturesApi>();
+        var mockFuturesTrading = new Mock<IHyperLiquidRestClientFuturesApiTrading>();
 
-        if (!skipCredentialValidation)
+        mockRestClient.Setup(x => x.FuturesApi).Returns(mockFuturesApi.Object);
+        mockFuturesApi.Setup(x => x.Trading).Returns(mockFuturesTrading.Object);
+
+        var trades = new[]
         {
-            address.ShouldNotBeNullOrEmpty();
-            privateKey.ShouldNotBeNullOrEmpty();
-        }
-        else
-        {
-            // Use dummy credentials if validation is skipped and credentials are missing
-            if (string.IsNullOrEmpty(address))
-                address = "0x0000000000000000000000000000000000000000";
-            if (string.IsNullOrEmpty(privateKey))
-                privateKey = "0000000000000000000000000000000000000000000000000000000000000000";
-        }
-
-        var apiCredentials = new ApiCredentials(address, privateKey);
-
-        var logger = _loggerFactory.CreateLogger<HyperliquidBroker>();
-
-        var broker = new HyperliquidBroker(
-            new HyperLiquidRestClient(options =>
-            {
-                options.ApiCredentials = apiCredentials;
-                options.Environment = HyperLiquidEnvironment.Testnet;
-            }),
-            new HyperLiquidSocketClient(options =>
-            {
-                options.ApiCredentials = apiCredentials;
-                options.Environment = HyperLiquidEnvironment.Testnet;
-            }),
-            GetTickerAliasService(),
-            logger
-        );
-        return broker;
-
-        ITickerAliasService GetTickerAliasService()
-        {
-            if (aliases != null)
-            {
-                return new TickerAliasService(aliases);
-            }
-
-            var mockTickerAliasService = new Mock<ITickerAliasService>();
-            mockTickerAliasService.Setup(x => x.TryGetAlias(It.IsAny<string>(), out It.Ref<string>.IsAny))
-                .Returns(false);
-            return mockTickerAliasService.Object;
-        }
-    }
-
-    private static (string? Address, string? PrivateKey) GetConfig()
-    {
-        var config = new ConfigurationBuilder()
-            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-            .AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true)
-            .Build();
-
-        return (config["Hyperliquid:Address"], config["Hyperliquid:PrivateKey"]);
-    }
-
-    private async Task<decimal> GetLimitPrice(
-        HyperliquidBroker broker,
-        string symbol,
-        AssetType assetType,
-        double quantity)
-    {
-        // Get current market price first
-        var assets = symbol.Split('/').Select(s => s.Trim()).ToArray();
-        var markets = assetType switch
-        {
-            AssetType.Spot => await broker.GetMarketsAsync(
-                new HashSet<string> { assets[0] },
-                assets[1],
-                assetPermissions: AssetPermissions.Spot),
-            Future => await broker.GetMarketsAsync(
-                new HashSet<string> { assets[0] },
-                assetPermissions: PerpetualFutures),
-            _ => throw new NotSupportedException($"Asset type {assetType} is not supported.")
+            CreateTrade("ETH", Future, 1.0, 2000m),
+            CreateTrade("BTC", Future, 0.5, 50000m)
         };
 
-        markets.ShouldNotBeNull();
-        markets.ShouldContainKey(symbol);
-        var marketInfo = markets[symbol][0];
+        var orderResults = new[]
+        {
+            new CallResult<HyperLiquidOrderResult>(
+                new HyperLiquidOrderResult
+                {
+                    OrderId = 333,
+                    Status = HlOrderStatus.Open,
+                    FilledQuantity = 0m
+                }),
+            new CallResult<HyperLiquidOrderResult>(
+                new HyperLiquidOrderResult
+                {
+                    OrderId = 444,
+                    Status = HlOrderStatus.Filled,
+                    FilledQuantity = 0.25m
+                })
+        };
 
-        var isLong = quantity >= 0;
-        var rawLimitPrice = isLong ? marketInfo.Bid * 0.99m : marketInfo.Ask * 1.01m;
-        rawLimitPrice.ShouldNotBeNull();
-        rawLimitPrice.Value.ShouldBeGreaterThan(0);
+        mockFuturesTrading
+            .Setup(x => x.PlaceMultipleOrdersAsync(
+                It.IsAny<IEnumerable<HyperLiquidOrderRequest>>(),
+                null,
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(orderResults));
 
-        var priceStep = marketInfo.PriceStep;
-        priceStep.ShouldNotBeNull();
+        var broker = GetBrokerWithMockedClient(mockRestClient.Object);
 
-        // Round the limit price to the nearest price step
-        var roundingType = isLong ? RoundingType.Down : RoundingType.Up;
-        var roundedLimitPrice = rawLimitPrice.Value.RoundToValidPrice(priceStep.Value, roundingType);
+        // act
+        var results = new List<TradeResult>();
+        await foreach (var result in broker.PlaceTradesAsync(trades))
+        {
+            results.Add(result);
+        }
 
-        _testOutputHelper.WriteLine(
-            $"Calculated limit price for {symbol}: {roundedLimitPrice} (raw: {rawLimitPrice.Value}, step: {priceStep.Value})");
-
-        return roundedLimitPrice;
+        // assert
+        results.Count.ShouldBe(2);
+        results[0].Success.ShouldBeTrue();
+        results[0].Order!.Id.ShouldBe(333);
+        results[1].Success.ShouldBeTrue();
+        results[1].Order!.Id.ShouldBe(444);
     }
 
-    private static Trade CreateTrade(string symbol, AssetType assetType, double quantity, decimal? price) =>
+    [Fact]
+    public async Task GivenMixedSpotAndFuturesTrades_WhenPlaceTradesAsync_ShouldReturnAllResults()
+    {
+        // arrange
+        var mockRestClient = new Mock<IHyperLiquidRestClient>();
+        var mockSpotApi = new Mock<IHyperLiquidRestClientSpotApi>();
+        var mockSpotTrading = new Mock<IHyperLiquidRestClientSpotApiTrading>();
+        var mockFuturesApi = new Mock<IHyperLiquidRestClientFuturesApi>();
+        var mockFuturesTrading = new Mock<IHyperLiquidRestClientFuturesApiTrading>();
+
+        mockRestClient.Setup(x => x.SpotApi).Returns(mockSpotApi.Object);
+        mockSpotApi.Setup(x => x.Trading).Returns(mockSpotTrading.Object);
+        mockRestClient.Setup(x => x.FuturesApi).Returns(mockFuturesApi.Object);
+        mockFuturesApi.Setup(x => x.Trading).Returns(mockFuturesTrading.Object);
+
+        var trades = new[]
+        {
+            CreateTrade("ETH", Spot, 0.5, 2000m),
+            CreateTrade("BTC", Future, 1.0, 50000m)
+        };
+
+        var spotOrderResults = new[]
+        {
+            new CallResult<HyperLiquidOrderResult>(
+                new HyperLiquidOrderResult
+                {
+                    OrderId = 555,
+                    Status = HlOrderStatus.Filled,
+                    FilledQuantity = 0.5m
+                })
+        };
+
+        var futuresOrderResults = new[]
+        {
+            new CallResult<HyperLiquidOrderResult>(
+                new HyperLiquidOrderResult
+                {
+                    OrderId = 666,
+                    Status = HlOrderStatus.Open,
+                    FilledQuantity = 0m
+                })
+        };
+
+        mockSpotTrading
+            .Setup(x => x.PlaceMultipleOrdersAsync(
+                It.IsAny<IEnumerable<HyperLiquidOrderRequest>>(),
+                null,
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(spotOrderResults));
+
+        mockFuturesTrading
+            .Setup(x => x.PlaceMultipleOrdersAsync(
+                It.IsAny<IEnumerable<HyperLiquidOrderRequest>>(),
+                null,
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(futuresOrderResults));
+
+        var broker = GetBrokerWithMockedClient(mockRestClient.Object);
+
+        // act
+        var results = new List<TradeResult>();
+        await foreach (var result in broker.PlaceTradesAsync(trades))
+        {
+            results.Add(result);
+        }
+
+        // assert
+        results.Count.ShouldBe(2);
+        results[0].Success.ShouldBeTrue();
+        results[0].Order!.Id.ShouldBe(555);
+        results[0].Trade.AssetType.ShouldBe(Spot);
+        results[1].Success.ShouldBeTrue();
+        results[1].Order!.Id.ShouldBe(666);
+        results[1].Trade.AssetType.ShouldBe(Future);
+    }
+
+    #endregion
+
+    #region GetOpenOrdersAsync Tests
+
+    [Fact]
+    public async Task GivenOpenOrders_WhenGetOpenOrdersAsync_ShouldReturnMappedOrders()
+    {
+        // arrange
+        var mockRestClient = new Mock<IHyperLiquidRestClient>();
+        var mockFuturesApi = new Mock<IHyperLiquidRestClientFuturesApi>();
+        var mockFuturesTrading = new Mock<IHyperLiquidRestClientFuturesApiTrading>();
+
+        mockRestClient.Setup(x => x.FuturesApi).Returns(mockFuturesApi.Object);
+        mockFuturesApi.Setup(x => x.Trading).Returns(mockFuturesTrading.Object);
+
+        var hlOrders = new[]
+        {
+            new HyperLiquidOrder
+            {
+                OrderId = 123,
+                Symbol = "ETH",
+                SymbolType = SymbolType.Spot,
+                Timestamp = DateTime.UtcNow.AddMinutes(-5),
+                OrderSide = HlOrderSide.Buy,
+                Quantity = 1.0m,
+                QuantityRemaining = 0.5m,
+                Price = 2000m,
+                ClientOrderId = "client123"
+            },
+            new HyperLiquidOrder
+            {
+                OrderId = 456,
+                Symbol = "BTC",
+                SymbolType = SymbolType.Futures,
+                Timestamp = DateTime.UtcNow.AddMinutes(-10),
+                OrderSide = HlOrderSide.Sell,
+                Quantity = 0.5m,
+                QuantityRemaining = 0.5m,
+                Price = 50000m,
+                ClientOrderId = "client456"
+            }
+        };
+
+        mockFuturesTrading
+            .Setup(x => x.GetOpenOrdersExtendedAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(hlOrders));
+
+        var broker = GetBrokerWithMockedClient(mockRestClient.Object);
+
+        // act
+        var orders = await broker.GetOpenOrdersAsync();
+
+        // assert
+        orders.Count.ShouldBe(2);
+        orders[123].Symbol.ShouldBe("ETH");
+        orders[123].AssetType.ShouldBe(Spot);
+        orders[123].OrderSide.ShouldBe(OrderSide.Buy);
+        orders[123].Amount.ShouldBe(1.0m);
+        orders[456].Symbol.ShouldBe("BTC");
+        orders[456].AssetType.ShouldBe(Future);
+        orders[456].OrderSide.ShouldBe(OrderSide.Sell);
+    }
+
+    [Fact]
+    public async Task GivenNoOpenOrders_WhenGetOpenOrdersAsync_ShouldReturnEmptyDictionary()
+    {
+        // arrange
+        var mockRestClient = new Mock<IHyperLiquidRestClient>();
+        var mockFuturesApi = new Mock<IHyperLiquidRestClientFuturesApi>();
+        var mockFuturesTrading = new Mock<IHyperLiquidRestClientFuturesApiTrading>();
+
+        mockRestClient.Setup(x => x.FuturesApi).Returns(mockFuturesApi.Object);
+        mockFuturesApi.Setup(x => x.Trading).Returns(mockFuturesTrading.Object);
+
+        mockFuturesTrading
+            .Setup(x => x.GetOpenOrdersExtendedAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(Array.Empty<HyperLiquidOrder>()));
+
+        var broker = GetBrokerWithMockedClient(mockRestClient.Object);
+
+        // act
+        var orders = await broker.GetOpenOrdersAsync();
+
+        // assert
+        orders.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task GivenApiError_WhenGetOpenOrdersAsync_ShouldThrowException()
+    {
+        // arrange
+        var mockRestClient = new Mock<IHyperLiquidRestClient>();
+        var mockFuturesApi = new Mock<IHyperLiquidRestClientFuturesApi>();
+        var mockFuturesTrading = new Mock<IHyperLiquidRestClientFuturesApiTrading>();
+
+        mockRestClient.Setup(x => x.FuturesApi).Returns(mockFuturesApi.Object);
+        mockFuturesApi.Setup(x => x.Trading).Returns(mockFuturesTrading.Object);
+
+        var error = new TestError("500", new ErrorInfo(ErrorType.SystemError, "Internal server error"), null);
+        mockFuturesTrading
+            .Setup(x => x.GetOpenOrdersExtendedAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                WebCallResult<HyperLiquidOrder[]>(
+                    null,
+                    HttpStatusCode.InternalServerError,
+                    error));
+
+        var broker = GetBrokerWithMockedClient(mockRestClient.Object);
+
+        // act & assert
+        await Should.ThrowAsync<HyperliquidException>(() => broker.GetOpenOrdersAsync());
+    }
+
+    #endregion
+
+    #region CancelOrderAsync Tests
+
+    [Fact]
+    public async Task GivenOpenSpotOrder_WhenCancelOrderAsync_ShouldCallApi()
+    {
+        // arrange
+        var mockRestClient = new Mock<IHyperLiquidRestClient>();
+        var mockSpotApi = new Mock<IHyperLiquidRestClientSpotApi>();
+        var mockSpotTrading = new Mock<IHyperLiquidRestClientSpotApiTrading>();
+
+        mockRestClient.Setup(x => x.SpotApi).Returns(mockSpotApi.Object);
+        mockSpotApi.Setup(x => x.Trading).Returns(mockSpotTrading.Object);
+
+        var order = new Order(
+            123,
+            "ETH",
+            Spot,
+            DateTime.UtcNow,
+            OrderSide.Buy,
+            OrderStatus.Open,
+            1m,
+            0m,
+            2000m,
+            "test");
+
+        mockSpotTrading
+            .Setup(x => x.CancelOrderAsync(
+                order.Symbol,
+                order.Id,
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult());
+
+        var broker = GetBrokerWithMockedClient(mockRestClient.Object);
+
+        // act
+        await broker.CancelOrderAsync(order);
+
+        // assert
+        mockSpotTrading.Verify(
+            x => x.CancelOrderAsync(order.Symbol, order.Id, null, null, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GivenOpenFuturesOrder_WhenCancelOrderAsync_ShouldCallApi()
+    {
+        // arrange
+        var mockRestClient = new Mock<IHyperLiquidRestClient>();
+        var mockFuturesApi = new Mock<IHyperLiquidRestClientFuturesApi>();
+        var mockFuturesTrading = new Mock<IHyperLiquidRestClientFuturesApiTrading>();
+
+        mockRestClient.Setup(x => x.FuturesApi).Returns(mockFuturesApi.Object);
+        mockFuturesApi.Setup(x => x.Trading).Returns(mockFuturesTrading.Object);
+
+        var order = new Order(
+            456,
+            "BTC",
+            Future,
+            DateTime.UtcNow,
+            OrderSide.Sell,
+            OrderStatus.Open,
+            0.5m,
+            0m,
+            50000m,
+            "test");
+
+        mockFuturesTrading
+            .Setup(x => x.CancelOrderAsync(
+                order.Symbol,
+                order.Id,
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult());
+
+        var broker = GetBrokerWithMockedClient(mockRestClient.Object);
+
+        // act
+        await broker.CancelOrderAsync(order);
+
+        // assert
+        mockFuturesTrading.Verify(
+            x => x.CancelOrderAsync(order.Symbol, order.Id, null, null, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    #endregion
+
+    #region EditOrderAsync Tests
+
+    [Fact]
+    public async Task GivenOrder_WhenEditOrderAsync_ShouldCallApi()
+    {
+        // arrange
+        var mockRestClient = new Mock<IHyperLiquidRestClient>();
+        var mockFuturesApi = new Mock<IHyperLiquidRestClientFuturesApi>();
+        var mockFuturesTrading = new Mock<IHyperLiquidRestClientFuturesApiTrading>();
+
+        mockRestClient.Setup(x => x.FuturesApi).Returns(mockFuturesApi.Object);
+        mockFuturesApi.Setup(x => x.Trading).Returns(mockFuturesTrading.Object);
+
+        var order = new Order(
+            789,
+            "ETH",
+            Future,
+            DateTime.UtcNow,
+            OrderSide.Buy,
+            OrderStatus.Open,
+            2m,
+            0m,
+            2100m,
+            "client789");
+
+        mockFuturesTrading
+            .Setup(x => x.EditOrderAsync(
+                order.Symbol,
+                order.Id,
+                order.ClientId,
+                It.IsAny<HlOrderSide>(),
+                It.IsAny<HyperLiquid.Net.Enums.OrderType>(),
+                order.Amount,
+                order.LimitPrice!.Value,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult());
+
+        var broker = GetBrokerWithMockedClient(mockRestClient.Object);
+
+        // act
+        await broker.EditOrderAsync(order);
+
+        // assert
+        mockFuturesTrading.Verify(
+            x => x.EditOrderAsync(
+                order.Symbol,
+                order.Id,
+                order.ClientId,
+                It.IsAny<HlOrderSide>(),
+                It.IsAny<HyperLiquid.Net.Enums.OrderType>(),
+                order.Amount,
+                order.LimitPrice!.Value,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    #endregion
+
+    private HyperliquidBroker GetBrokerWithMockedClient(
+        IHyperLiquidRestClient? restClient = null,
+        IReadOnlyDictionary<string, string>? aliases = null)
+    {
+        restClient ??= new Mock<IHyperLiquidRestClient>().Object;
+        var mockSocketClient = new Mock<IHyperLiquidSocketClient>();
+        var logger = _loggerFactory.CreateLogger<HyperliquidBroker>();
+
+        return new HyperliquidBroker(
+            restClient,
+            mockSocketClient.Object,
+            GetTickerAliasService(aliases),
+            logger);
+    }
+
+    private static WebCallResult WebCallResult(
+        HttpStatusCode httpStatusCode = HttpStatusCode.OK,
+        Error? error = null) =>
         new(
-            symbol,
-            assetType,
-            Convert.ToDecimal(quantity),
-            price,
-            ClientOrderId: $"0x{RandomNumberGenerator.GetHexString(32, true)}");
+            httpStatusCode,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            error);
+
+
+    private static WebCallResult<T> WebCallResult<T>(
+        T? result,
+        HttpStatusCode httpStatusCode = HttpStatusCode.OK,
+        Error? error = null) =>
+        new(
+            httpStatusCode,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            ResultDataSource.Server,
+            result,
+            error);
+
+    private class TestError(string? errorCode, ErrorInfo errorInfo, Exception? exception)
+        : Error(
+            errorCode,
+            errorInfo,
+            exception);
 }

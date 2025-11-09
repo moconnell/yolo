@@ -187,10 +187,11 @@ public sealed class HyperliquidBroker : IYoloBroker
     public async Task<IReadOnlyList<decimal>> GetDailyClosePricesAsync(
         string ticker,
         int periods,
+        bool includeToday = false,
         CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrEmpty(ticker, nameof(ticker));
-        var klines = await GetDailyPriceHistoryAsync(ticker, periods, ct);
+        var klines = await GetDailyPriceHistoryAsync(ticker, periods, includeToday, ct);
         return klines.Select(x => x.ClosePrice).ToArray();
     }
 
@@ -814,17 +815,18 @@ public sealed class HyperliquidBroker : IYoloBroker
     private async Task<HyperLiquidKline[]> GetDailyPriceHistoryAsync(
         string ticker,
         int periods,
+        bool includeToday = false,
         CancellationToken ct = default)
     {
         ticker = _tickerAliasService.TryGetAlias(ticker, out var alias) ? alias! : ticker;
-        var startTime = DateTime.UtcNow.AddDays(-periods);
-        var endTime = DateTime.UtcNow;
+        var endDate = includeToday ? DateTime.Today : DateTime.Today.AddDays(-1);
+        var startDate = endDate.AddDays(-periods + 1);
         var klines = await GetDataAsync(
             () => _hyperliquidClient.SpotApi.ExchangeData.GetKlinesAsync(
                 ticker,
                 KlineInterval.OneDay,
-                startTime,
-                endTime,
+                startDate,
+                endDate,
                 ct),
             $"Could not get prices for {ticker}");
 
