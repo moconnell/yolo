@@ -371,13 +371,19 @@ public class HyperliquidBrokerIntegrationTest
     [InlineData("ETH", 10)]
     [InlineData("BTC", 30)]
     [InlineData("SOL", 365)]
-    public async Task GivenValidTicker_WhenGetDailyClosePricesAsync_ShouldReturnPrices(string ticker, int periods)
+    [InlineData("ETH", 10, true)]
+    [InlineData("BTC", 30, true)]
+    [InlineData("SOL", 365, true)]
+    public async Task GivenValidTicker_WhenGetDailyClosePricesAsync_ShouldReturnPrices(
+        string ticker,
+        int periods,
+        bool includeToday = false)
     {
         // arrange
         var broker = GetTestBroker();
 
         // act
-        var closePrices = await broker.GetDailyClosePricesAsync(ticker, periods);
+        var closePrices = await broker.GetDailyClosePricesAsync(ticker, periods, includeToday);
 
         // assert
         closePrices.ShouldNotBeNull();

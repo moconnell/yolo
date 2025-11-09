@@ -819,14 +819,14 @@ public sealed class HyperliquidBroker : IYoloBroker
         CancellationToken ct = default)
     {
         ticker = _tickerAliasService.TryGetAlias(ticker, out var alias) ? alias! : ticker;
-        var endTime = includeToday ? DateTime.UtcNow : DateTime.Today;
-        var startTime = DateTime.Today.AddDays(-periods + 1);
+        var endDate = includeToday ? DateTime.Today : DateTime.Today.AddDays(-1);
+        var startDate = endDate.AddDays(-periods + 1);
         var klines = await GetDataAsync(
             () => _hyperliquidClient.SpotApi.ExchangeData.GetKlinesAsync(
                 ticker,
                 KlineInterval.OneDay,
-                startTime,
-                endTime,
+                startDate,
+                endDate,
                 ct),
             $"Could not get prices for {ticker}");
 
