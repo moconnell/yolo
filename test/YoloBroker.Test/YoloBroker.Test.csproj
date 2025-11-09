@@ -21,6 +21,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <PackageReference Include="Newtonsoft.Json" />
         <ProjectReference Include="..\..\src\YoloBroker\YoloBroker.csproj" />
     </ItemGroup>
 

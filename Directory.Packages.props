@@ -23,7 +23,7 @@
     <PackageVersion Include="Moq" Version="4.20.72" />
     <PackageVersion Include="Moq.Contrib.HttpClient" Version="1.4.0" />
     <PackageVersion Include="Nethereum.Signer.EIP712" Version="5.0.0" />
-    <PackageVersion Include="Newtonsoft.Json" Version="13.0.1" />
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageVersion Include="Serilog.Extensions.Logging" Version="9.0.2" />
     <PackageVersion Include="Serilog.Extensions.Logging.File" Version="3.0.0" />
     <PackageVersion Include="Shouldly" Version="4.3.0" />

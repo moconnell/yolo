@@ -25,6 +25,7 @@
     <ProjectReference Include="..\..\src\YoloTrades\YoloTrades.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" />
     <None Update="Data\json\001\markets.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
