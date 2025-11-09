@@ -33,6 +33,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <PackageReference Include="System.Text.Json" />
         <None Update="Data\volatilities.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
