@@ -366,6 +366,70 @@ public class HyperliquidBrokerIntegrationTest
         // Positions dictionary should contain both spot and futures if they exist
     }
 
+    [Theory]
+    [Trait("Category", "Integration")]
+    [InlineData("ETH", 10)]
+    [InlineData("BTC", 30)]
+    [InlineData("SOL", 365)]
+    public async Task GivenValidTicker_WhenGetDailyClosePricesAsync_ShouldReturnPrices(string ticker, int periods)
+    {
+        // arrange
+        var broker = GetTestBroker();
+
+        // act
+        var closePrices = await broker.GetDailyClosePricesAsync(ticker, periods);
+
+        // assert
+        closePrices.ShouldNotBeNull();
+        closePrices.Count.ShouldBeGreaterThan(0);
+        closePrices.Count.ShouldBeLessThanOrEqualTo(periods);
+        closePrices.All(price => price > 0).ShouldBeTrue();
+
+        // Log the prices for verification
+        _testOutputHelper.WriteLine($"{ticker} close prices ({closePrices.Count} periods):");
+        for (var i = 0; i < closePrices.Count; i++)
+        {
+            _testOutputHelper.WriteLine($"  Day {i + 1}: {closePrices[i]:N2}");
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task GivenTickerWithAlias_WhenGetDailyClosePricesAsync_ShouldUseAlias()
+    {
+        // arrange
+        var aliases = new Dictionary<string, string>
+        {
+            ["SHIB"] = "kSHIB"
+        };
+        var broker = GetTestBroker(aliases);
+
+        // act
+        var closePrices = await broker.GetDailyClosePricesAsync("SHIB", 5);
+
+        // assert
+        closePrices.ShouldNotBeNull();
+        closePrices.Count.ShouldBeGreaterThan(0);
+        closePrices.All(price => price > 0).ShouldBeTrue();
+
+        _testOutputHelper.WriteLine($"SHIB (via kSHIB alias) close prices ({closePrices.Count} periods):");
+        for (var i = 0; i < closePrices.Count; i++)
+        {
+            _testOutputHelper.WriteLine($"  Day {i + 1}: {closePrices[i]:N8}");
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task GivenInvalidTicker_WhenGetDailyClosePricesAsync_ShouldThrowException()
+    {
+        // arrange
+        var broker = GetTestBroker();
+
+        // act & assert
+        await Should.ThrowAsync<Exception>(() => broker.GetDailyClosePricesAsync("INVALIDTICKER123", 10));
+    }
+
     [Fact(Skip = "No bid for BTC/USDC spot")]
     [Trait("Category", "Integration")]
     public async Task GivenMultipleTrades_WhenPlaceTradesAsync_ShouldHandleMixedAssetTypes()

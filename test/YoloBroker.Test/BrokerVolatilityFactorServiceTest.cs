@@ -46,12 +46,16 @@ public class BrokerVolatilityFactorServiceTest
         var service = new BrokerVolatilityFactorService(mockBroker.Object);
 
         // act
-        var result = await service.GetFactorsAsync(null);
+        var result = await service.GetFactorsAsync();
 
         // assert
         result.ShouldBe(FactorDataFrame.Empty);
         mockBroker.Verify(
-            b => b.GetDailyClosePricesAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            b => b.GetDailyClosePricesAsync(
+                It.IsAny<string>(),
+                It.IsAny<int>(),
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -68,7 +72,11 @@ public class BrokerVolatilityFactorServiceTest
         // assert
         result.ShouldBe(FactorDataFrame.Empty);
         mockBroker.Verify(
-            b => b.GetDailyClosePricesAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            b => b.GetDailyClosePricesAsync(
+                It.IsAny<string>(),
+                It.IsAny<int>(),
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -86,7 +94,11 @@ public class BrokerVolatilityFactorServiceTest
         // assert
         result.ShouldBe(FactorDataFrame.Empty);
         mockBroker.Verify(
-            b => b.GetDailyClosePricesAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            b => b.GetDailyClosePricesAsync(
+                It.IsAny<string>(),
+                It.IsAny<int>(),
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -97,7 +109,11 @@ public class BrokerVolatilityFactorServiceTest
         var mockBroker = new Mock<IYoloBroker>();
         var prices = new List<decimal> { 100m, 102m, 98m, 101m, 99m, 103m, 97m, 100m, 104m, 96m };
 
-        mockBroker.Setup(b => b.GetDailyClosePricesAsync(BtcUsdt, 30, It.IsAny<CancellationToken>()))
+        mockBroker.Setup(b => b.GetDailyClosePricesAsync(
+                BtcUsdt,
+                30,
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(prices);
 
         var service = new BrokerVolatilityFactorService(mockBroker.Object);
@@ -113,7 +129,11 @@ public class BrokerVolatilityFactorServiceTest
         result[FactorType.Volatility, BtcUsdt].ShouldBeGreaterThan(0);
 
         mockBroker.Verify(
-            b => b.GetDailyClosePricesAsync(BtcUsdt, 30, It.IsAny<CancellationToken>()),
+            b => b.GetDailyClosePricesAsync(
+                BtcUsdt,
+                30,
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -125,9 +145,17 @@ public class BrokerVolatilityFactorServiceTest
         var btcPrices = new List<decimal> { 100m, 102m, 98m, 101m, 99m, 103m, 97m, 100m, 104m, 96m };
         var ethPrices = new List<decimal> { 50m, 51m, 49m, 50.5m, 49.5m, 51.5m, 48.5m, 50m, 52m, 48m };
 
-        mockBroker.Setup(b => b.GetDailyClosePricesAsync(BtcUsdt, 30, It.IsAny<CancellationToken>()))
+        mockBroker.Setup(b => b.GetDailyClosePricesAsync(
+                BtcUsdt,
+                30,
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(btcPrices);
-        mockBroker.Setup(b => b.GetDailyClosePricesAsync(EthUsdt, 30, It.IsAny<CancellationToken>()))
+        mockBroker.Setup(b => b.GetDailyClosePricesAsync(
+                EthUsdt,
+                30,
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(ethPrices);
 
         var service = new BrokerVolatilityFactorService(mockBroker.Object);
@@ -146,10 +174,18 @@ public class BrokerVolatilityFactorServiceTest
         result[FactorType.Volatility, EthUsdt].ShouldBeGreaterThan(0);
 
         mockBroker.Verify(
-            b => b.GetDailyClosePricesAsync(BtcUsdt, 30, It.IsAny<CancellationToken>()),
+            b => b.GetDailyClosePricesAsync(
+                BtcUsdt,
+                30,
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()),
             Times.Once);
         mockBroker.Verify(
-            b => b.GetDailyClosePricesAsync(EthUsdt, 30, It.IsAny<CancellationToken>()),
+            b => b.GetDailyClosePricesAsync(
+                EthUsdt,
+                30,
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -161,7 +197,11 @@ public class BrokerVolatilityFactorServiceTest
         var cts = new CancellationTokenSource();
         var prices = new List<decimal> { 100m, 102m, 98m, 101m, 99m, 103m, 97m, 100m, 104m, 96m };
 
-        mockBroker.Setup(b => b.GetDailyClosePricesAsync(BtcUsdt, 30, cts.Token))
+        mockBroker.Setup(b => b.GetDailyClosePricesAsync(
+                BtcUsdt,
+                30,
+                It.IsAny<bool>(),
+                cts.Token))
             .ReturnsAsync(prices);
 
         var service = new BrokerVolatilityFactorService(mockBroker.Object);
@@ -172,7 +212,11 @@ public class BrokerVolatilityFactorServiceTest
         // assert
         result.ShouldNotBeNull();
         mockBroker.Verify(
-            b => b.GetDailyClosePricesAsync(BtcUsdt, 30, cts.Token),
+            b => b.GetDailyClosePricesAsync(
+                BtcUsdt,
+                30,
+                It.IsAny<bool>(),
+                cts.Token),
             Times.Once);
     }
 
@@ -184,7 +228,11 @@ public class BrokerVolatilityFactorServiceTest
         var prices = new List<decimal> { 100m, 102m, 98m, 101m, 99m, 103m, 97m, 100m, 104m, 96m };
         var factors = new HashSet<FactorType> { FactorType.Carry, FactorType.Momentum };
 
-        mockBroker.Setup(b => b.GetDailyClosePricesAsync(BtcUsdt, 30, It.IsAny<CancellationToken>()))
+        mockBroker.Setup(b => b.GetDailyClosePricesAsync(
+                BtcUsdt,
+                30,
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(prices);
 
         var service = new BrokerVolatilityFactorService(mockBroker.Object);
@@ -196,7 +244,11 @@ public class BrokerVolatilityFactorServiceTest
         result.ShouldNotBeNull();
         result.ShouldNotBe(FactorDataFrame.Empty);
         mockBroker.Verify(
-            b => b.GetDailyClosePricesAsync(BtcUsdt, 30, It.IsAny<CancellationToken>()),
+            b => b.GetDailyClosePricesAsync(
+                BtcUsdt,
+                30,
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -207,19 +259,27 @@ public class BrokerVolatilityFactorServiceTest
         var mockBroker = new Mock<IYoloBroker>();
         var prices = new List<decimal> { 100m, 102m, 98m, 101m, 99m, 103m, 97m, 100m, 104m, 96m };
 
-        mockBroker.Setup(b => b.GetDailyClosePricesAsync(BtcUsdt, 30, It.IsAny<CancellationToken>()))
+        mockBroker.Setup(b => b.GetDailyClosePricesAsync(
+                BtcUsdt,
+                30,
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(prices);
 
         var service = new BrokerVolatilityFactorService(mockBroker.Object);
 
         // act
-        var result = await service.GetFactorsAsync([BtcUsdt], null);
+        var result = await service.GetFactorsAsync([BtcUsdt]);
 
         // assert
         result.ShouldNotBeNull();
         result.ShouldNotBe(FactorDataFrame.Empty);
         mockBroker.Verify(
-            b => b.GetDailyClosePricesAsync(BtcUsdt, 30, It.IsAny<CancellationToken>()),
+            b => b.GetDailyClosePricesAsync(
+                BtcUsdt,
+                30,
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 }

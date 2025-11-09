@@ -110,7 +110,7 @@ public class HyperliquidBrokerTest
         var broker = GetBrokerWithMockedClient();
         var trade = new Trade(
             "BTC",
-            (AssetType) 999, // Invalid asset type
+            (AssetType)999, // Invalid asset type
             1m,
             50000m);
 
@@ -126,7 +126,7 @@ public class HyperliquidBrokerTest
         var order = new Order(
             123,
             "BTC",
-            (AssetType) 999, // Invalid asset type
+            (AssetType)999, // Invalid asset type
             DateTime.UtcNow,
             OrderSide.Buy,
             OrderStatus.Open,
@@ -160,6 +160,121 @@ public class HyperliquidBrokerTest
             broker.GetDailyClosePricesAsync(null!, 10));
         await Should.ThrowAsync<ArgumentException>(() =>
             broker.GetDailyClosePricesAsync("", 10));
+    }
+
+    [Fact]
+    public async Task GivenValidTicker_WhenGetDailyClosePricesAsync_ShouldReturnClosePrices()
+    {
+        // arrange
+        var mockRestClient = new Mock<IHyperLiquidRestClient>();
+        var mockSpotApi = new Mock<IHyperLiquidRestClientSpotApi>();
+        var mockSpotExchangeData = new Mock<IHyperLiquidRestClientSpotApiExchangeData>();
+
+        mockRestClient.Setup(x => x.SpotApi).Returns(mockSpotApi.Object);
+        mockSpotApi.Setup(x => x.ExchangeData).Returns(mockSpotExchangeData.Object);
+
+        var klines = new[]
+        {
+            new HyperLiquidKline
+            {
+                OpenTime = DateTime.UtcNow.AddDays(-3),
+                ClosePrice = 1900m,
+                OpenPrice = 1850m,
+                HighPrice = 1950m,
+                LowPrice = 1800m,
+                Volume = 1000m
+            },
+            new HyperLiquidKline
+            {
+                OpenTime = DateTime.UtcNow.AddDays(-2),
+                ClosePrice = 2000m,
+                OpenPrice = 1900m,
+                HighPrice = 2050m,
+                LowPrice = 1850m,
+                Volume = 1200m
+            },
+            new HyperLiquidKline
+            {
+                OpenTime = DateTime.UtcNow.AddDays(-1),
+                ClosePrice = 2100m,
+                OpenPrice = 2000m,
+                HighPrice = 2150m,
+                LowPrice = 1950m,
+                Volume = 1500m
+            }
+        };
+
+        mockSpotExchangeData
+            .Setup(x => x.GetKlinesAsync(
+                It.IsAny<string>(),
+                KlineInterval.OneDay,
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(klines));
+
+        var broker = GetBrokerWithMockedClient(mockRestClient.Object);
+
+        // act
+        var closePrices = await broker.GetDailyClosePricesAsync("ETH", 3);
+
+        // assert
+        closePrices.Count.ShouldBe(3);
+        closePrices[0].ShouldBe(1900m);
+        closePrices[1].ShouldBe(2000m);
+        closePrices[2].ShouldBe(2100m);
+    }
+
+    [Fact]
+    public async Task GivenTickerWithAlias_WhenGetDailyClosePricesAsync_ShouldUseAlias()
+    {
+        // arrange
+        var mockRestClient = new Mock<IHyperLiquidRestClient>();
+        var mockSpotApi = new Mock<IHyperLiquidRestClientSpotApi>();
+        var mockSpotExchangeData = new Mock<IHyperLiquidRestClientSpotApiExchangeData>();
+
+        mockRestClient.Setup(x => x.SpotApi).Returns(mockSpotApi.Object);
+        mockSpotApi.Setup(x => x.ExchangeData).Returns(mockSpotExchangeData.Object);
+
+        var klines = new[]
+        {
+            new HyperLiquidKline
+            {
+                OpenTime = DateTime.UtcNow.AddDays(-1),
+                ClosePrice = 50000m,
+                OpenPrice = 49000m,
+                HighPrice = 51000m,
+                LowPrice = 48000m,
+                Volume = 500m
+            }
+        };
+
+        mockSpotExchangeData
+            .Setup(x => x.GetKlinesAsync(
+                "BTC-PERP", // The alias
+                KlineInterval.OneDay,
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(klines));
+
+        var aliases = new Dictionary<string, string> { { "BTC", "BTC-PERP" } };
+        var broker = GetBrokerWithMockedClient(mockRestClient.Object, aliases);
+
+        // act
+        var closePrices = await broker.GetDailyClosePricesAsync("BTC", 1);
+
+        // assert
+        closePrices.Count.ShouldBe(1);
+        closePrices[0].ShouldBe(50000m);
+        mockSpotExchangeData.Verify(
+            x => x.GetKlinesAsync(
+                "BTC-PERP",
+                KlineInterval.OneDay,
+                It.IsAny<DateTime>(),
+                It.IsAny<DateTime>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]
