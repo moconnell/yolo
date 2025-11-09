@@ -25,8 +25,7 @@ public class HyperliquidBrokerTest
             builder.SetMinimumLevel(LogLevel.Debug);
         });
     }
-
-
+    
     [Fact]
     public async Task GivenNullTrades_WhenPlaceTradesAsync_ShouldThrowArgumentNullException()
     {
@@ -139,8 +138,7 @@ public class HyperliquidBrokerTest
         // act & assert
         await Should.ThrowAsync<ArgumentNullException>(() => broker.EditOrderAsync(null!));
     }
-
-
+    
     [Fact]
     public async Task GivenNullOrEmptyTicker_WhenGetDailyClosePricesAsync_ShouldThrowArgumentException()
     {
@@ -217,7 +215,6 @@ public class HyperliquidBrokerTest
         results.ShouldBeEmpty();
     }
 
-
     private HyperliquidBroker GetTestBroker(
         IReadOnlyDictionary<string, string>? aliases = null)
     {
@@ -233,7 +230,5 @@ public class HyperliquidBrokerTest
         );
 
         return broker;
-
-
     }
 }
