@@ -15,6 +15,15 @@ public static partial class LoggerExtensions
     public static partial void OpenOrders(
         this ILogger logger,
         IEnumerable<Order> orders);
+
+    [LoggerMessage(
+        EventId = WellKnown.TradeEventIds.CancelledOrders,
+        Level = LogLevel.Warning,
+        Message =
+            "Cancelled open orders!\n{Orders}")]
+    public static partial void CancelledOrders(
+        this ILogger logger,
+        IEnumerable<Order> orders);
     
     [LoggerMessage(
         EventId = WellKnown.TradeEventIds.PlacedOrder,
