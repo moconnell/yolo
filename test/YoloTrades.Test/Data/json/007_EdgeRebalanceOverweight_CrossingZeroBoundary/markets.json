@@ -1,0 +1,21 @@
+{
+  "BTC": [
+    {
+      "Name": "BTC",
+      "BaseAsset": "BTC",
+      "QuoteAsset": "USDC",
+      "AssetType": 1,
+      "TimeStamp": "2025-09-07T10:27:05.935997Z",
+      "PriceStep": 1,
+      "QuantityStep": 0.00001,
+      "MinProvideSize": 0.0001,
+      "Ask": 50000.0,
+      "Bid": 49999.0,
+      "Last": null,
+      "Mid": 49999.5,
+      "Expiry": null,
+      "Key": "BTC-Future",
+      "Spread": 1.0
+    }
+  ]
+}

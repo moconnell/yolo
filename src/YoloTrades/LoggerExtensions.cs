@@ -25,7 +25,7 @@ public static partial class LoggerExtensions
 
     [LoggerMessage(
         EventId = TradeEventIds.MarketPositions,
-        Level = LogLevel.Debug,
+        Level = LogLevel.Information,
         Message = "({Token}): market positions... {MarketPositions}")]
     public static partial void MarketPositions(
         this ILogger logger,
@@ -34,7 +34,7 @@ public static partial class LoggerExtensions
 
     [LoggerMessage(
         EventId = TradeEventIds.GeneratedTrade,
-        Level = LogLevel.Debug,
+        Level = LogLevel.Information,
         Message =
             "({Token}): new {Trade} (delta: {Delta:0.000})")]
     public static partial void GeneratedTrade(
@@ -79,7 +79,7 @@ public static partial class LoggerExtensions
 
     [LoggerMessage(
         EventId = TradeEventIds.WithinTradeBuffer,
-        Level = LogLevel.Debug,
+        Level = LogLevel.Information,
         Message =
             "({Token}): no action - delta is within trade buffer (current weight: {CurrentWeight:0.000}, target weight: {ConstrainedTargetWeight:0.000}, delta: {Delta:0.000})")]
     public static partial void WithinTradeBuffer(
@@ -91,7 +91,7 @@ public static partial class LoggerExtensions
 
     [LoggerMessage(
         EventId = TradeEventIds.DeltaTooSmall,
-        Level = LogLevel.Debug,
+        Level = LogLevel.Information,
         Message =
             "({Token}): no action - delta too small to trade (delta: {Delta:0.0000})")]
     public static partial void DeltaTooSmall(

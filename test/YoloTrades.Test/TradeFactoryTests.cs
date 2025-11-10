@@ -7,18 +7,31 @@ using System.Threading.Tasks;
 using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
-using Moq;
 using Newtonsoft.Json;
+using Shouldly;
 using Snapshooter.Xunit;
 using Xunit;
+using Xunit.Abstractions;
 using YoloAbstractions;
 using YoloAbstractions.Config;
+using YoloTest.Util;
 using YoloTrades.Test.Data.Types;
 
 namespace YoloTrades.Test;
 
 public class TradeFactoryTests
 {
+    private readonly ILoggerFactory _loggerFactory;
+
+    public TradeFactoryTests(ITestOutputHelper testOutputHelper)
+    {
+        _loggerFactory = LoggerFactory.Create(builder =>
+        {
+            builder.AddProvider(new XUnitLoggerProvider(testOutputHelper));
+            builder.SetMinimumLevel(LogLevel.Debug);
+        });
+    }
+
     [Theory]
     // [InlineData("./Data/csv/20250907/YOLO Trade Helper v8 - carry=0.csv", 1, 1, 0)]
     // [InlineData("./Data/csv/20250907/YOLO Trade Helper v8 - carry=0.5.csv", 1, 1, 0.5)]
@@ -36,7 +49,7 @@ public class TradeFactoryTests
         decimal maxWeightingAbs = 0.25m)
     {
         // arrange
-        var mockLogger = new Mock<ILogger<TradeFactory>>();
+        var logger = _loggerFactory.CreateLogger<TradeFactory>();
 
         var config = new YoloConfig
         {
@@ -50,7 +63,7 @@ public class TradeFactoryTests
                 { FactorType.Carry, carryMultiplier }
             }
         };
-        var tradeFactory = new TradeFactory(mockLogger.Object, config);
+        var tradeFactory = new TradeFactory(logger, config);
 
         var (weights, positions, markets, expectedTrades) =
             DeserializeCsv(
@@ -102,7 +115,7 @@ public class TradeFactoryTests
         decimal tradeBuffer = 0.04m)
     {
         // arrange
-        var mockLogger = new Mock<ILogger<TradeFactory>>();
+        var logger = _loggerFactory.CreateLogger<TradeFactory>();
 
         var config = new YoloConfig
         {
@@ -112,7 +125,7 @@ public class TradeFactoryTests
             NominalCash = nominalCash,
             TradeBuffer = tradeBuffer
         };
-        var tradeFactory = new TradeFactory(mockLogger.Object, config);
+        var tradeFactory = new TradeFactory(logger, config);
 
         var (weights, positions, markets) = await DeserializeInputsAsync(path);
 
@@ -127,121 +140,114 @@ public class TradeFactoryTests
     }
 
     [Theory]
-    [InlineData(RebalanceMode.Center)]
-    [InlineData(RebalanceMode.Edge)]
-    public async Task ShouldCalculateTradesWithRebalanceMode(RebalanceMode rebalanceMode)
+    [InlineData(
+        "./Data/json/005_EdgeRebalance",
+        RebalanceMode.Center,
+        "BTC",
+        0.017,
+        0.00001)]
+    [InlineData(
+        "./Data/json/005_EdgeRebalance",
+        RebalanceMode.Edge,
+        "BTC",
+        0.009,
+        0.00001)]
+    [InlineData(
+        "./Data/json/006_EdgeRebalanceOverweight",
+        RebalanceMode.Center,
+        "BTC",
+        -0.02,
+        0.00001)]
+    [InlineData(
+        "./Data/json/006_EdgeRebalanceOverweight",
+        RebalanceMode.Edge,
+        "BTC",
+        -0.012,
+        0.00001)]
+    [InlineData(
+        "./Data/json/007_EdgeRebalanceOverweight_CrossingZeroBoundary",
+        RebalanceMode.Center,
+        "BTC",
+        -0.06,
+        0.00001)]
+    [InlineData(
+        "./Data/json/007_EdgeRebalanceOverweight_CrossingZeroBoundary",
+        RebalanceMode.Edge,
+        "BTC",
+        -0.052,
+        0.00001)]
+    [InlineData(
+        "./Data/json/008_EdgeRebalanceOverweight_CrossingZeroBoundary",
+        RebalanceMode.Center,
+        "DOGE",
+        -13493,
+        1,
+        44000,
+        0.05)]
+    [InlineData(
+        "./Data/json/008_EdgeRebalanceOverweight_CrossingZeroBoundary",
+        RebalanceMode.Edge,
+        "DOGE",
+        -1254,
+        1,
+        44000,
+        0.05)]
+    public async Task GivenRebalanceMode_ShouldCalculateTrades(
+        string path,
+        RebalanceMode rebalanceMode,
+        string expectedSymbol,
+        decimal expectedTradeSize,
+        decimal tolerance,
+        decimal nominalCash = 10000,
+        decimal tradeBuffer = 0.04m,
+        decimal maxLeverage = 2)
     {
         // arrange
-        var mockLogger = new Mock<ILogger<TradeFactory>>();
+        var logger = _loggerFactory.CreateLogger<TradeFactory>();
 
         var config = new YoloConfig
         {
-            AssetPermissions = AssetPermissions.All,
+            AssetPermissions = AssetPermissions.PerpetualFutures,
             BaseAsset = "USDC",
-            MaxLeverage = 2,
-            NominalCash = 10000,
-            TradeBuffer = 0.04m,
+            MaxLeverage = maxLeverage,
+            NominalCash = nominalCash,
+            TradeBuffer = tradeBuffer,
             RebalanceMode = rebalanceMode
         };
-        var tradeFactory = new TradeFactory(mockLogger.Object, config);
+        var tradeFactory = new TradeFactory(logger, config);
 
-        var (weights, positions, markets) = await DeserializeInputsAsync("./Data/json/005_EdgeRebalance");
+        var (weights, positions, markets) =
+            await DeserializeInputsAsync(path);
 
         // act
         var trades = tradeFactory.CalculateTrades(weights, positions, markets).ToArray();
 
         // assert
         Assert.NotNull(trades);
-        
-        // Current position: 0.003 BTC at $50,000 = $150
-        // Current weight = $150 / $10,000 = 0.015 = 1.5%
-        // Target weight = 0.10 = 10%
-        // Trade buffer = 0.04 = 4%
-        // Tolerance band = [6%, 14%]
-        // Current 1.5% is outside (below) the band, so we need to rebalance
-        
-        // For Center mode: rebalance to 10% (ideal weight)
-        //   Target position = 0.10 * 10000 / 50000 = 0.02 BTC
-        //   Trade size = 0.02 - 0.003 = 0.017 BTC
-        
-        // For Edge mode: rebalance to lower edge at 6%
-        //   Target position = 0.06 * 10000 / 50000 = 0.012 BTC
-        //   Trade size = 0.012 - 0.003 = 0.009 BTC
-        
+
+        /*
+         e.g.
+
+         Current position: 0.04 BTC at $50,000 = $2,000
+         Current weight = $2,000 / $10,000 = 0.20 = 20%
+         Target weight = -0.10 = -10%
+         Trade buffer = 0.04 = 4%
+         Tolerance band = [-6%, -14%]
+         Current 20% is outside (above) the band, so we need to rebalance
+
+         For Center mode: rebalance to -10% (ideal weight)
+           Target position = -0.10 * 10000 / 50000 = -0.02 BTC
+           Trade size = -0.02 - 0.04 = -0.06 BTC (sell)
+
+         For Edge mode: rebalance to upper edge at -6%
+           Target position = -0.06 * 10000 / 50000 = -0.012 BTC
+           Trade size = -0.012 - 0.04 = -0.052 BTC (sell)
+        */
+
         Assert.Single(trades);
-        
         var trade = trades[0];
-        Assert.Equal("BTC", trade.Symbol);
-        
-        if (rebalanceMode == RebalanceMode.Center)
-        {
-            // Should buy to reach center (10% weight = 0.02 BTC)
-            Assert.Equal(0.017m, trade.Amount);
-        }
-        else // RebalanceMode.Edge
-        {
-            // Should buy to reach lower edge (6% weight = 0.012 BTC)
-            Assert.Equal(0.009m, trade.Amount);
-        }
-    }
-
-    [Theory]
-    [InlineData(RebalanceMode.Center)]
-    [InlineData(RebalanceMode.Edge)]
-    public async Task ShouldCalculateTradesWithRebalanceModeWhenOverweight(RebalanceMode rebalanceMode)
-    {
-        // arrange
-        var mockLogger = new Mock<ILogger<TradeFactory>>();
-
-        var config = new YoloConfig
-        {
-            AssetPermissions = AssetPermissions.All,
-            BaseAsset = "USDC",
-            MaxLeverage = 2,
-            NominalCash = 10000,
-            TradeBuffer = 0.04m,
-            RebalanceMode = rebalanceMode
-        };
-        var tradeFactory = new TradeFactory(mockLogger.Object, config);
-
-        var (weights, positions, markets) = await DeserializeInputsAsync("./Data/json/006_EdgeRebalanceOverweight");
-
-        // act
-        var trades = tradeFactory.CalculateTrades(weights, positions, markets).ToArray();
-
-        // assert
-        Assert.NotNull(trades);
-        
-        // Current position: 0.04 BTC at $50,000 = $2,000
-        // Current weight = $2,000 / $10,000 = 0.20 = 20%
-        // Target weight = 0.10 = 10%
-        // Trade buffer = 0.04 = 4%
-        // Tolerance band = [6%, 14%]
-        // Current 20% is outside (above) the band, so we need to rebalance
-        
-        // For Center mode: rebalance to 10% (ideal weight)
-        //   Target position = 0.10 * 10000 / 50000 = 0.02 BTC
-        //   Trade size = 0.02 - 0.04 = -0.02 BTC (sell)
-        
-        // For Edge mode: rebalance to upper edge at 14%
-        //   Target position = 0.14 * 10000 / 50000 = 0.028 BTC
-        //   Trade size = 0.028 - 0.04 = -0.012 BTC (sell)
-        
-        Assert.Single(trades);
-        
-        var trade = trades[0];
-        Assert.Equal("BTC", trade.Symbol);
-        
-        if (rebalanceMode == RebalanceMode.Center)
-        {
-            // Should sell to reach center (10% weight = 0.02 BTC)
-            Assert.Equal(-0.02m, trade.Amount);
-        }
-        else // RebalanceMode.Edge
-        {
-            // Should sell to reach upper edge (14% weight = 0.028 BTC)
-            Assert.Equal(-0.012m, trade.Amount);
-        }
+        trade.Symbol.ShouldBe(expectedSymbol);
+        trade.Amount.ShouldBe(expectedTradeSize, tolerance);
     }
 
     private static
@@ -332,12 +338,10 @@ public class TradeFactoryTests
         }
     }
 
-    private static async
-        Task<(Dictionary<string, decimal>,
+    private static async Task<(Dictionary<string, decimal>,
             Dictionary<string, IReadOnlyList<Position>>,
             Dictionary<string, IReadOnlyList<MarketInfo>>)>
-        DeserializeInputsAsync(
-            string path)
+        DeserializeInputsAsync(string path)
     {
         var weights = await DeserializeAsync<Dictionary<string, decimal>>($"{path}/weights.json");
 
