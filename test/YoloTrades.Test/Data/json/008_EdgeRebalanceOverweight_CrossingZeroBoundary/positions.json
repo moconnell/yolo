@@ -1,0 +1,10 @@
+{
+  "DOGE": [
+    {
+      "AssetName": "DOGE",
+      "BaseAsset": "DOGE",
+      "AssetType": "Future",
+      "Amount": 13246
+    }
+  ]
+}

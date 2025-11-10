@@ -142,7 +142,7 @@ public class TradeFactory : ITradeFactory
                 var trades = CalcTrades(
                     token,
                     [.. projectedPositions.Values],
-                    constrainedTargetWeight,
+                    rebalanceTarget,
                     remainingDelta);
 
                 foreach (var (trade, remainingDeltaPostTrade) in trades)
@@ -169,11 +169,11 @@ public class TradeFactory : ITradeFactory
     private IEnumerable<(Trade trade, decimal remainingDelta)> CalcTrades(
         string token,
         IReadOnlyList<ProjectedPosition> projectedPositions,
-        decimal bufferedTargetWeight,
+        decimal rebalanceTarget,
         decimal remainingDelta)
     {
-        var startingWeight = bufferedTargetWeight - remainingDelta;
-        var crossingZeroWeightBoundary = startingWeight != 0 && bufferedTargetWeight / startingWeight < 0;
+        var startingWeight = rebalanceTarget - remainingDelta;
+        var crossingZeroWeightBoundary = startingWeight != 0 && rebalanceTarget / startingWeight < 0;
 
         var marketPositions = projectedPositions.Count(HasPosition) switch
         {
@@ -258,12 +258,13 @@ public class TradeFactory : ITradeFactory
                 var spread = market.Ask!.Value - market.Bid!.Value;
                 var rawLimitPrice = market.Bid!.Value + spread * factor;
                 var limitPriceSteps = rawLimitPrice / market.PriceStep;
-                return limitPriceSteps is null
+                var limitPrice = limitPriceSteps is null
                     ? null
                     : (isBuy
                           ? Math.Floor(limitPriceSteps.Value)
                           : Math.Ceiling(limitPriceSteps.Value)) *
                       market.PriceStep;
+                return limitPrice;
             }
         }
 
@@ -285,13 +286,11 @@ public class TradeFactory : ITradeFactory
         return isBuy ? LogNull(market.Ask, _logger.NoAsk) : LogNull(market.Bid, _logger.NoBid);
     }
 
-    private static decimal CalculateEdgeTarget(decimal currentWeight, decimal idealWeight, decimal tradeBuffer)
-    {
+    private static decimal CalculateEdgeTarget(decimal currentWeight, decimal idealWeight, decimal tradeBuffer) =>
         // Calculate the nearest edge of the tolerance band
         // If current weight is above ideal, rebalance to upper edge: idealWeight + tradeBuffer
         // If current weight is below ideal, rebalance to lower edge: idealWeight - tradeBuffer
-        return currentWeight > idealWeight
+        currentWeight > idealWeight
             ? idealWeight + tradeBuffer
             : idealWeight - tradeBuffer;
-    }
 }

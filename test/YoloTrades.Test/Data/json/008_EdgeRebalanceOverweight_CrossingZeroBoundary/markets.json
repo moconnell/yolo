@@ -1,0 +1,21 @@
+{
+  "DOGE": [
+    {
+      "Name": "DOGE",
+      "BaseAsset": "DOGE",
+      "QuoteAsset": "USDC",
+      "AssetType": 1,
+      "TimeStamp": "2025-11-10T18:27:05.935997Z",
+      "PriceStep": 0.00001,
+      "QuantityStep": 1,
+      "MinProvideSize": 60,
+      "Ask": 0.17977,
+      "Bid": 0.17976,
+      "Last": null,
+      "Mid": 0.176765,
+      "Expiry": null,
+      "Key": "DOGE-Future",
+      "Spread": 0.00001
+    }
+  ]
+}

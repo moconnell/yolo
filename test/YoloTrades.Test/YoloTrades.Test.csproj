@@ -10,6 +10,7 @@
     <PackageReference Include="CsvHelper" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Moq" />
+    <PackageReference Include="Shouldly" />
     <PackageReference Include="Snapshooter.Xunit" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio">
@@ -23,6 +24,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\YoloTrades\YoloTrades.csproj" />
+    <ProjectReference Include="..\YoloTest.Util\YoloTest.Util.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" />
@@ -105,6 +107,24 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="Data\json\006_EdgeRebalanceOverweight\weights.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Data\json\007_EdgeRebalanceOverweight_CrossingZeroBoundary\markets.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Data\json\007_EdgeRebalanceOverweight_CrossingZeroBoundary\positions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Data\json\007_EdgeRebalanceOverweight_CrossingZeroBoundary\weights.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Data\json\008_EdgeRebalanceOverweight_CrossingZeroBoundary\markets.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Data\json\008_EdgeRebalanceOverweight_CrossingZeroBoundary\positions.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Data\json\008_EdgeRebalanceOverweight_CrossingZeroBoundary\weights.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
