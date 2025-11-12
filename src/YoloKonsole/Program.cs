@@ -32,6 +32,9 @@ internal class Program
     [Argument('s', "silent", "Silent running: no challenge will be issued before placing trades")]
     internal static bool Silent { get; set; }
 
+    [Argument('k', "kill-orders", "Kill (cancel) any open orders instead of quitting")]
+    internal static bool KillOrders { get; set; }
+
     private static async Task<int> Main(string[] args)
     {
 #if DEBUG
@@ -92,18 +95,46 @@ __  ______  __    ____  __
 
             if (orders.Count != 0)
             {
-                _logger.OpenOrders(orders.Values);
-
-                if (!Silent)
+                if (KillOrders)
                 {
-                    Console.WriteLine("Open orders!");
-                    Console.WriteLine();
-                    foreach (var order in orders.Values)
-                        Console.WriteLine(
-                            $"{order.Symbol}:\t{ToSide(order.Amount)} {Math.Abs(order.Amount)} at {order.LimitPrice}");
-                }
+                    _logger.CancelledOrders(orders.Values);
 
-                return OpenOrders;
+                    if (!Silent)
+                    {
+                        Console.WriteLine("Cancelling open orders...");
+                        Console.WriteLine();
+                        foreach (var order in orders.Values)
+                            Console.WriteLine(
+                                $"{order.Symbol}:\t{ToSide(order.Amount)} {Math.Abs(order.Amount)} at {order.LimitPrice}");
+                        Console.WriteLine();
+                    }
+
+                    foreach (var order in orders.Values)
+                    {
+                        await broker.CancelOrderAsync(order, cancellationToken);
+                    }
+
+                    if (!Silent)
+                    {
+                        Console.WriteLine("All open orders cancelled. Proceeding with rebalance...");
+                        Console.WriteLine();
+                    }
+                }
+                else
+                {
+                    _logger.OpenOrders(orders.Values);
+
+                    if (!Silent)
+                    {
+                        Console.WriteLine("Open orders!");
+                        Console.WriteLine();
+                        foreach (var order in orders.Values)
+                            Console.WriteLine(
+                                $"{order.Symbol}:\t{ToSide(order.Amount)} {Math.Abs(order.Amount)} at {order.LimitPrice}");
+                    }
+
+                    return OpenOrders;
+                }
             }
 
             var positions = await broker.GetPositionsAsync(cancellationToken);
