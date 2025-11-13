@@ -271,3 +271,8 @@ appsettings.*.json
 
 # secrets directory
 secrets/
+
+# coverage results
+coverage/
+coverage-results/
+*.lcov
