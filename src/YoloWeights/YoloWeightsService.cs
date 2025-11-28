@@ -43,11 +43,11 @@ public class YoloWeightsService : ICalcWeights
         _logger.LogInformation("Factors (normalised):\n{Factors}", normalizedFactors);
 
         var weights = normalizedFactors.ApplyWeights(_factorWeights, _maxWeightingAbs);
-        _logger.LogInformation("weights:\n{Weights}", weights);
 
         var weightsDict = weights.Rows.ToDictionary(
             r => (string) r["Ticker"],
             r => Convert.ToDecimal((double) r["Weight"]));
+        _logger.LogInformation("Weights:\n{Weights}", weightsDict);
 
         return weightsDict;
     }
