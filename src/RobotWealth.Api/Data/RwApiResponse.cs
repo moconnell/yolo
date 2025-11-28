@@ -13,5 +13,5 @@ public record RwApiResponse<T> : IApiResponse<T>
     public required long LastUpdated { get; init; }
 
     [JsonPropertyName("success")]
-    public required string Success { get; init; }
+    public required bool Success { get; init; }
 }
