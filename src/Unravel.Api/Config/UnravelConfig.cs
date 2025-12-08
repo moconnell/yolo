@@ -1,3 +1,4 @@
+using YoloAbstractions;
 using YoloAbstractions.Config;
 
 namespace Unravel.Api.Config;
@@ -6,7 +7,7 @@ public record UnravelConfig : ApiConfig
 {
     public string DateFormat { get; init; } = "yyyy-MM-dd";
 
-    public FactorConfig[] Factors { get; init; } = [];
+    public FactorType[] Factors { get; init; } = [];
 
     public UnravelExchange Exchange { get; init; } = UnravelExchange.Hyperliquid;
 

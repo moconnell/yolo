@@ -11,4 +11,5 @@ public enum FactorType
     RelativeIlliquidity,
     RetailFlow,
     SupplyVelocity,
+    TrendLongonlyAdaptive,
 }
