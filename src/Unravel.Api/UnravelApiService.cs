@@ -10,6 +10,16 @@ namespace Unravel.Api;
 public class UnravelApiService : IUnravelApiService
 {
     private const string ApiKeyHeader = "X-API-KEY";
+    private static readonly Dictionary<FactorType, string> FactorTypeToStringMap = new()
+    {
+        { FactorType.Carry, "carry_enhanced" },
+        { FactorType.Momentum, "momentum_enhanced" },
+        { FactorType.OpenInterestDivergence, "open_interest_divergence" },
+        { FactorType.RelativeIlliquidity, "relative_illiquidity" },
+        { FactorType.RetailFlow, "retail_flow" },
+        { FactorType.SupplyVelocity, "supply_velocity" },
+        { FactorType.TrendLongonlyAdaptive, "trend_longonly_adaptive" },
+    };
 
     private readonly HttpClient _httpClient;
     private readonly UnravelConfig _config;
@@ -47,16 +57,18 @@ public class UnravelApiService : IUnravelApiService
         var tickersCsv = Uri.EscapeDataString(tickerList.ToCsv());
         var results = new List<FactorDataFrame>();
 
-        foreach (var fc in _config.Factors)
+        foreach (var fac in _config.Factors)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var url = string.Format(baseUrl, fc.Id, tickersCsv);
+            if (!FactorTypeToStringMap.TryGetValue(fac, out var factorTypeString))
+                throw new InvalidOperationException($"Factor type {fac} is not supported.");
+            var url = string.Format(baseUrl, factorTypeString, tickersCsv);
             var response = await _httpClient.GetAsync<FactorsLiveResponse, double>(url, _headers, cancellationToken);
 
             if (response.Tickers.SequenceEqual(tickerList, StringComparer.OrdinalIgnoreCase))
             {
-                var dataFrame = FactorDataFrame.NewFrom(response.Tickers, response.TimeStamp, (fc.Type, response.Data));
+                var dataFrame = FactorDataFrame.NewFrom(response.Tickers, response.TimeStamp, (fac, response.Data));
                 results.Add(dataFrame);
                 continue;
             }
@@ -66,7 +78,7 @@ public class UnravelApiService : IUnravelApiService
             {
                 if (throwOnMissingValue)
                     throw new ApiException(
-                        $"Not all requested tickers were returned for {fc}: {string.Join(", ", missingTickers)}");
+                        $"Not all requested tickers were returned for {fac}: {string.Join(", ", missingTickers)}");
 
                 var values = new List<double>(response.Data);
                 foreach (var missingTicker in missingTickers)
@@ -75,14 +87,14 @@ public class UnravelApiService : IUnravelApiService
                     values.Insert(insertIndex, double.NaN);
                 }
 
-                var dataFrame = FactorDataFrame.NewFrom(tickerList, response.TimeStamp, (fc.Type, values));
+                var dataFrame = FactorDataFrame.NewFrom(tickerList, response.TimeStamp, (fac, values));
                 results.Add(dataFrame);
             }
             else
             {
                 var unexpectedTickers = response.Tickers.Except(tickerList).ToArray();
                 throw new ApiException(
-                    $"Unravel API returned unexpected tickers for factor {fc.Type}: {unexpectedTickers.ToCsv()}");
+                    $"Unravel API returned unexpected tickers for factor {fac}: {unexpectedTickers.ToCsv()}");
             }
         }
 

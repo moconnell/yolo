@@ -13,7 +13,7 @@ namespace Unravel.Api.Test;
 
 public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
 {
-    private const string RetailFlow = "retail-flow";
+    private const string RetailFlow = "retail_flow";
 
     [Fact]
     public async Task GivenGoodConfig_WhenMocked_ShouldReturnFactors()
@@ -26,7 +26,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         var config = new UnravelConfig
         {
             ApiBaseUrl = "http://foo.org/api",
-            Factors = [new FactorConfig { Id = RetailFlow, Type = FactorType.RetailFlow }],
+            Factors = [FactorType.RetailFlow],
             UrlPathFactorsLive = "/factors?id={0}&tickers={1}"
         };
         handler.SetupRequest(
@@ -84,6 +84,67 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         result.Tickers.ShouldBe([]);
     }
 
+    [Theory]
+    [InlineData(FactorType.Unknown, true)]
+    [InlineData((FactorType)999, true)]
+    [InlineData(FactorType.RetailFlow, false)]
+    public async Task GivenInvalidFactorType_WhenMocked_ShouldThrow(FactorType factorType, bool shouldThrow = false)
+    {
+        // arrange
+        const string btc = "BTC";
+
+        var config = new UnravelConfig
+        {
+            ApiBaseUrl = "http://foo.org/api",
+            Factors = [factorType],
+            UrlPathFactorsLive = "/factors?id={0}&tickers={1}"
+        };
+        var handler = new Mock<HttpMessageHandler>();
+        var httpClient = handler.CreateClient();
+        if (!shouldThrow)
+        {
+            handler.SetupRequest(
+                    HttpMethod.Get,
+                    $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, RetailFlow, btc)}")
+                .ReturnsAsync(
+                    new HttpResponseMessage
+                    {
+                        Content = new StringContent(
+                            """
+                        {
+                            "data": [
+                                0.25
+                            ],
+                            "index": "2023-06-30",
+                            "columns": [
+                                "BTC"
+                            ]
+                        }
+                        """),
+                        StatusCode = HttpStatusCode.OK
+                    });
+        }
+        var svc = new UnravelApiService(httpClient, config);
+
+        if (shouldThrow)
+        {
+            // act & assert
+            await Should.ThrowAsync<InvalidOperationException>(async () =>
+                await svc.GetFactorsLiveAsync([btc]));
+            return;
+        }
+
+        // act
+        var result = await svc.GetFactorsLiveAsync([btc]);
+
+        outputHelper.WriteLine(result.ToString());
+
+        // assert
+        result.ShouldNotBeNull();
+        result.FactorTypes.ShouldBe([factorType]);
+        result.Tickers.ShouldBe([btc]);
+    }
+
     [Fact]
     [Trait("Category", "Integration")]
     public async Task GivenGoodConfig_WhenLiveData_ShouldReturnFactors()
@@ -108,16 +169,21 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         // act
         var result = await svc.GetFactorsLiveAsync(tickers, cancellationToken: cancellationTokenSource.Token);
 
+        outputHelper.WriteLine(string.Empty);
         outputHelper.WriteLine(result.ToString());
 
         // assert
         result.ShouldNotBeNull();
-        result.FactorTypes.ShouldBe([FactorType.RetailFlow, FactorType.Carry]);
+        result.FactorTypes.ShouldBe(unravelConfig.Factors);
         result.Tickers.Count.ShouldBe(tickers.Length);
         result.Tickers.Except(tickers).ShouldBe([]);
-        tickers.All(ticker => result[FactorType.RetailFlow, ticker] != 0).ShouldBe(true);
         result[FactorType.RetailFlow, "MNT"].ShouldBe(double.NaN);
-        tickers.All(ticker => result[FactorType.Carry, ticker] != 0).ShouldBe(true);
+        foreach (var factor in unravelConfig.Factors)
+        {
+            if (factor == FactorType.TrendLongonlyAdaptive)
+                continue; // can be zero
+            tickers.All(ticker => result[factor, ticker] != 0).ShouldBe(true);
+        }
     }
 
     [Fact]
@@ -190,7 +256,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         var config = new UnravelConfig
         {
             ApiBaseUrl = "http://foo.org/api",
-            Factors = [new FactorConfig { Id = RetailFlow, Type = FactorType.RetailFlow }],
+            Factors = [FactorType.RetailFlow],
             UniverseSize = 10
         };
 
@@ -239,7 +305,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         var config = new UnravelConfig
         {
             ApiBaseUrl = "http://foo.org/api",
-            Factors = [new FactorConfig { Id = RetailFlow, Type = FactorType.RetailFlow }],
+            Factors = [FactorType.RetailFlow],
             UrlPathFactorsLive = "/factors?id={0}&tickers={1}"
         };
 
@@ -286,7 +352,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         var config = new UnravelConfig
         {
             ApiBaseUrl = "http://foo.org/api",
-            Factors = [new FactorConfig { Id = RetailFlow, Type = FactorType.RetailFlow }],
+            Factors = [FactorType.RetailFlow],
             UrlPathFactorsLive = "/factors?id={0}&tickers={1}"
         };
 
@@ -330,7 +396,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         var config = new UnravelConfig
         {
             ApiBaseUrl = "http://foo.org/api",
-            Factors = [new FactorConfig { Id = RetailFlow, Type = FactorType.RetailFlow }],
+            Factors = [FactorType.RetailFlow],
             UrlPathFactorsLive = "/factors?id={0}&tickers={1}"
         };
 
@@ -379,7 +445,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         var config = new UnravelConfig
         {
             ApiBaseUrl = "http://foo.org/api",
-            Factors = [new FactorConfig { Id = RetailFlow, Type = FactorType.RetailFlow }],
+            Factors = [FactorType.RetailFlow],
             UrlPathFactorsLive = "/factors?id={0}&tickers={1}"
         };
 
@@ -422,7 +488,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         var config = new UnravelConfig
         {
             ApiBaseUrl = "http://foo.org/api",
-            Factors = [new FactorConfig { Id = RetailFlow, Type = FactorType.RetailFlow }],
+            Factors = [FactorType.RetailFlow],
             UrlPathFactorsLive = "/factors?id={0}&tickers={1}"
         };
 
@@ -469,7 +535,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         var config = new UnravelConfig
         {
             ApiBaseUrl = "http://foo.org/api",
-            Factors = [new FactorConfig { Id = RetailFlow, Type = FactorType.RetailFlow }],
+            Factors = [FactorType.RetailFlow],
             UrlPathFactorsLive = "/factors?id={0}&tickers={1}"
         };
 
@@ -489,7 +555,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         var config = new UnravelConfig
         {
             ApiBaseUrl = "http://foo.org/api",
-            Factors = [new FactorConfig { Id = RetailFlow, Type = FactorType.RetailFlow }],
+            Factors = [FactorType.RetailFlow],
             UrlPathFactorsLive = "/factors?id={0}&tickers={1}"
         };
 
@@ -509,7 +575,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         var config = new UnravelConfig
         {
             ApiBaseUrl = "http://foo.org/api",
-            Factors = [new FactorConfig { Id = RetailFlow, Type = FactorType.RetailFlow }],
+            Factors = [FactorType.RetailFlow],
             UrlPathFactorsLive = "/factors?id={0}&tickers={1}"
         };
 
@@ -553,7 +619,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         var config = new UnravelConfig
         {
             ApiBaseUrl = "http://foo.org/api",
-            Factors = [new FactorConfig { Id = RetailFlow, Type = FactorType.RetailFlow }],
+            Factors = [FactorType.RetailFlow],
             UrlPathFactorsLive = "/factors?id={0}&tickers={1}"
         };
 
