@@ -84,6 +84,67 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         result.Tickers.ShouldBe([]);
     }
 
+    [Theory]
+    [InlineData(FactorType.Unknown, true)]
+    [InlineData((FactorType)999, true)]
+    [InlineData(FactorType.RetailFlow, false)]
+    public async Task GivenInvalidFactorType_WhenMocked_ShouldThrow(FactorType factorType, bool shouldThrow = false)
+    {
+        // arrange
+        const string btc = "BTC";
+
+        var config = new UnravelConfig
+        {
+            ApiBaseUrl = "http://foo.org/api",
+            Factors = [factorType],
+            UrlPathFactorsLive = "/factors?id={0}&tickers={1}"
+        };
+        var handler = new Mock<HttpMessageHandler>();
+        var httpClient = handler.CreateClient();
+        if (!shouldThrow)
+        {
+            handler.SetupRequest(
+                    HttpMethod.Get,
+                    $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, RetailFlow, btc)}")
+                .ReturnsAsync(
+                    new HttpResponseMessage
+                    {
+                        Content = new StringContent(
+                            """
+                        {
+                            "data": [
+                                0.25
+                            ],
+                            "index": "2023-06-30",
+                            "columns": [
+                                "BTC"
+                            ]
+                        }
+                        """),
+                        StatusCode = HttpStatusCode.OK
+                    });
+        }
+        var svc = new UnravelApiService(httpClient, config);
+
+        if (shouldThrow)
+        {
+            // act & assert
+            await Should.ThrowAsync<InvalidOperationException>(async () =>
+                await svc.GetFactorsLiveAsync([btc]));
+            return;
+        }
+
+        // act
+        var result = await svc.GetFactorsLiveAsync([btc]);
+
+        outputHelper.WriteLine(result.ToString());
+
+        // assert
+        result.ShouldNotBeNull();
+        result.FactorTypes.ShouldBe([factorType]);
+        result.Tickers.ShouldBe([btc]);
+    }
+
     [Fact]
     [Trait("Category", "Integration")]
     public async Task GivenGoodConfig_WhenLiveData_ShouldReturnFactors()

@@ -28,7 +28,7 @@ public class UnravelApiService : IUnravelApiService
     public UnravelApiService(HttpClient httpClient, UnravelConfig config)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-        _config = config ?? throw new ArgumentNullException(nameof(config));        
+        _config = config ?? throw new ArgumentNullException(nameof(config));
         _headers = new Dictionary<string, string>
         {
             { ApiKeyHeader, _config.ApiKey }
@@ -61,7 +61,8 @@ public class UnravelApiService : IUnravelApiService
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var factorTypeString = FactorTypeToStringMap[fac];
+            if (!FactorTypeToStringMap.TryGetValue(fac, out var factorTypeString))
+                throw new InvalidOperationException($"Factor type {fac} is not supported.");
             var url = string.Format(baseUrl, factorTypeString, tickersCsv);
             var response = await _httpClient.GetAsync<FactorsLiveResponse, double>(url, _headers, cancellationToken);
 
