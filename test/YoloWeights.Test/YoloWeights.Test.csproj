@@ -1,9 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net9.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
         <IsPackable>false</IsPackable>
     </PropertyGroup>
 
@@ -17,13 +14,13 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Using Include="Xunit"/>
+        <Using Include="Xunit" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\src\YoloAbstractions\YoloAbstractions.csproj" />
-      <ProjectReference Include="..\..\src\YoloWeights\YoloWeights.csproj" />
-      <ProjectReference Include="..\YoloTest.Util\YoloTest.Util.csproj" />
+        <ProjectReference Include="..\..\src\YoloAbstractions\YoloAbstractions.csproj" />
+        <ProjectReference Include="..\..\src\YoloWeights\YoloWeights.csproj" />
+        <ProjectReference Include="..\YoloTest.Util\YoloTest.Util.csproj" />
     </ItemGroup>
 
 </Project>
