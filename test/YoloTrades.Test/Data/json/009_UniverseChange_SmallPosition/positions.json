@@ -1,0 +1,26 @@
+{
+  "BTC": [
+    {
+      "AssetName": "BTC",
+      "BaseAsset": "BTC",
+      "AssetType": "Future",
+      "Amount": 0.009
+    }
+  ],
+  "ETH": [
+    {
+      "AssetName": "ETH",
+      "BaseAsset": "ETH",
+      "AssetType": "Future",
+      "Amount": 0.35
+    }
+  ],
+  "MNT": [
+    {
+      "AssetName": "MNT",
+      "BaseAsset": "MNT",
+      "AssetType": "Future",
+      "Amount": 50.0
+    }
+  ]
+}

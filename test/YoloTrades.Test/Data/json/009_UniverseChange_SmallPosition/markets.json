@@ -1,0 +1,78 @@
+{
+  "BTC": [
+    {
+      "Name": "BTC",
+      "BaseAsset": "BTC",
+      "QuoteAsset": "USDC",
+      "AssetType": 1,
+      "TimeStamp": "2025-12-10T08:00:00Z",
+      "PriceStep": 1,
+      "QuantityStep": 0.00001,
+      "MinProvideSize": 0.0001,
+      "Ask": 100000.0,
+      "Bid": 99999.0,
+      "Last": null,
+      "Mid": 99999.5,
+      "Expiry": null,
+      "Key": "BTC-Future",
+      "Spread": 1.0
+    }
+  ],
+  "ETH": [
+    {
+      "Name": "ETH",
+      "BaseAsset": "ETH",
+      "QuoteAsset": "USDC",
+      "AssetType": 1,
+      "TimeStamp": "2025-12-10T08:00:00Z",
+      "PriceStep": 0.1,
+      "QuantityStep": 0.0001,
+      "MinProvideSize": 0.0024,
+      "Ask": 4000.0,
+      "Bid": 3999.9,
+      "Last": null,
+      "Mid": 3999.95,
+      "Expiry": null,
+      "Key": "ETH-Future",
+      "Spread": 0.1
+    }
+  ],
+  "MNT": [
+    {
+      "Name": "MNT",
+      "BaseAsset": "MNT",
+      "QuoteAsset": "USDC",
+      "AssetType": 1,
+      "TimeStamp": "2025-12-10T08:00:00Z",
+      "PriceStep": 0.0001,
+      "QuantityStep": 0.1,
+      "MinProvideSize": 5.0,
+      "Ask": 1.20,
+      "Bid": 1.19,
+      "Last": null,
+      "Mid": 1.195,
+      "Expiry": null,
+      "Key": "MNT-Future",
+      "Spread": 0.01
+    }
+  ],
+  "WLFI": [
+    {
+      "Name": "WLFI",
+      "BaseAsset": "WLFI",
+      "QuoteAsset": "USDC",
+      "AssetType": 1,
+      "TimeStamp": "2025-12-10T08:00:00Z",
+      "PriceStep": 0.01,
+      "QuantityStep": 0.1,
+      "MinProvideSize": 1.0,
+      "Ask": 25.50,
+      "Bid": 25.49,
+      "Last": null,
+      "Mid": 25.495,
+      "Expiry": null,
+      "Key": "WLFI-Future",
+      "Spread": 0.01
+    }
+  ]
+}
