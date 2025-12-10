@@ -1,8 +1,5 @@
-using System;
-using System.Linq;
 using MathNet.Numerics.LinearAlgebra;
 using Shouldly;
-using Xunit;
 using Xunit.Abstractions;
 using YoloAbstractions.Extensions;
 

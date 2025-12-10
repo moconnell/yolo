@@ -1,9 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net9.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
         <IsPackable>false</IsPackable>
         <AssemblyName>RobotWealth.Api.Test</AssemblyName>
         <RootNamespace>RobotWealth.Api.Test</RootNamespace>
@@ -14,27 +11,26 @@
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
-        <PackageReference Include="Microsoft.Extensions.Configuration"/>
-        <PackageReference Include="Microsoft.Extensions.Configuration.Json"/>
-        <PackageReference Include="Microsoft.NET.Test.Sdk"/>
-        <PackageReference Include="Moq"/>
-        <PackageReference Include="Moq.Contrib.HttpClient"/>
-        <PackageReference Include="Shouldly"/>
-        <PackageReference Include="xunit"/>
-        <PackageReference Include="xunit.runner.visualstudio"/>
+        <PackageReference Include="Microsoft.Extensions.Configuration" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" />
+        <PackageReference Include="Moq" />
+        <PackageReference Include="Moq.Contrib.HttpClient" />
+        <PackageReference Include="Newtonsoft.Json" />
+        <PackageReference Include="Shouldly" />
+        <PackageReference Include="xunit" />
+        <PackageReference Include="xunit.runner.visualstudio" />
     </ItemGroup>
 
     <ItemGroup>
-        <Using Include="Xunit"/>
+        <Using Include="Xunit" />
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\RobotWealth.Api\RobotWealth.Api.csproj"/>
+        <ProjectReference Include="..\..\src\RobotWealth.Api\RobotWealth.Api.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Newtonsoft.Json" />
-      <PackageReference Include="System.Text.Json" />
         <None Update="Data\volatilities.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>

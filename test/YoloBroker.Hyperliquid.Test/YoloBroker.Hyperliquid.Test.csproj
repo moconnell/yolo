@@ -1,8 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFramework>net9.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
         <IsPackable>false</IsPackable>
     </PropertyGroup>
     <ItemGroup>
@@ -10,22 +7,22 @@
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
-        <PackageReference Include="Microsoft.Extensions.Configuration.Json"/>
-        <PackageReference Include="Microsoft.NET.Test.Sdk"/>
-        <PackageReference Include="Moq"/>
-        <PackageReference Include="Shouldly"/>
-        <PackageReference Include="xunit"/>
+        <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" />
+        <PackageReference Include="Moq" />
+        <PackageReference Include="Shouldly" />
+        <PackageReference Include="xunit" />
         <PackageReference Include="xunit.runner.visualstudio">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
     </ItemGroup>
     <ItemGroup>
-        <Using Include="Xunit"/>
+        <Using Include="Xunit" />
     </ItemGroup>
     <ItemGroup>
-        <ProjectReference Include="..\..\src\YoloBroker.Hyperliquid\YoloBroker.Hyperliquid.csproj"/>
-        <ProjectReference Include="..\YoloTest.Util\YoloTest.Util.csproj"/>
+        <ProjectReference Include="..\..\src\YoloBroker.Hyperliquid\YoloBroker.Hyperliquid.csproj" />
+        <ProjectReference Include="..\YoloTest.Util\YoloTest.Util.csproj" />
     </ItemGroup>
     <ItemGroup>
         <None Update="appsettings.json">

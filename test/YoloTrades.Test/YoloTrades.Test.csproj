@@ -1,7 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <AssemblyName>YoloTrades.Test</AssemblyName>
     <RootNamespace>YoloTrades.Test</RootNamespace>
@@ -27,7 +25,6 @@
     <ProjectReference Include="..\YoloTest.Util\YoloTest.Util.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" />
     <None Update="Data\json\001\markets.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -127,5 +124,8 @@
     <None Update="Data\json\008_EdgeRebalanceOverweight_CrossingZeroBoundary\weights.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
   </ItemGroup>
 </Project>
