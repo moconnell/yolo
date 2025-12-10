@@ -244,6 +244,92 @@ public class TradeFactoryTests
         trade.Amount.ShouldBe(expectedTradeSize, tolerance);
     }
 
+    [Theory]
+    [InlineData("./Data/json/009_UniverseChange_SmallPosition", 0.04)]
+    [InlineData("./Data/json/009_UniverseChange_SmallPosition", 0.02)]
+    public async Task GivenUniverseChange_ShouldClosePositionRegardlessOfToleranceBand(
+        string path,
+        decimal tradeBuffer)
+    {
+        // arrange
+        var logger = _loggerFactory.CreateLogger<TradeFactory>();
+
+        var config = new YoloConfig
+        {
+            AssetPermissions = AssetPermissions.All,
+            BaseAsset = "USDC",
+            MaxLeverage = 2,
+            NominalCash = 10000,
+            TradeBuffer = tradeBuffer,
+            MinOrderValue = null // No minimum order value restriction
+        };
+        var tradeFactory = new TradeFactory(logger, config);
+
+        var (weights, positions, markets) = await DeserializeInputsAsync(path);
+
+        // Calculate what the position weight would be
+        // MNT position: 50 tokens at $1.195 = $59.75
+        // Current weight: $59.75 / $10000 = 0.005975 (~0.6%)
+        // This is well within typical trade buffers (2-4%)
+
+        // act
+        var trades = tradeFactory.CalculateTrades(weights, positions, markets).ToArray();
+
+        // assert
+        Assert.NotNull(trades);
+
+        // Should generate a trade to close the MNT position even though it's small
+        var mntTrade = trades.FirstOrDefault(t => t.Symbol == "MNT");
+        Assert.NotNull(mntTrade);
+        
+        // The trade should close the entire MNT position (sell 50 MNT)
+        mntTrade.Amount.ShouldBe(-50.0m, 0.1m);
+        mntTrade.OrderSide.ShouldBe(OrderSide.Sell);
+    }
+
+    [Theory]
+    [InlineData("./Data/json/010_UniverseChange_BelowMinOrderValue", 10.0)]
+    public async Task GivenUniverseChange_ShouldClosePositionEvenWhenBelowMinOrderValue(
+        string path,
+        decimal minOrderValue)
+    {
+        // arrange
+        var logger = _loggerFactory.CreateLogger<TradeFactory>();
+
+        var config = new YoloConfig
+        {
+            AssetPermissions = AssetPermissions.All,
+            BaseAsset = "USDC",
+            MaxLeverage = 2,
+            NominalCash = 10000,
+            TradeBuffer = 0.04m,
+            MinOrderValue = minOrderValue // Set minimum order value
+        };
+        var tradeFactory = new TradeFactory(logger, config);
+
+        var (weights, positions, markets) = await DeserializeInputsAsync(path);
+
+        // Calculate what the position value is
+        // MNT position: 5 tokens at ~$1.19 = $5.95
+        // This is below the MinOrderValue of $10
+        // But since MNT dropped from universe, it should still be closed
+
+        // act
+        var trades = tradeFactory.CalculateTrades(weights, positions, markets).ToArray();
+
+        // assert
+        Assert.NotNull(trades);
+
+        // Should generate a trade to close MNT even though order value is below MinOrderValue
+        // because the token dropped from the universe
+        var mntTrade = trades.FirstOrDefault(t => t.Symbol == "MNT");
+        Assert.NotNull(mntTrade);
+        
+        // The trade should close the entire MNT position (sell 5 MNT)
+        mntTrade.Amount.ShouldBe(-5.0m, 0.1m);
+        mntTrade.OrderSide.ShouldBe(OrderSide.Sell);
+    }
+
     private static
         (Dictionary<string, decimal> weights,
         Dictionary<string, IReadOnlyList<Position>> positions,

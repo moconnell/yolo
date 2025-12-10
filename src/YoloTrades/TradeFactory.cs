@@ -147,7 +147,9 @@ public class TradeFactory : ITradeFactory
                     var currentProjectedPosition = projectedPositions[trade.Symbol];
                     var newProjectedPosition = currentProjectedPosition + trade;
                     projectedPositions[trade.Symbol] = newProjectedPosition;
-                    if (trade.IsTradable(MinOrderValue))
+                    // For tokens that dropped out of the universe, bypass MinOrderValue check
+                    var minOrderValueForCheck = isInUniverse ? MinOrderValue : null;
+                    if (trade.IsTradable(minOrderValueForCheck))
                         yield return trade;
                     else
                         _logger.DeltaTooSmall(token, remainingDelta);
