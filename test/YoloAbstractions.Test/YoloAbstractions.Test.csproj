@@ -19,4 +19,7 @@
     <ItemGroup>
         <ProjectReference Include="..\..\src\YoloAbstractions\YoloAbstractions.csproj" />
     </ItemGroup>
+    <ItemGroup>
+        <Using Include="Xunit" />
+    </ItemGroup>
 </Project>

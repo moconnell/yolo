@@ -1,9 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.Data.Analysis;
 using Shouldly;
-using Xunit;
 using static YoloAbstractions.FactorType;
 
 namespace YoloAbstractions.Test;
@@ -261,8 +257,8 @@ public class FactorDataFrameTest
 
         // assert
         result.ShouldNotBeNull();
-        ((StringDataFrameColumn) result["Ticker"]).ToArray().ShouldBe(tickers);
-        var calculatedWeights = ((DoubleDataFrameColumn) result["Weight"]).Cast<double>().ToArray();
+        ((StringDataFrameColumn)result["Ticker"]).ToArray().ShouldBe(tickers);
+        var calculatedWeights = ((DoubleDataFrameColumn)result["Weight"]).Cast<double>().ToArray();
         const double tolerance = 0.0000001;
         for (var i = 0; i < calculatedWeights.Length; i++)
         {
@@ -596,7 +592,7 @@ public class FactorDataFrameTest
 
         // assert
         result.ShouldNotBeNull();
-        var resultWeights = ((DoubleDataFrameColumn) result["Weight"]).ToArray();
+        var resultWeights = ((DoubleDataFrameColumn)result["Weight"]).ToArray();
 
         // MNT should only use Carry factor (normalized by weight=1.0)
         resultWeights[2].ShouldBe(0.05);
@@ -625,7 +621,7 @@ public class FactorDataFrameTest
         var result = factorDataFrame.ApplyWeights(weights);
 
         // assert
-        var resultWeights = ((DoubleDataFrameColumn) result["Weight"]).ToArray();
+        var resultWeights = ((DoubleDataFrameColumn)result["Weight"]).ToArray();
         resultWeights[0].ShouldBe(0.0);
     }
 
@@ -656,7 +652,7 @@ public class FactorDataFrameTest
         var result = factorDataFrame.ApplyWeights(weights, volatilityScaling: true);
 
         // assert
-        var resultWeights = ((DoubleDataFrameColumn) result["Weight"]).ToArray();
+        var resultWeights = ((DoubleDataFrameColumn)result["Weight"]).ToArray();
         // BTC: 0.15 / 1.0 (zero vol replaced with 1.0)
         resultWeights[0].ShouldBe(0.15);
         // ETH: 0.10 / 0.5
@@ -723,6 +719,6 @@ public class FactorDataFrameTest
 
         // act & assert
         Should.Throw<ArgumentOutOfRangeException>(() =>
-            factorDataFrame.Normalize((NormalizationMethod) 999));
+            factorDataFrame.Normalize((NormalizationMethod)999));
     }
 }
