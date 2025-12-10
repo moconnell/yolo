@@ -1,0 +1,16 @@
+root = true
+
+# All files
+[*]
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Code files
+[*.{cs,csx,vb,vbx}]
+indent_size = 4
+charset = utf-8
+
+# Suppress IDE0005 (unnecessary using directive) as it produces false positives with implicit usings
+[*.cs]
+dotnet_diagnostic.IDE0005.severity = none

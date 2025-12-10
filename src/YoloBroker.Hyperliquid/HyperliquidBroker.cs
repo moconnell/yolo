@@ -358,11 +358,13 @@ public sealed class HyperliquidBroker : IYoloBroker
 
         void AddOrderTracker(TradeResult result)
         {
-            if (!result.Success || result.Order == null || result.Order.IsCompleted())
+            if (!result.Success || result.Order == null)
             {
                 return;
             }
 
+            // Track market orders even if already completed to handle websocket updates
+            // and properly update the UI
             var orderId = result.Order.Id;
             var order = result.Order;
             var trade = result.Trade;
@@ -439,6 +441,16 @@ public sealed class HyperliquidBroker : IYoloBroker
                                     var marketTradeResult = await PlaceTradeAsync(marketTrade, ct);
                                     if (marketTradeResult.Success)
                                     {
+                                        // Track the market order to handle websocket updates
+                                        if (marketTradeResult.Order != null)
+                                        {
+                                            var orderId = marketTradeResult.Order.Id;
+                                            if (orderTrackers.TryAdd(orderId, new OrderTracker(marketTradeResult.Order, marketTrade, DateTime.UtcNow)))
+                                            {
+                                                _logger.LogDebug("Added order tracker for order {OrderId} for {Symbol}", orderId, marketTradeResult.Order.Symbol);
+                                            }
+                                        }
+
                                         updateChannel.Writer.TryWrite(
                                             new OrderUpdate(
                                                 marketTrade.Symbol,

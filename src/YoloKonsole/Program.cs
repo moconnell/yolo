@@ -13,6 +13,7 @@ using YoloBroker.Interface;
 using YoloKonsole.Extensions;
 using YoloTrades;
 using static YoloKonsole.Constants.WellKnown.TradeEventIds;
+using System.Diagnostics;
 
 namespace YoloKonsole;
 
@@ -43,10 +44,10 @@ internal class Program
             @"
 __  ______  __    ____  __
 \ \/ / __ \/ /   / __ \/ /
- \  / / / / /   / / / / / 
- / / /_/ / /___/ /_/ /_/  
-/_/\____/_____/\____(_)   
-                          
+ \  / / / / /   / / / / /
+ / / /_/ / /___/ /_/ /_/
+/_/\____/_____/\____(_)
+
 ");
 
         CancellationTokenSource source = new();
@@ -69,8 +70,12 @@ __  ______  __    ____  __
             var config = builder.Build();
 
             var serviceProvider = new ServiceCollection()
-                .AddLogging(loggingBuilder => loggingBuilder
-                    .AddFile(config.GetSection("Logging:File")))
+                .AddLogging(loggingBuilder =>
+                {
+                    loggingBuilder.AddFile(config.GetSection("Logging:File"));
+                    if (Debugger.IsAttached)
+                        loggingBuilder.AddConsole();
+                })
                 .AddBroker(config)
                 .AddWeightsServices(config)
                 .AddSingleton<ITradeFactory, TradeFactory>()
