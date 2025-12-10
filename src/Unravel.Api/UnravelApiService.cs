@@ -64,11 +64,11 @@ public class UnravelApiService : IUnravelApiService
             if (!FactorTypeToStringMap.TryGetValue(fac, out var factorTypeString))
                 throw new InvalidOperationException($"Factor type {fac} is not supported.");
             var url = string.Format(baseUrl, factorTypeString, tickersCsv);
-            var response = await _httpClient.GetAsync<FactorsLiveResponse, double>(url, _headers, cancellationToken);
+            var response = await _httpClient.GetAsync<FactorsLiveResponse, double?>(url, _headers, cancellationToken);
 
             if (response.Tickers.SequenceEqual(tickerList, StringComparer.OrdinalIgnoreCase))
             {
-                var dataFrame = FactorDataFrame.NewFrom(response.Tickers, response.TimeStamp, (fac, response.Data));
+                var dataFrame = FactorDataFrame.NewFrom(response.Tickers, response.TimeStamp, (fac, response.Data.Select(d => d ?? double.NaN).ToArray()));
                 results.Add(dataFrame);
                 continue;
             }
@@ -80,7 +80,7 @@ public class UnravelApiService : IUnravelApiService
                     throw new ApiException(
                         $"Not all requested tickers were returned for {fac}: {string.Join(", ", missingTickers)}");
 
-                var values = new List<double>(response.Data);
+                var values = response.Data.Select(d => d ?? double.NaN).ToList();
                 foreach (var missingTicker in missingTickers)
                 {
                     var insertIndex = tickerList.IndexOf(missingTicker);

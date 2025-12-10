@@ -310,7 +310,6 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         };
 
         var requestedTickers = new[] { "ADA", "BTC", "ETH" };
-        var returnedTickers = new[] { "BTC", "ETH" }; // Missing ADA
         var tickersCsv = Uri.EscapeDataString(string.Join(",", requestedTickers));
 
         handler.SetupRequest(
@@ -324,9 +323,55 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
                         {
                             "data": [0.5, 0.7],
                             "index": "2023-06-30",
-                            "columns": ["BTC", "ETH"]
+                            "columns": ["BTC", "ETH"] 
                         }
-                        """),
+                        """), // Missing ADA
+                    StatusCode = HttpStatusCode.OK
+                });
+
+        var svc = new UnravelApiService(httpClient, config);
+
+        // act
+        var result = await svc.GetFactorsLiveAsync(requestedTickers, throwOnMissingValue: false);
+
+        // assert
+        result.ShouldNotBeNull();
+        result.Tickers.ShouldBe(requestedTickers);
+        result[FactorType.RetailFlow, "ADA"].ShouldBe(double.NaN);
+        result[FactorType.RetailFlow, "BTC"].ShouldBe(0.5, 0.000000001);
+        result[FactorType.RetailFlow, "ETH"].ShouldBe(0.7, 0.000000001);
+    }
+
+    [Fact]
+    public async Task GivenMissingValues_WhenThrowOnMissingValueFalse_ShouldPopulateNaN()
+    {
+        // arrange
+        var handler = new Mock<HttpMessageHandler>();
+        var httpClient = handler.CreateClient();
+        var config = new UnravelConfig
+        {
+            ApiBaseUrl = "http://foo.org/api",
+            Factors = [FactorType.RetailFlow],
+            UrlPathFactorsLive = "/factors?id={0}&tickers={1}"
+        };
+
+        var requestedTickers = new[] { "ADA", "BTC", "ETH" };
+        var tickersCsv = Uri.EscapeDataString(string.Join(",", requestedTickers));
+
+        handler.SetupRequest(
+                HttpMethod.Get,
+                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, RetailFlow, tickersCsv)}")
+            .ReturnsAsync(
+                new HttpResponseMessage
+                {
+                    Content = new StringContent(
+                        """
+                        {
+                            "data": [null, 0.5, 0.7],
+                            "index": "2023-06-30",
+                            "columns": ["ADA", "BTC", "ETH"] 
+                        }
+                        """), // Missing ADA
                     StatusCode = HttpStatusCode.OK
                 });
 
@@ -543,7 +588,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
 
         // act & assert
         await Should.ThrowAsync<ArgumentException>(async () =>
-            await svc.GetFactorsLiveAsync(Array.Empty<string>()));
+            await svc.GetFactorsLiveAsync([]));
     }
 
     [Fact]
@@ -562,8 +607,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         var svc = new UnravelApiService(httpClient, config);
 
         // act & assert
-        await Should.ThrowAsync<ArgumentException>(async () =>
-            await svc.GetFactorsLiveAsync(new[] { "  ", "\t", "" }));
+        await Should.ThrowAsync<ArgumentException>(async () => await svc.GetFactorsLiveAsync(["  ", "\t", ""]));
     }
 
     [Fact]

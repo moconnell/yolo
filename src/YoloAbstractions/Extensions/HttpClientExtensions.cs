@@ -38,13 +38,21 @@ public static class HttpClientExtensions
                 $"Could not fetch from API ({url}): {response.ReasonPhrase} ({response.StatusCode})");
         }
 
-        var apiResponse = await response.Content.ReadFromJsonAsync<TResponse>(cancellationToken: cancellationToken);
-
-        if (apiResponse is null || apiResponse.Data is null || apiResponse.Data.Count == 0)
+        try
         {
-            throw new ApiException($"No data returned from API ({url})");
-        }
+            var apiResponse = await response.Content.ReadFromJsonAsync<TResponse>(cancellationToken: cancellationToken);
 
-        return apiResponse;
+            if (apiResponse is null || apiResponse.Data is null || apiResponse.Data.Count == 0)
+            {
+                throw new ApiException($"No data returned from API ({url})");
+            }
+
+            return apiResponse;
+        }
+        catch (Exception ex) when (ex is not ApiException)
+        {
+            var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new ApiException($"Error deserializing API response from ({url}): {ex.Message}\r\n{responseContent}", ex);
+        }
     }
 }
