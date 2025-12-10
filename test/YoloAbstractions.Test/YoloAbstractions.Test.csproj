@@ -3,6 +3,7 @@
         <IsPackable>false</IsPackable>
     </PropertyGroup>
     <ItemGroup>
+        <PackageReference Include="Moq" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" />
         <PackageReference Include="Newtonsoft.Json" />
         <PackageReference Include="Shouldly" />
@@ -20,6 +21,7 @@
         <ProjectReference Include="..\..\src\YoloAbstractions\YoloAbstractions.csproj" />
     </ItemGroup>
     <ItemGroup>
+        <Using Include="Moq" />
         <Using Include="Xunit" />
     </ItemGroup>
 </Project>
