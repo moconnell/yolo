@@ -7,6 +7,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="HyperLiquid.Net" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
     <PackageReference Include="Nethereum.Signer.EIP712" />
     <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>
