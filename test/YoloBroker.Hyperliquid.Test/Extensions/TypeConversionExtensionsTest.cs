@@ -1,6 +1,5 @@
 using HyperLiquid.Net.Enums;
 using Shouldly;
-using Xunit;
 using YoloBroker.Hyperliquid.Extensions;
 
 namespace YoloBroker.Hyperliquid.Test.Extensions;

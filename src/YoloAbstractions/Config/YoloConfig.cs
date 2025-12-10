@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace YoloAbstractions.Config;
 
 public record YoloConfig

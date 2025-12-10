@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace YoloAbstractions.Extensions;
 
 public static partial class EnumerableExtensions

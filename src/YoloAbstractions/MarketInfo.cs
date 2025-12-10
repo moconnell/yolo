@@ -1,5 +1,3 @@
-using System;
-
 namespace YoloAbstractions;
 
 public record MarketInfo(
