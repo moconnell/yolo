@@ -43,7 +43,7 @@ There is a pre-built win64 console app in the releases section, which can be sch
 ## Requirements
 
 - Windows 10/11 x64
-- .NET 9 installation required
+- .NET 10 installation required
 - PowerShell 5.1+ (included with Windows)
 
 ## Troubleshooting
@@ -95,6 +95,7 @@ The default setting of `Center` will rebalance to the ideal calculated asset wei
 Setting this to `Edge` will rebalance to the nearest edge of the tolerance band instead. This can be optimal depending on broker fee structure, as price is theoretically nearly as likely to reverse away from the ideal weight as it is to continue.
 
 For example, with a target weight of 10% and a TradeBuffer of 4%:
+
 - The tolerance band is [6%, 14%]
 - If current weight is 2% (below the band):
   - `Center` mode: rebalance to 10% (ideal weight)
@@ -104,6 +105,7 @@ For example, with a target weight of 10% and a TradeBuffer of 4%:
   - `Edge` mode: rebalance to 14% (upper edge)
 
 Possible values:
+
 ```
 Center  (default)
 Edge

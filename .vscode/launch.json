@@ -28,7 +28,7 @@
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
-      "program": "${workspaceFolder}/src/YoloKonsole/bin/Debug/net9.0/YoloKonsole.dll",
+      "program": "${workspaceFolder}/src/YoloKonsole/bin/Debug/net10.0/YoloKonsole.dll",
       "args": [],
       "cwd": "${workspaceFolder}/src/YoloKonsole",
       "stopAtEntry": false,

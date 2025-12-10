@@ -1,5 +1,3 @@
-using System;
-
 namespace YoloAbstractions.Exceptions;
 
 public class ConfigException : ApplicationException

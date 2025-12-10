@@ -1,4 +1,3 @@
-using System;
 using CryptoExchange.Net.Objects;
 
 namespace YoloBroker.Hyperliquid.Extensions;

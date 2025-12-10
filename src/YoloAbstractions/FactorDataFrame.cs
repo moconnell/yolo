@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using MathNet.Numerics.LinearAlgebra;
 using Microsoft.Data.Analysis;
 using static YoloAbstractions.FactorType;
@@ -17,15 +14,15 @@ public sealed record FactorDataFrame
         _dataFrame = dataFrame;
         FactorTypes = factorTypes;
         var i = 0;
-        var tickerCol = (StringDataFrameColumn) dataFrame["Ticker"];
+        var tickerCol = (StringDataFrameColumn)dataFrame["Ticker"];
         var kvps = tickerCol.Select(x => KeyValuePair.Create(x, i++));
         _tickerIndex = new Dictionary<string, int>(kvps, StringComparer.OrdinalIgnoreCase);
     }
 
     public IReadOnlyList<FactorType> FactorTypes { get; init; }
 
-    public IReadOnlyList<string> Tickers => ((StringDataFrameColumn) _dataFrame["Ticker"]).ToArray();
-    
+    public IReadOnlyList<string> Tickers => ((StringDataFrameColumn)_dataFrame["Ticker"]).ToArray();
+
     public bool IsEmpty => _dataFrame.Rows.Count == 0 || FactorTypes.Count == 0 || Tickers.Count == 0;
 
     public static readonly FactorDataFrame Empty = NewFrom([], DateTime.MinValue);
@@ -68,7 +65,7 @@ public sealed record FactorDataFrame
                 return double.NaN;
             }
 
-            var val = (double?) _dataFrame[factorType.ToString()][index];
+            var val = (double?)_dataFrame[factorType.ToString()][index];
             return val ?? double.NaN;
         }
     }
@@ -87,7 +84,7 @@ public sealed record FactorDataFrame
 
             foreach (var factorType in FactorTypes)
             {
-                var col = (DoubleDataFrameColumn) _dataFrame[factorType.ToString()];
+                var col = (DoubleDataFrameColumn)_dataFrame[factorType.ToString()];
                 dict[factorType] = col[rowIndex] ?? double.NaN;
             }
 
@@ -137,7 +134,7 @@ public sealed record FactorDataFrame
         foreach (var factorType in FactorTypes.Except([Volatility]))
         {
             var colName = factorType.ToString();
-            var col = (DoubleDataFrameColumn) _dataFrame[colName];
+            var col = (DoubleDataFrameColumn)_dataFrame[colName];
 
             var normalizedCol = method switch
             {
@@ -160,7 +157,7 @@ public sealed record FactorDataFrame
         }
 
         var normalizedDf = new DataFrame(normalizedColumns);
-        return new FactorDataFrame(normalizedDf, [..FactorTypes]);
+        return new FactorDataFrame(normalizedDf, [.. FactorTypes]);
     }
 
     private static IEnumerable<double> NormalizeZScore(DoubleDataFrameColumn col)
@@ -242,7 +239,7 @@ public sealed record FactorDataFrame
             .Select(c => Enum.TryParse<FactorType>(c.Name, out var ft) && weights.TryGetValue(ft, out var w) ? w : 0d)
             .ToArray();
 
-        var rows = (int) _dataFrame.Rows.Count;
+        var rows = (int)_dataFrame.Rows.Count;
         var columns = factorCols.Length;
 
         var tickerWeightsVector = GetWeights();
@@ -326,7 +323,7 @@ public sealed record FactorDataFrame
 
         var sb = new System.Text.StringBuilder();
         var columns = _dataFrame.Columns.ToList();
-        var rowCount = (int) _dataFrame.Rows.Count;
+        var rowCount = (int)_dataFrame.Rows.Count;
 
         // Calculate column widths
         var columnWidths = new int[columns.Count];

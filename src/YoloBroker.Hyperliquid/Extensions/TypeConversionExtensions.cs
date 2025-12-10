@@ -1,4 +1,3 @@
-using System;
 using HyperLiquid.Net.Enums;
 
 namespace YoloBroker.Hyperliquid.Extensions;
