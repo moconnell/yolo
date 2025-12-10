@@ -13,8 +13,10 @@ internal static class TickerAliasUtil
         }
 
         var mockTickerAliasService = new Mock<ITickerAliasService>();
+#pragma warning disable CS8601 // Possible null reference assignment.
         mockTickerAliasService.Setup(x => x.TryGetAlias(It.IsAny<string>(), out It.Ref<string>.IsAny))
             .Returns(false);
+#pragma warning restore CS8601 // Possible null reference assignment.
         return mockTickerAliasService.Object;
     }
 }
