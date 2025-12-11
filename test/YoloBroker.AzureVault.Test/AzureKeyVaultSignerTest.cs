@@ -12,6 +12,7 @@ namespace YoloBroker.AzureVault.Test;
 public class AzureKeyVaultSignerTest(ITestOutputHelper output)
 {
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task GivenVaultUriAndKeyName_SignerRecoversAddress()
     {
         var configuration = new ConfigurationBuilder()

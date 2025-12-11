@@ -31,8 +31,6 @@ public sealed class AzureKeyVaultSigner
 
         if (key.KeyType != KeyType.Ec && key.KeyType != KeyType.EcHsm)
             throw new InvalidOperationException($"Key '{keyName}' is not EC.");
-        // if (key.KeyOperations != KeyCurveName.P256K)
-        //     throw new InvalidOperationException($"Key '{keyName}' must be created with curve SECP256K1.");
     }
 
     /// <summary>

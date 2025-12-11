@@ -5,6 +5,11 @@
     <PackageReference Include="Azure.Security.KeyVault.Keys" />
     <PackageReference Include="Nethereum.Signer" />
     <PackageReference Include="Nethereum.Util" />
+    <PackageReference Include="Newtonsoft.Json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\YoloBroker\YoloBroker.csproj" />
   </ItemGroup>
 
 </Project>
