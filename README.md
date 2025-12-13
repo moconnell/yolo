@@ -54,7 +54,70 @@ If you get execution policy errors:
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
-## Logging/PathFormat
+## appsettings.json
+
+There is an example of this file included in the build. You will need to add config as follows to either run the RobotWealth YOLO strategy or a combination of single factors from Unravel.
+
+### Example for RobotWealth YOLO
+
+As per the original intention, the app supports running the RobotWealth YOLO crypto strategy.
+
+The relevant config elements to include in this case are as follows:
+
+```JSON
+{
+  "RobotWealth": {
+    "ApiBaseUrl": "https://api.robotwealth.com/v1/yolo",
+    "ApiKey": ""
+  },
+  "Yolo": {
+    "FactorWeights": {
+      "Carry": 1,
+      "Momentum": 1,
+      "Trend": 1
+    },
+  }
+}
+```
+
+### Unravel Example
+
+The app also supports combining multiple single factors from Unravel.
+
+The relevant config elements to include in this case are as follows (but not only):
+
+```JSON
+{
+  "Unravel": {
+    "ApiBaseUrl": "https://unravel.finance/api/v1",
+    "ApiKey": "",
+    "Factors": [
+      "Carry",
+      "Momentum",
+      "OpenInterestDivergence",
+      "RelativeIlliquidity",
+      "RetailFlow",
+      "SupplyVelocity",
+      "TrendLongonlyAdaptive"
+    ]
+  },
+  "Yolo": {
+    "FactorWeights": {
+      "Carry": 1,
+      "Momentum": 1,
+      "OpenInterestDivergence": 1,
+      "RelativeIlliquidity": 1,
+      "RetailFlow": 1,
+      "SupplyVelocity": 1,
+      "TrendLongonlyAdaptive": 1
+    },
+    "FactorNormalizationMethod": "CrossSectionalZScore",
+  }
+}
+
+```
+
+### Logging/PathFormat
 
 This determines where the application will write logs to. Windows paths using `\` must be escaped as `\\` as below. The substitution token `{Date}` included in the path means that a new file will be written each day. You can omit this if you would prefer to have a single file.
 
@@ -66,11 +129,11 @@ This determines where the application will write logs to. Windows paths using `\
 }
 ```
 
-## Yolo/BaseAsset
+### Yolo/BaseAsset
 
 This is the token that the application will trade in and out of. It defaults to `USD` but you could equally change to `USDT` etc. if preferred.
 
-## Yolo/AssetPermissions
+### Yolo/AssetPermissions
 
 In case your account does not have margin trading or futures enabled, it is possible to configure accordingly via the `AssetPermissions` setting - possible settings of which are currently:
 
@@ -86,7 +149,7 @@ In case your account does not have margin trading or futures enabled, it is poss
     All
 ```
 
-## Yolo/RebalanceMode
+### Yolo/RebalanceMode
 
 This setting determines the target weight when rebalancing positions that are outside the tolerance band (TradeBuffer).
 
@@ -106,12 +169,12 @@ For example, with a target weight of 10% and a TradeBuffer of 4%:
 
 Possible values:
 
-```
-Center  (default)
+```JSON
+Center  // (default)
 Edge
 ```
 
-## Yolo/SpreadSplit
+### Yolo/SpreadSplit
 
 This setting determines the placement of the limit price within the bid-ask price spread and can take any value between 0 and 1 (values greater than 1 will be treated as 1).
 
