@@ -60,7 +60,7 @@ There is an example of this file included in the build. You will need to add con
 
 ### Example for RobotWealth YOLO
 
-As per the original intention, the app supports running the RobotWealth YOLO crypto strategy.
+As per the original intention, the app supports running the [RobotWealth YOLO](https://robotwealth.com/yolo-strategy-cheat-sheet/) crypto strategy.
 
 The relevant config elements to include in this case are as follows:
 
@@ -82,12 +82,17 @@ The relevant config elements to include in this case are as follows:
 
 ### Unravel Example
 
-The app also supports combining multiple single factors from Unravel.
+The app also supports combining multiple single factors from [Unravel](https://unravel.finance/home).
 
-The relevant config elements to include in this case are as follows (but not only):
+The relevant config elements to include in this case are as follows (note the required `Aliases` config for SHIB - there may be other tickers in future that require similar treatment):
 
 ```JSON
 {
+  "Hyperliquid": {
+    "Aliases": {
+      "SHIB": "kSHIB"
+    }
+  },
   "Unravel": {
     "ApiBaseUrl": "https://unravel.finance/api/v1",
     "ApiKey": "",
@@ -114,8 +119,37 @@ The relevant config elements to include in this case are as follows (but not onl
     "FactorNormalizationMethod": "CrossSectionalZScore",
   }
 }
-
 ```
+
+Factor normalisation is currently cross-sectional rank / quantile normalisation (TODO: time-series normalisation).
+
+## Hyperliquid
+
+The app currently only supports Hyperliquid - even if the architecture would easily allow the implementation of further brokers.
+
+`Address` and `PrivateKey` can be configure directly in `appsettings.json` for e.g. testing - or via single-file secrets configured by the script `setup-secrets.ps1`
+
+```JSON
+  "Hyperliquid": {
+    "Address": "",
+    "PrivateKey": "",
+    "UseTestnet": false
+  },
+```
+
+## Azure Vault
+
+The app also now supports signing via a key stored in an Azure Key Vault - in this case omit `Hyperliquid` config for `Address` and `PrivateKey` detailed above, as it will be ignored even if present.
+
+```JSON
+  "AzureVault": {
+    "VaultUri": "",
+    "KeyName": "",
+    "ExpectedAddress": ""  // optional verification
+  },
+```
+
+The key must be created in Azure Key Vault as EC (elliptic curve) and P256K in order to be compatible with Ethereum wallet signing (see: [Key types, algorithms, and operations](https://learn.microsoft.com/en-us/azure/key-vault/keys/about-keys-details))
 
 ### Logging/PathFormat
 
