@@ -1,5 +1,7 @@
 <Project>
   <ItemGroup>
+    <PackageVersion Include="Azure.Identity" Version="1.17.1" />
+    <PackageVersion Include="Azure.Security.KeyVault.Keys" Version="4.8.0" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="coverlet.msbuild" Version="6.0.4" />
     <PackageVersion Include="CsvHelper" Version="33.1.0" />
@@ -19,7 +21,9 @@
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
     <PackageVersion Include="Moq" Version="4.20.72" />
     <PackageVersion Include="Moq.Contrib.HttpClient" Version="1.4.0" />
+    <PackageVersion Include="Nethereum.Signer" Version="5.0.0" />
     <PackageVersion Include="Nethereum.Signer.EIP712" Version="5.0.0" />
+    <PackageVersion Include="Nethereum.Util" Version="5.0.0" />
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageVersion Include="Serilog.Extensions.Logging" Version="10.0.0" />
     <PackageVersion Include="Serilog.Extensions.Logging.File" Version="3.0.0" />
