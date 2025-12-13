@@ -1001,6 +1001,7 @@ public class HyperliquidBrokerTest
             restClient,
             mockSocketClient.Object,
             GetTickerAliasService(aliases),
+            null,
             logger);
     }
 

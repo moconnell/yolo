@@ -26,7 +26,7 @@ public static class BrokerServiceCollectionExtensions
             var hyperliquidConfig = config.GetHyperliquidConfig()!;
             services.AddHyperLiquid(options =>
             {
-                options.ApiCredentials = new ApiCredentials(hyperliquidConfig.Address, hyperliquidConfig.PrivateKey.IsValidEthereumAddressHexFormat() ? hyperliquidConfig.PrivateKey : "0x0");
+                options.ApiCredentials = new ApiCredentials(hyperliquidConfig.Address, hyperliquidConfig.PrivateKey is string pk && pk.IsValidEthereumAddressHexFormat() ? pk : "0x0");
 
                 if (hyperliquidConfig.UseTestnet)
                 {
@@ -43,6 +43,7 @@ public static class BrokerServiceCollectionExtensions
                     serviceProvider.GetRequiredService<IHyperLiquidRestClient>(),
                     serviceProvider.GetRequiredService<IHyperLiquidSocketClient>(),
                     serviceProvider.GetRequiredService<ITickerAliasService>(),
+                    hyperliquidConfig.VaultAddress,
                     serviceProvider.GetRequiredService<ILogger<HyperliquidBroker>>()
                 );
                 hyperliquidBroker.ConfigureAzureKeyVaultSigner(config);

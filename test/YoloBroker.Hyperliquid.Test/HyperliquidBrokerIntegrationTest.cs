@@ -508,6 +508,7 @@ public class HyperliquidBrokerIntegrationTest
                 options.Environment = HyperLiquidEnvironment.Testnet;
             }),
             GetTickerAliasService(aliases),
+            null,
             logger
         );
         return broker;
