@@ -101,7 +101,7 @@ public sealed class HyperliquidBroker : IYoloBroker
     {
         ArgumentNullException.ThrowIfNull(trades);
 
-        var tradeArray = trades as Trade[] ?? trades.ToArray();
+        var tradeArray = trades as Trade[] ?? [.. trades];
         if (tradeArray.Length == 0)
         {
             yield break;
@@ -192,7 +192,7 @@ public sealed class HyperliquidBroker : IYoloBroker
     {
         ArgumentException.ThrowIfNullOrEmpty(ticker, nameof(ticker));
         var klines = await GetDailyPriceHistoryAsync(ticker, periods, includeToday, ct);
-        return klines.Select(x => x.ClosePrice).ToArray();
+        return [.. klines.Select(x => x.ClosePrice)];
     }
 
     public async IAsyncEnumerable<OrderUpdate> ManageOrdersAsync(
@@ -203,7 +203,7 @@ public sealed class HyperliquidBroker : IYoloBroker
         ArgumentNullException.ThrowIfNull(trades);
         ArgumentNullException.ThrowIfNull(settings);
 
-        var tradeArray = trades as Trade[] ?? trades.ToArray();
+        var tradeArray = trades as Trade[] ?? [.. trades];
         if (tradeArray.Length == 0)
         {
             yield break;

@@ -1,4 +1,4 @@
-namespace YoloBroker.AzureVault;
+namespace YoloBroker.AzureVault.Config;
 
 public record AzureVaultConfig
 {

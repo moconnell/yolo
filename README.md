@@ -125,7 +125,7 @@ Factor normalisation is currently cross-sectional rank / quantile normalisation 
 
 ## Hyperliquid
 
-The app currently only supports Hyperliquid - even if the architecture would easily allow the implementation of further brokers.
+The app currently only supports [Hyperliquid](https://hyperliquid.xyz/) - even if the architecture would easily allow the implementation of further brokers.
 
 `Address` and `PrivateKey` can be configure directly in `appsettings.json` for e.g. testing - or via single-file secrets configured by the script `setup-secrets.ps1`
 
@@ -137,9 +137,9 @@ The app currently only supports Hyperliquid - even if the architecture would eas
   },
 ```
 
-## Azure Vault
+## Azure Key Vault Signing
 
-The app also now supports signing via a key stored in an Azure Key Vault - in this case omit `Hyperliquid` config for `Address` and `PrivateKey` detailed above, as it will be ignored even if present.
+The app also now supports signing via a private key stored in an [Azure Key Vault](https://azure.microsoft.com/products/key-vault) - in this case omit `Hyperliquid` config for `PrivateKey` detailed above, as it will be ignored even if present.
 
 ```JSON
   "AzureVault": {
@@ -149,7 +149,9 @@ The app also now supports signing via a key stored in an Azure Key Vault - in th
   },
 ```
 
-The key must be created in Azure Key Vault as EC (elliptic curve) and P256K in order to be compatible with Ethereum wallet signing (see: [Key types, algorithms, and operations](https://learn.microsoft.com/en-us/azure/key-vault/keys/about-keys-details))
+The key must be created in Azure Key Vault as EC (elliptic curve) and P256K in order to be compatible with Ethereum wallet signing (see: [Key types, algorithms, and operations](https://learn.microsoft.com/en-us/azure/key-vault/keys/about-keys-details)).
+
+You will need to install [Azure Command-Line Interface](https://learn.microsoft.com/cli/azure/) and [authenticate](https://learn.microsoft.com/cli/azure/authenticate-azure-cli) on the host machine in order to facilitate this.
 
 ### Logging/PathFormat
 
@@ -165,7 +167,7 @@ This determines where the application will write logs to. Windows paths using `\
 
 ### Yolo/BaseAsset
 
-This is the token that the application will trade in and out of. It defaults to `USD` but you could equally change to `USDT` etc. if preferred.
+This is the token that the application will trade in and out of. It defaults to `USDC` as this is what Hyperliquid supports.
 
 ### Yolo/AssetPermissions
 
@@ -182,6 +184,8 @@ In case your account does not have margin trading or futures enabled, it is poss
     ExpiringFutures
     All
 ```
+
+N.B. only `PerpetualFutures` has been fully implemented and tested for use with Hyperliquid.
 
 ### Yolo/RebalanceMode
 

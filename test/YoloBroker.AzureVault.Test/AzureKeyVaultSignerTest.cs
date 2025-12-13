@@ -6,6 +6,7 @@ using Nethereum.Util;
 using Org.BouncyCastle.Math;
 using Shouldly;
 using Xunit.Abstractions;
+using YoloBroker.AzureVault.Config;
 
 namespace YoloBroker.AzureVault.Test;
 

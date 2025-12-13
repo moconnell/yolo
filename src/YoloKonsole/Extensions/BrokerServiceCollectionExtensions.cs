@@ -1,10 +1,14 @@
 using CryptoExchange.Net.Authentication;
 using HyperLiquid.Net;
+using HyperLiquid.Net.Interfaces.Clients;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Nethereum.Util;
 using YoloAbstractions.Exceptions;
 using YoloAbstractions.Interfaces;
 using YoloBroker;
+using YoloBroker.AzureVault.Extensions;
 using YoloBroker.Hyperliquid;
 using YoloBroker.Hyperliquid.Config;
 using YoloBroker.Interface;
@@ -22,7 +26,7 @@ public static class BrokerServiceCollectionExtensions
             var hyperliquidConfig = config.GetHyperliquidConfig()!;
             services.AddHyperLiquid(options =>
             {
-                options.ApiCredentials = new ApiCredentials(hyperliquidConfig.Address, hyperliquidConfig.PrivateKey);
+                options.ApiCredentials = new ApiCredentials(hyperliquidConfig.Address, hyperliquidConfig.PrivateKey.IsValidEthereumAddressHexFormat() ? hyperliquidConfig.PrivateKey : "0x0");
 
                 if (hyperliquidConfig.UseTestnet)
                 {
@@ -31,9 +35,19 @@ public static class BrokerServiceCollectionExtensions
                     options.Socket.OutputOriginalData = true;
                 }
             });
-            
+
             services.AddSingleton<ITickerAliasService>(new TickerAliasService(hyperliquidConfig.Aliases));
-            services.AddSingleton<IYoloBroker, HyperliquidBroker>();
+            services.AddSingleton<IYoloBroker>(serviceProvider =>
+            {
+                HyperliquidBroker hyperliquidBroker = new(
+                    serviceProvider.GetRequiredService<IHyperLiquidRestClient>(),
+                    serviceProvider.GetRequiredService<IHyperLiquidSocketClient>(),
+                    serviceProvider.GetRequiredService<ITickerAliasService>(),
+                    serviceProvider.GetRequiredService<ILogger<HyperliquidBroker>>()
+                );
+                hyperliquidBroker.ConfigureAzureKeyVaultSigner(config);
+                return hyperliquidBroker;
+            });
             services.AddSingleton<IGetFactors, BrokerVolatilityFactorService>();
 
             return services;
