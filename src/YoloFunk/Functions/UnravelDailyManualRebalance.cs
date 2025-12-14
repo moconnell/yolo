@@ -5,26 +5,26 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using YoloAbstractions.Interfaces;
 
-namespace YoloFunk;
+namespace YoloFunk.Functions;
 
-public class YoloManualRebalance
+public class UnravelDailyManualRebalance
 {
-    private const string StrategyKey = "momentumdaily";
+    private const string StrategyKey = "unraveldaily";
 
-    private readonly ILogger<YoloManualRebalance> _logger;
+    private readonly ILogger<UnravelDailyManualRebalance> _logger;
     private readonly ICommand _rebalanceCommand;
 
-    public YoloManualRebalance(
+    public UnravelDailyManualRebalance(
         [FromKeyedServices(StrategyKey)] ICommand rebalanceCommand,
-        ILogger<YoloManualRebalance> logger)
+        ILogger<UnravelDailyManualRebalance> logger)
     {
         _rebalanceCommand = rebalanceCommand;
         _logger = logger;
     }
 
-    [Function("MomentumDailyManual")]
+    [Function(nameof(UnravelDailyManualRebalance))]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "rebalance/momentum-daily")]
+        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "rebalance/unravel-daily")]
         HttpRequestData req,
         CancellationToken cancellationToken)
     {

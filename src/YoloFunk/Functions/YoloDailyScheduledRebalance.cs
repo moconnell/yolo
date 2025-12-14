@@ -3,27 +3,25 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using YoloAbstractions.Interfaces;
 
-namespace YoloFunk;
+namespace YoloFunk.Functions;
 
-public class ValueWeeklyScheduled
+public class YoloDailyScheduledRebalance
 {
-    private const string StrategyKey = "valueweekly";
+    private const string StrategyKey = "yolodaily"; // Match your config section name
 
-    private readonly ILogger<ValueWeeklyScheduled> _logger;
+    private readonly ILogger<YoloDailyScheduledRebalance> _logger;
     private readonly ICommand _rebalanceCommand;
 
-    public ValueWeeklyScheduled(
+    public YoloDailyScheduledRebalance(
         [FromKeyedServices(StrategyKey)] ICommand rebalanceCommand,
-        ILogger<ValueWeeklyScheduled> logger)
+        ILogger<YoloDailyScheduledRebalance> logger)
     {
         _rebalanceCommand = rebalanceCommand;
         _logger = logger;
     }
 
-    [Function("ValueWeeklyScheduled")]
-    public async Task Run(
-        [TimerTrigger("0 0 1 * * 0")] TimerInfo myTimer, // Sundays at 1am
-        CancellationToken cancellationToken)
+    [Function(nameof(YoloDailyScheduledRebalance))]
+    public async Task Run([TimerTrigger("0 30 0 * * *")] TimerInfo myTimer, CancellationToken cancellationToken)
     {
         _logger.LogInformation("{Strategy} scheduled rebalance executed at: {executionTime}",
             StrategyKey, DateTime.UtcNow);

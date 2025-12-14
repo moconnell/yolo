@@ -86,9 +86,11 @@ fi
 echo ""
 echo "Step 5: Add Secrets to Key Vault"
 echo "--------------------------------"
-echo "IMPORTANT: You need to store SECRETS (not Keys) for Hyperliquid private keys."
-echo "Keys (like EC keys) are for vault-side signing. Secrets are retrieved values."
+echo "IMPORTANT: Hyperliquid Wallet Architecture:"
+echo "  - Agent Wallet: API credentials (address + private key) for signing transactions"
+echo "  - Vault Address: The actual funded account where your funds are deposited"
 echo ""
+echo "You need BOTH for each environment. We'll store these as SECRETS (not Keys)."
 echo "We'll check which secrets already exist and only add missing ones."
 echo ""
 
@@ -99,32 +101,92 @@ secret_exists() {
 
 # Development (testnet) secrets
 echo "Development Environment (Testnet):"
-if secret_exists "hyperliquid-dev-address" && secret_exists "hyperliquid-dev-privatekey"; then
-    echo "✅ Development secrets already exist (skipping)"
+echo "-----------------------------------"
+if secret_exists "hyperliquid-dev-agent-address" && secret_exists "hyperliquid-dev-agent-privatekey"; then
+    echo "✅ Development agent wallet secrets already exist (skipping)"
 else
-    read -p "Enter Hyperliquid TESTNET address: " DEV_ADDRESS
-    read -sp "Enter Hyperliquid TESTNET private key: " DEV_KEY
+    echo "Agent/API Wallet (for signing transactions):"
+    read -p "  Enter agent wallet address: " DEV_AGENT_ADDRESS
+    read -sp "  Enter agent wallet private key: " DEV_AGENT_KEY
     echo ""
     
-    az keyvault secret set --vault-name $KEYVAULT_NAME --name "hyperliquid-dev-address" --value "$DEV_ADDRESS" >/dev/null
-    az keyvault secret set --vault-name $KEYVAULT_NAME --name "hyperliquid-dev-privatekey" --value "$DEV_KEY" >/dev/null
-    echo "✅ Development secrets added"
+    az keyvault secret set --vault-name $KEYVAULT_NAME --name "hyperliquid-dev-agent-address" --value "$DEV_AGENT_ADDRESS" >/dev/null
+    az keyvault secret set --vault-name $KEYVAULT_NAME --name "hyperliquid-dev-agent-privatekey" --value "$DEV_AGENT_KEY" >/dev/null
+    echo "✅ Development agent wallet secrets added"
 fi
+
+# Strategy-specific vault addresses (dev)
+echo ""
+echo "Strategy Vault Addresses (the funded accounts to trade with):"
+echo "  You can add multiple strategies. Press Enter with empty name when done."
+echo ""
+
+STRATEGY_NUM=1
+while true; do
+    read -p "  Strategy $STRATEGY_NUM name (e.g., 'momentumdaily', or Enter to skip): " STRATEGY_NAME
+    
+    if [ -z "$STRATEGY_NAME" ]; then
+        break
+    fi
+    
+    SECRET_NAME="hyperliquid-dev-vault-${STRATEGY_NAME}"
+    
+    if secret_exists "$SECRET_NAME"; then
+        echo "  ✅ Vault address for $STRATEGY_NAME already exists (skipping)"
+    else
+        read -p "  Enter vault address for $STRATEGY_NAME: " VAULT_ADDRESS
+        az keyvault secret set --vault-name $KEYVAULT_NAME --name "$SECRET_NAME" --value "$VAULT_ADDRESS" >/dev/null
+        echo "  ✅ Vault address for $STRATEGY_NAME added"
+    fi
+    
+    STRATEGY_NUM=$((STRATEGY_NUM + 1))
+    echo ""
+done
 
 # Production (mainnet) secrets
 echo ""
 echo "Production Environment (Mainnet):"
-if secret_exists "hyperliquid-prod-address" && secret_exists "hyperliquid-prod-privatekey"; then
-    echo "✅ Production secrets already exist (skipping)"
+echo "----------------------------------"
+if secret_exists "hyperliquid-prod-agent-address" && secret_exists "hyperliquid-prod-agent-privatekey"; then
+    echo "✅ Production agent wallet secrets already exist (skipping)"
 else
-    read -p "Enter Hyperliquid MAINNET address: " PROD_ADDRESS
-    read -sp "Enter Hyperliquid MAINNET private key: " PROD_KEY
+    echo "Agent/API Wallet (for signing transactions):"
+    read -p "  Enter agent wallet address: " PROD_AGENT_ADDRESS
+    read -sp "  Enter agent wallet private key: " PROD_AGENT_KEY
     echo ""
     
-    az keyvault secret set --vault-name $KEYVAULT_NAME --name "hyperliquid-prod-address" --value "$PROD_ADDRESS" >/dev/null
-    az keyvault secret set --vault-name $KEYVAULT_NAME --name "hyperliquid-prod-privatekey" --value "$PROD_KEY" >/dev/null
-    echo "✅ Production secrets added"
+    az keyvault secret set --vault-name $KEYVAULT_NAME --name "hyperliquid-prod-agent-address" --value "$PROD_AGENT_ADDRESS" >/dev/null
+    az keyvault secret set --vault-name $KEYVAULT_NAME --name "hyperliquid-prod-agent-privatekey" --value "$PROD_AGENT_KEY" >/dev/null
+    echo "✅ Production agent wallet secrets added"
 fi
+
+# Strategy-specific vault addresses (prod)
+echo ""
+echo "Strategy Vault Addresses (the funded accounts to trade with):"
+echo "  You can add multiple strategies. Press Enter with empty name when done."
+echo ""
+
+STRATEGY_NUM=1
+while true; do
+    read -p "  Strategy $STRATEGY_NUM name (e.g., 'momentumdaily', or Enter to skip): " STRATEGY_NAME
+    
+    if [ -z "$STRATEGY_NAME" ]; then
+        break
+    fi
+    
+    SECRET_NAME="hyperliquid-prod-vault-${STRATEGY_NAME}"
+    
+    if secret_exists "$SECRET_NAME"; then
+        echo "  ✅ Vault address for $STRATEGY_NAME already exists (skipping)"
+    else
+        read -p "  Enter vault address for $STRATEGY_NAME: " VAULT_ADDRESS
+        az keyvault secret set --vault-name $KEYVAULT_NAME --name "$SECRET_NAME" --value "$VAULT_ADDRESS" >/dev/null
+        echo "  ✅ Vault address for $STRATEGY_NAME added"
+    fi
+    
+    STRATEGY_NUM=$((STRATEGY_NUM + 1))
+    echo ""
+done
 
 # RobotWealth API key
 echo ""

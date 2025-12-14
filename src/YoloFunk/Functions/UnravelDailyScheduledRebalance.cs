@@ -3,25 +3,27 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using YoloAbstractions.Interfaces;
 
-namespace YoloFunk;
+namespace YoloFunk.Functions;
 
-public class YoloScheduledRebalance
+public class UnravelDailyScheduledRebalance
 {
-    private const string StrategyKey = "momentumdaily"; // Match your config section name
+    private const string StrategyKey = "unraveldaily";
 
-    private readonly ILogger<YoloScheduledRebalance> _logger;
+    private readonly ILogger<UnravelDailyScheduledRebalance> _logger;
     private readonly ICommand _rebalanceCommand;
 
-    public YoloScheduledRebalance(
+    public UnravelDailyScheduledRebalance(
         [FromKeyedServices(StrategyKey)] ICommand rebalanceCommand,
-        ILogger<YoloScheduledRebalance> logger)
+        ILogger<UnravelDailyScheduledRebalance> logger)
     {
         _rebalanceCommand = rebalanceCommand;
         _logger = logger;
     }
 
-    [Function("MomentumDailyScheduled")]
-    public async Task Run([TimerTrigger("0 30 0 * * *")] TimerInfo myTimer, CancellationToken cancellationToken)
+    [Function(nameof(UnravelDailyScheduledRebalance))]
+    public async Task Run(
+        [TimerTrigger("0 30 0 * * *")] TimerInfo myTimer, // Daily at 12:30am
+        CancellationToken cancellationToken)
     {
         _logger.LogInformation("{Strategy} scheduled rebalance executed at: {executionTime}",
             StrategyKey, DateTime.UtcNow);

@@ -73,26 +73,18 @@ public static class AddStrategyServices
             });
 
             var tickerAliasService = new TickerAliasService(hyperliquidConfig.Aliases);
+            var vaultAddress = !string.IsNullOrEmpty(hyperliquidConfig.VaultAddress) ? hyperliquidConfig.VaultAddress : null;
 
             return new HyperliquidBroker(
                 restClient,
                 socketClient,
                 tickerAliasService,
-                hyperliquidConfig.VaultAddress,
+                vaultAddress,
                 sp.GetRequiredService<ILogger<HyperliquidBroker>>());
         });
 
-        services.AddKeyedSingleton<IGetFactors>($"{strategyKey}-broker-volatility", (sp, key) =>
-        {
-            return new BrokerVolatilityFactorService(
-                sp.GetRequiredKeyedService<IYoloBroker>(strategyKey));
-        });
-
         // Register factor providers for this strategy
-        var factorProviders = new List<string>
-        {
-            $"{strategyKey}-broker-volatility" // Always include broker volatility
-        };
+        var factorProviders = new List<string>();
 
         var robotWealthConfig = strategyConfig.GetSection("RobotWealth").Get<RobotWealthConfig>();
         if (robotWealthConfig is not null)
@@ -111,6 +103,14 @@ public static class AddStrategyServices
         var unravelConfig = strategyConfig.GetSection("Unravel").Get<UnravelConfig>();
         if (unravelConfig is not null)
         {
+            var bvKey = $"{strategyKey}-broker-volatility";
+            services.AddKeyedSingleton<IGetFactors>(bvKey, (sp, key) =>
+            {
+                return new BrokerVolatilityFactorService(
+                    sp.GetRequiredKeyedService<IYoloBroker>(strategyKey));
+            });
+            factorProviders.Add(bvKey);
+
             var unKey = $"{strategyKey}-unravel";
             services.AddKeyedSingleton(unKey, unravelConfig);
             services.AddKeyedSingleton<IGetFactors>(unKey, (sp, key) =>
