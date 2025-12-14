@@ -1,9 +1,7 @@
 using CryptoExchange.Net.Authentication;
 using HyperLiquid.Net;
-using HyperLiquid.Net.Interfaces.Clients;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using YoloAbstractions.Exceptions;
 using YoloAbstractions.Interfaces;
 using YoloBroker;
@@ -11,7 +9,7 @@ using YoloBroker.Hyperliquid;
 using YoloBroker.Hyperliquid.Config;
 using YoloBroker.Interface;
 
-namespace YoloKonsole.Extensions;
+namespace YoloFunk.Extensions;
 
 public static class BrokerServiceCollectionExtensions
 {

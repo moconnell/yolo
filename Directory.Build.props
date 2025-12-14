@@ -6,4 +6,9 @@
         <LangVersion>latest</LangVersion>
         <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     </PropertyGroup>
+
+    <!-- Disable CPM for Azure Functions generated extension projects -->
+    <PropertyGroup Condition="'$(MSBuildProjectName)' == 'WorkerExtensions'">
+        <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    </PropertyGroup>
 </Project>

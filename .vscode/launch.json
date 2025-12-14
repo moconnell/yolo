@@ -39,6 +39,12 @@
         "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT": "1",
         "DOTNET_SYSTEM_NET_HTTP_USESOCKETSHTTPHANDLER": "0"
       }
+    },
+    {
+      "name": "Attach to .NET Functions",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "${command:azureFunctions.pickProcess}"
     }
   ]
 }

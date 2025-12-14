@@ -1,0 +1,242 @@
+#!/bin/bash
+
+# Setup script for Azure Functions deployment
+# This script helps you configure all necessary Azure resources and GitHub secrets
+
+set -e
+
+echo "🚀 YOLO Azure Functions Deployment Setup"
+echo "========================================"
+echo ""
+
+# Check prerequisites
+command -v az >/dev/null 2>&1 || { echo "❌ Azure CLI is required but not installed. Visit https://aka.ms/InstallAzureCLI"; exit 1; }
+command -v gh >/dev/null 2>&1 || { echo "⚠️  GitHub CLI not installed. You'll need to manually add secrets to GitHub."; GH_INSTALLED=false; }
+
+# Configuration (matching your existing Azure resources)
+RESOURCE_GROUP="ResourceGroup1"
+LOCATION="switzerlandnorth"  # Azure uses lowercase, no spaces
+KEYVAULT_NAME="YOLO"
+SP_NAME="github-yolo-funk"
+
+echo "Configuration:"
+echo "  Resource Group: $RESOURCE_GROUP"
+echo "  Location: $LOCATION"
+echo "  Key Vault: $KEYVAULT_NAME"
+echo ""
+echo "NOTE: This script will use your existing Resource Group and Key Vault."
+echo "      It will only create what doesn't already exist."
+echo ""
+
+read -p "Continue with this configuration? (y/n) " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "Aborted."
+    exit 1
+fi
+
+# Login to Azure
+echo ""
+echo "Step 1: Azure Login"
+echo "-------------------"
+az login
+
+# Get subscription ID
+SUBSCRIPTION_ID=$(az account show --query id --output tsv)
+echo "✅ Using subscription: $SUBSCRIPTION_ID"
+
+# Create Resource Group
+echo ""
+echo "Step 2: Create Resource Group"
+echo "-----------------------------"
+if az group show --name $RESOURCE_GROUP >/dev/null 2>&1; then
+    echo "✅ Resource group $RESOURCE_GROUP already exists"
+else
+    az group create --name $RESOURCE_GROUP --location $LOCATION
+    echo "✅ Created resource group: $RESOURCE_GROUP"
+fi
+
+# Create shared Application Insights
+echo ""
+echo "Step 3: Create Shared Application Insights"
+echo "------------------------------------------"
+cd "$(dirname "$0")"
+az deployment group create \
+  --resource-group $RESOURCE_GROUP \
+  --template-file .azure/app-insights.bicep \
+  --parameters location=$LOCATION
+echo "✅ Application Insights created"
+
+# Create Key Vault
+echo ""
+echo "Step 4: Create Azure Key Vault"
+echo "------------------------------"
+if az keyvault show --name $KEYVAULT_NAME >/dev/null 2>&1; then
+    echo "✅ Key Vault $KEYVAULT_NAME already exists"
+else
+    az keyvault create \
+      --name $KEYVAULT_NAME \
+      --resource-group $RESOURCE_GROUP \
+      --location $LOCATION \
+      --enable-rbac-authorization false
+    echo "✅ Created Key Vault: $KEYVAULT_NAME"
+fi
+
+# Add secrets to Key Vault
+echo ""
+echo "Step 5: Add Secrets to Key Vault"
+echo "--------------------------------"
+echo "IMPORTANT: You need to store SECRETS (not Keys) for Hyperliquid private keys."
+echo "Keys (like EC keys) are for vault-side signing. Secrets are retrieved values."
+echo ""
+echo "We'll check which secrets already exist and only add missing ones."
+echo ""
+
+# Helper function to check if secret exists
+secret_exists() {
+    az keyvault secret show --vault-name $KEYVAULT_NAME --name "$1" >/dev/null 2>&1
+}
+
+# Development (testnet) secrets
+echo "Development Environment (Testnet):"
+if secret_exists "hyperliquid-dev-address" && secret_exists "hyperliquid-dev-privatekey"; then
+    echo "✅ Development secrets already exist (skipping)"
+else
+    read -p "Enter Hyperliquid TESTNET address: " DEV_ADDRESS
+    read -sp "Enter Hyperliquid TESTNET private key: " DEV_KEY
+    echo ""
+    
+    az keyvault secret set --vault-name $KEYVAULT_NAME --name "hyperliquid-dev-address" --value "$DEV_ADDRESS" >/dev/null
+    az keyvault secret set --vault-name $KEYVAULT_NAME --name "hyperliquid-dev-privatekey" --value "$DEV_KEY" >/dev/null
+    echo "✅ Development secrets added"
+fi
+
+# Production (mainnet) secrets
+echo ""
+echo "Production Environment (Mainnet):"
+if secret_exists "hyperliquid-prod-address" && secret_exists "hyperliquid-prod-privatekey"; then
+    echo "✅ Production secrets already exist (skipping)"
+else
+    read -p "Enter Hyperliquid MAINNET address: " PROD_ADDRESS
+    read -sp "Enter Hyperliquid MAINNET private key: " PROD_KEY
+    echo ""
+    
+    az keyvault secret set --vault-name $KEYVAULT_NAME --name "hyperliquid-prod-address" --value "$PROD_ADDRESS" >/dev/null
+    az keyvault secret set --vault-name $KEYVAULT_NAME --name "hyperliquid-prod-privatekey" --value "$PROD_KEY" >/dev/null
+    echo "✅ Production secrets added"
+fi
+
+# RobotWealth API key
+echo ""
+if secret_exists "robotwealth-api-key"; then
+    echo "✅ RobotWealth API key already exists (skipping)"
+else
+    read -sp "Enter RobotWealth API key: " ROBOTWEALTH_KEY
+    echo ""
+    az keyvault secret set --vault-name $KEYVAULT_NAME --name "robotwealth-api-key" --value "$ROBOTWEALTH_KEY" >/dev/null
+    echo "✅ RobotWealth API key added"
+fi
+
+# Create Service Principal
+echo ""
+echo "Step 6: Create Service Principal for GitHub"
+echo "-------------------------------------------"
+SP_JSON=$(az ad sp create-for-rbac \
+  --name $SP_NAME \
+  --role contributor \
+  --scopes /subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP \
+  --sdk-auth)
+
+echo "✅ Service Principal created"
+
+# Save to file
+mkdir -p .github/secrets
+echo "$SP_JSON" > .github/secrets/AZURE_CREDENTIALS.json
+echo "✅ Saved credentials to .github/secrets/AZURE_CREDENTIALS.json"
+
+# Add to GitHub
+echo ""
+echo "Step 7: Configure GitHub Secrets"
+echo "--------------------------------"
+
+if [ "$GH_INSTALLED" != false ]; then
+    echo "Adding secrets to GitHub repository..."
+    
+    # Check if we're in a GitHub repo
+    if gh repo view >/dev/null 2>&1; then
+        gh secret set AZURE_CREDENTIALS < .github/secrets/AZURE_CREDENTIALS.json
+        echo "✅ AZURE_CREDENTIALS added to GitHub"
+        
+        gh variable set AZURE_KEYVAULT_NAME --body "$KEYVAULT_NAME"
+        echo "✅ AZURE_KEYVAULT_NAME variable added to GitHub"
+    else
+        echo "⚠️  Not in a GitHub repository. Skipping GitHub secret configuration."
+        echo "   You'll need to manually add AZURE_CREDENTIALS to GitHub secrets."
+    fi
+else
+    echo "⚠️  GitHub CLI not installed."
+    echo "   Manually add the following secret to your GitHub repository:"
+    echo "   Name: AZURE_CREDENTIALS"
+    echo "   Value: (contents of .github/secrets/AZURE_CREDENTIALS.json)"
+    echo ""
+    echo "   Also add this variable:"
+    echo "   Name: AZURE_KEYVAULT_NAME"
+    echo "   Value: $KEYVAULT_NAME"
+fi
+
+# Create GitHub Environments
+echo ""
+echo "Step 8: Create GitHub Environments"
+echo "----------------------------------"
+echo "⚠️  Manual step required:"
+echo "   1. Go to your GitHub repository → Settings → Environments"
+echo "   2. Create 'production' environment"
+echo "   3. Enable 'Required reviewers' and add yourself"
+echo "   4. (Optional) Create 'development' environment"
+
+# Create develop branch
+echo ""
+echo "Step 9: Create develop branch"
+echo "-----------------------------"
+if git rev-parse --verify develop >/dev/null 2>&1; then
+    echo "✅ develop branch already exists"
+else
+    read -p "Create and push develop branch? (y/n) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        git checkout -b develop
+        git push -u origin develop
+        git checkout -
+        echo "✅ develop branch created and pushed"
+    else
+        echo "⚠️  Skipped creating develop branch"
+    fi
+fi
+
+# Summary
+echo ""
+echo "========================================"
+echo "✅ Setup Complete!"
+echo "========================================"
+echo ""
+echo "Next steps:"
+echo "  1. Complete GitHub Environment setup (see Step 8 above)"
+echo "  2. Push code to trigger first deployment:"
+echo "     - Push to 'develop' → deploys to yolo-funk-dev"
+echo "     - Push to 'master' → deploys to yolo-funk-prod (requires approval)"
+echo "     - Create PR → deploys to ephemeral environment"
+echo ""
+echo "  3. Configure Function App settings after first deployment:"
+echo "     See DEPLOYMENT.md for configuration examples"
+echo ""
+echo "Resources created:"
+echo "  - Resource Group: $RESOURCE_GROUP"
+echo "  - Application Insights: yolo-funk-insights"
+echo "  - Key Vault: $KEYVAULT_NAME"
+echo "  - Service Principal: $SP_NAME"
+echo ""
+echo "Security note:"
+echo "  - AZURE_CREDENTIALS saved to .github/secrets/"
+echo "  - This directory is in .gitignore - do NOT commit!"
+echo "  - Delete after confirming GitHub secrets are configured"
+echo ""
