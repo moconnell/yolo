@@ -1,245 +1,252 @@
 name: Deploy to Azure Functions
 
 permissions:
-    contents: read
+  contents: read
 
 on:
-    push:
-        branches:
-            - master
-            - develop
-            - "feature/**"
-        paths:
-            - "src/YoloFunk/**"
-            - ".azure/**"
-            - ".github/workflows/deploy-azure-functions.yml"
-    pull_request:
-        types: [opened, synchronize, reopened]
-        paths:
-            - "src/YoloFunk/**"
-    workflow_dispatch:
-        inputs:
-            environment:
-                description: "Environment to deploy to"
-                required: true
-                type: choice
-                options:
-                    - dev
-                    - prod
+  push:
+    branches:
+      - master
+      - develop
+      - "feature/**"
+    paths:
+      - "src/YoloFunk/**"
+      - ".azure/**"
+      - ".github/workflows/deploy-azure-functions.yml"
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "src/YoloFunk/**"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy to"
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
 
 env:
-    DOTNET_VERSION: "10.0.x"
-    AZURE_RESOURCE_GROUP: "ResourceGroup1"
-    AZURE_LOCATION: "switzerlandnorth"
+  DOTNET_VERSION: "10.0.x"
+  AZURE_RESOURCE_GROUP: "ResourceGroup1"
+  AZURE_LOCATION: "switzerlandnorth"
 
 jobs:
-    determine-environment:
-        runs-on: ubuntu-latest
-        outputs:
-            environment: ${{ steps.set-env.outputs.environment }}
-            function-app-name: ${{ steps.set-env.outputs.function-app-name }}
-            hyperliquid-network: ${{ steps.set-env.outputs.hyperliquid-network }}
-            deploy: ${{ steps.set-env.outputs.deploy }}
-        steps:
-            - name: Determine environment
-              id: set-env
-              run: |
-                  # Manual dispatch takes precedence
-                  if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-                    ENV="${{ github.event.inputs.environment }}"
-                    echo "environment=$ENV" >> $GITHUB_OUTPUT
-                    echo "function-app-name=yolo-funk-$ENV" >> $GITHUB_OUTPUT
-                    if [ "$ENV" = "prod" ]; then
-                      echo "hyperliquid-network=mainnet" >> $GITHUB_OUTPUT
-                    else
-                      echo "hyperliquid-network=testnet" >> $GITHUB_OUTPUT
-                    fi
-                    echo "deploy=true" >> $GITHUB_OUTPUT
-                    exit 0
-                  fi
+  determine-environment:
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+      function-app-name: ${{ steps.set-env.outputs.function-app-name }}
+      hyperliquid-network: ${{ steps.set-env.outputs.hyperliquid-network }}
+      deploy: ${{ steps.set-env.outputs.deploy }}
+    steps:
+      - name: Determine environment
+        id: set-env
+        run: |
+          # Manual dispatch takes precedence
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ENV="${{ github.event.inputs.environment }}"
+            echo "environment=$ENV" >> $GITHUB_OUTPUT
+            echo "function-app-name=yolo-funk-$ENV" >> $GITHUB_OUTPUT
+            if [ "$ENV" = "prod" ]; then
+              echo "hyperliquid-network=mainnet" >> $GITHUB_OUTPUT
+            else
+              echo "hyperliquid-network=testnet" >> $GITHUB_OUTPUT
+            fi
+            echo "deploy=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
 
-                  # Pull requests create ephemeral environments
-                  if [ "${{ github.event_name }}" = "pull_request" ]; then
-                    ENV="pr-${{ github.event.pull_request.number }}"
-                    echo "environment=$ENV" >> $GITHUB_OUTPUT
-                    echo "function-app-name=yolo-funk-$ENV" >> $GITHUB_OUTPUT
-                    echo "hyperliquid-network=testnet" >> $GITHUB_OUTPUT
-                    echo "deploy=true" >> $GITHUB_OUTPUT
-                    exit 0
-                  fi
+          # Pull requests create ephemeral environments
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            ENV="pr-${{ github.event.pull_request.number }}"
+            echo "environment=$ENV" >> $GITHUB_OUTPUT
+            echo "function-app-name=yolo-funk-$ENV" >> $GITHUB_OUTPUT
+            echo "hyperliquid-network=testnet" >> $GITHUB_OUTPUT
+            echo "deploy=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
 
-                  # Branch-based deployment
-                  if [ "${{ github.ref }}" = "refs/heads/master" ]; then
-                    echo "environment=prod" >> $GITHUB_OUTPUT
-                    echo "function-app-name=yolo-funk-prod" >> $GITHUB_OUTPUT
-                    echo "hyperliquid-network=mainnet" >> $GITHUB_OUTPUT
-                    echo "deploy=true" >> $GITHUB_OUTPUT
-                  elif [ "${{ github.ref }}" = "refs/heads/develop" ]; then
-                    echo "environment=dev" >> $GITHUB_OUTPUT
-                    echo "function-app-name=yolo-funk-dev" >> $GITHUB_OUTPUT
-                    echo "hyperliquid-network=testnet" >> $GITHUB_OUTPUT
-                    echo "deploy=true" >> $GITHUB_OUTPUT
-                  elif [[ "${{ github.ref }}" == refs/heads/feature/* ]]; then
-                    # Extract branch name and sanitize for Azure naming
-                    BRANCH_NAME=$(echo "${{ github.ref }}" | sed 's/refs\/heads\/feature\///' | sed 's/[^a-zA-Z0-9-]/-/g' | cut -c1-20)
-                    ENV="feat-$BRANCH_NAME"
-                    echo "environment=$ENV" >> $GITHUB_OUTPUT
-                    echo "function-app-name=yolo-funk-$ENV" >> $GITHUB_OUTPUT
-                    echo "hyperliquid-network=testnet" >> $GITHUB_OUTPUT
-                    echo "deploy=true" >> $GITHUB_OUTPUT
-                  else
-                    echo "deploy=false" >> $GITHUB_OUTPUT
-                  fi
+          # Branch-based deployment
+          if [ "${{ github.ref }}" = "refs/heads/master" ]; then
+            echo "environment=prod" >> $GITHUB_OUTPUT
+            echo "function-app-name=yolo-funk-prod" >> $GITHUB_OUTPUT
+            echo "hyperliquid-network=mainnet" >> $GITHUB_OUTPUT
+            echo "deploy=true" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref }}" = "refs/heads/develop" ]; then
+            echo "environment=dev" >> $GITHUB_OUTPUT
+            echo "function-app-name=yolo-funk-dev" >> $GITHUB_OUTPUT
+            echo "hyperliquid-network=testnet" >> $GITHUB_OUTPUT
+            echo "deploy=true" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == refs/heads/feature/* ]]; then
+            # Extract branch name and sanitize for Azure naming
+            BRANCH_NAME=$(echo "${{ github.ref }}" | sed 's/refs\/heads\/feature\///' | sed 's/[^a-zA-Z0-9-]/-/g' | cut -c1-20)
+            ENV="feat-$BRANCH_NAME"
+            echo "environment=$ENV" >> $GITHUB_OUTPUT
+            echo "function-app-name=yolo-funk-$ENV" >> $GITHUB_OUTPUT
+            echo "hyperliquid-network=testnet" >> $GITHUB_OUTPUT
+            echo "deploy=true" >> $GITHUB_OUTPUT
+          else
+            echo "deploy=false" >> $GITHUB_OUTPUT
+          fi
 
-    provision-infrastructure:
-        needs: determine-environment
-        if: needs.determine-environment.outputs.deploy == 'true'
-        runs-on: ubuntu-latest
-        environment: ${{ needs.determine-environment.outputs.environment == 'prod' && 'production' || 'development' }}
-        outputs:
-            function-app-name: ${{ steps.deploy-infra.outputs.functionAppName }}
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+  provision-infrastructure:
+    needs: determine-environment
+    if: needs.determine-environment.outputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    environment: ${{ needs.determine-environment.outputs.environment == 'prod' && 'production' || 'development' }}
+    outputs:
+      function-app-name: ${{ steps.deploy-infra.outputs.functionAppName }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Azure Login
-              uses: azure/login@v2
-              with:
-                  creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-            - name: Ensure Resource Group exists
-              run: |
-                  az group create \
-                    --name ${{ env.AZURE_RESOURCE_GROUP }} \
-                    --location ${{ env.AZURE_LOCATION }} \
-                    --tags Environment=${{ needs.determine-environment.outputs.environment }} ManagedBy=GitHub
+      - name: Ensure Resource Group exists
+        run: |
+          az group create \
+            --name ${{ env.AZURE_RESOURCE_GROUP }} \
+            --location ${{ env.AZURE_LOCATION }} \
+            --tags Environment=${{ needs.determine-environment.outputs.environment }} ManagedBy=GitHub
 
-            - name: Deploy shared Application Insights (if not exists)
-              run: |
-                  if ! az monitor app-insights component show \
-                    --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-                    --app yolo-funk-insights 2>/dev/null; then
-                    az deployment group create \
-                      --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-                      --template-file .azure/app-insights.bicep \
-                      --parameters location=${{ env.AZURE_LOCATION }}
-                  fi
+      - name: Deploy shared Application Insights (if not exists)
+        run: |
+          if ! az monitor app-insights component show \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --app yolo-funk-insights 2>/dev/null; then
+            az deployment group create \
+              --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+              --template-file .azure/app-insights.bicep \
+              --parameters location=${{ env.AZURE_LOCATION }}
+          fi
 
-            - name: Deploy Function App Infrastructure
-              id: deploy-infra
-              run: |
-                  OUTPUT=$(az deployment group create \
-                    --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-                    --template-file .azure/function-app.bicep \
-                    --parameters \
-                      environmentName=${{ needs.determine-environment.outputs.environment }} \
-                      location=${{ env.AZURE_LOCATION }} \
-                      hyperliquidNetwork=${{ needs.determine-environment.outputs.hyperliquid-network }} \
-                    --query 'properties.outputs' \
-                    --output json)
+      - name: Deploy Function App Infrastructure
+        id: deploy-infra
+        run: |
+          OUTPUT=$(az deployment group create \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --template-file .azure/function-app.bicep \
+            --parameters \
+              environmentName=${{ needs.determine-environment.outputs.environment }} \
+              location=${{ env.AZURE_LOCATION }} \
+              hyperliquidNetwork=${{ needs.determine-environment.outputs.hyperliquid-network }} \
+            --query 'properties.outputs' \
+            --output json)
 
-                  FUNCTION_APP_NAME=$(echo $OUTPUT | jq -r '.functionAppName.value')
-                  PRINCIPAL_ID=$(echo $OUTPUT | jq -r '.principalId.value')
+          FUNCTION_APP_NAME=$(echo $OUTPUT | jq -r '.functionAppName.value')
+          PRINCIPAL_ID=$(echo $OUTPUT | jq -r '.principalId.value')
 
-                  echo "functionAppName=$FUNCTION_APP_NAME" >> $GITHUB_OUTPUT
-                  echo "principalId=$PRINCIPAL_ID" >> $GITHUB_OUTPUT
-                  echo "Deployed: $FUNCTION_APP_NAME"
+          echo "functionAppName=$FUNCTION_APP_NAME" >> $GITHUB_OUTPUT
+          echo "principalId=$PRINCIPAL_ID" >> $GITHUB_OUTPUT
+          echo "Deployed: $FUNCTION_APP_NAME"
 
-            - name: Grant Key Vault Access (if secrets configured)
-              if: vars.AZURE_KEYVAULT_NAME != ''
-              run: |
-                  az keyvault set-policy \
-                    --name ${{ vars.AZURE_KEYVAULT_NAME }} \
-                    --object-id ${{ steps.deploy-infra.outputs.principalId }} \
-                    --secret-permissions get list
+      - name: Grant Key Vault Access (if secrets configured)
+        if: vars.AZURE_KEYVAULT_NAME != ''
+        run: |
+          # Get the Key Vault resource ID
+          KEYVAULT_ID=$(az keyvault show \
+            --name ${{ vars.AZURE_KEYVAULT_NAME }} \
+            --query id \
+            --output tsv)
 
-    build-and-deploy:
-        permissions:
-            contents: read
-            pull-requests: write
-        needs: [determine-environment, provision-infrastructure]
-        if: needs.determine-environment.outputs.deploy == 'true'
-        runs-on: ubuntu-latest
-        environment: ${{ needs.determine-environment.outputs.environment == 'prod' && 'production' || 'development' }}
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+          # Grant Key Vault Secrets User role to the function app's managed identity
+          az role assignment create \
+            --assignee ${{ steps.deploy-infra.outputs.principalId }} \
+            --role "Key Vault Secrets User" \
+            --scope $KEYVAULT_ID
 
-            - name: Setup .NET
-              uses: actions/setup-dotnet@v5
-              with:
-                  dotnet-version: ${{ env.DOTNET_VERSION }}
+  build-and-deploy:
+    permissions:
+      contents: read
+      pull-requests: write
+    needs: [determine-environment, provision-infrastructure]
+    if: needs.determine-environment.outputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    environment: ${{ needs.determine-environment.outputs.environment == 'prod' && 'production' || 'development' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Restore dependencies
-              run: |
-                  cd src/YoloFunk
-                  dotnet restore
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
-            - name: Build
-              run: |
-                  cd src/YoloFunk
-                  dotnet build --configuration Release --no-restore
+      - name: Restore dependencies
+        run: |
+          cd src/YoloFunk
+          dotnet restore
 
-            - name: Publish
-              run: |
-                  cd src/YoloFunk
-                  dotnet publish --configuration Release --no-build --output ./output
+      - name: Build
+        run: |
+          cd src/YoloFunk
+          dotnet build --configuration Release --no-restore
 
-            - name: Azure Login
-              uses: azure/login@v2
-              with:
-                  creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Publish
+        run: |
+          cd src/YoloFunk
+          dotnet publish --configuration Release --no-build --output ./output
 
-            - name: Deploy to Azure Functions
-              uses: Azure/functions-action@v1
-              with:
-                  app-name: ${{ needs.provision-infrastructure.outputs.function-app-name }}
-                  package: "src/YoloFunk/output"
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-            - name: Get Function App URL
-              id: get-url
-              run: |
-                  FUNCTION_URL=$(az functionapp show \
-                    --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-                    --name ${{ needs.provision-infrastructure.outputs.function-app-name }} \
-                    --query 'defaultHostName' \
-                    --output tsv)
-                  echo "function-url=https://$FUNCTION_URL" >> $GITHUB_OUTPUT
-                  echo "Function App URL: https://$FUNCTION_URL"
+      - name: Deploy to Azure Functions
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ needs.provision-infrastructure.outputs.function-app-name }}
+          package: "src/YoloFunk/output"
 
-            - name: Smoke Test - Health Check
-              run: |
-                  sleep 30  # Wait for Function App to warm up
-                  FUNCTION_URL="${{ steps.get-url.outputs.function-url }}"
+      - name: Get Function App URL
+        id: get-url
+        run: |
+          FUNCTION_URL=$(az functionapp show \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --name ${{ needs.provision-infrastructure.outputs.function-app-name }} \
+            --query 'defaultHostName' \
+            --output tsv)
+          echo "function-url=https://$FUNCTION_URL" >> $GITHUB_OUTPUT
+          echo "Function App URL: https://$FUNCTION_URL"
 
-                  # Try to get function list (admin endpoint)
-                  STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$FUNCTION_URL/admin/functions")
+      - name: Smoke Test - Health Check
+        run: |
+          sleep 30  # Wait for Function App to warm up
+          FUNCTION_URL="${{ steps.get-url.outputs.function-url }}"
 
-                  if [ "$STATUS" = "401" ] || [ "$STATUS" = "200" ]; then
-                    echo "✅ Function App is responding (HTTP $STATUS)"
-                  else
-                    echo "❌ Function App health check failed (HTTP $STATUS)"
-                    exit 1
-                  fi
+          # Try to get function list (admin endpoint)
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$FUNCTION_URL/admin/functions")
 
-            - name: Comment PR with deployment URL
-              if: github.event_name == 'pull_request'
-              uses: actions/github-script@v7
-              with:
-                  github-token: ${{ secrets.GITHUB_TOKEN }}
-                  script: |
-                      github.rest.issues.createComment({
-                      issue_number: context.issue.number,
-                      owner: context.repo.owner,
-                      repo: context.repo.repo,
-                      body: `### 🚀 Deployed to Azure Functions\n\n**Environment:** \`${{ needs.determine-environment.outputs.environment }}\`\n**Function App:** \`${{ needs.provision-infrastructure.outputs.function-app-name }}\`\n**URL:** ${{ steps.get-url.outputs.function-url }}\n**Network:** \`${{ needs.determine-environment.outputs.hyperliquid-network }}\`\n\n_This environment will be automatically cleaned up when the PR is closed._`
-                      })
+          if [ "$STATUS" = "401" ] || [ "$STATUS" = "200" ]; then
+            echo "✅ Function App is responding (HTTP $STATUS)"
+          else
+            echo "❌ Function App health check failed (HTTP $STATUS)"
+            exit 1
+          fi
 
-            - name: Summary
-              run: |
-                  echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
-                  echo "" >> $GITHUB_STEP_SUMMARY
-                  echo "- **Environment:** ${{ needs.determine-environment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
-                  echo "- **Function App:** ${{ needs.provision-infrastructure.outputs.function-app-name }}" >> $GITHUB_STEP_SUMMARY
-                  echo "- **URL:** ${{ steps.get-url.outputs.function-url }}" >> $GITHUB_STEP_SUMMARY
-                  echo "- **Network:** ${{ needs.determine-environment.outputs.hyperliquid-network }}" >> $GITHUB_STEP_SUMMARY
+      - name: Comment PR with deployment URL
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `### 🚀 Deployed to Azure Functions\n\n**Environment:** \`${{ needs.determine-environment.outputs.environment }}\`\n**Function App:** \`${{ needs.provision-infrastructure.outputs.function-app-name }}\`\n**URL:** ${{ steps.get-url.outputs.function-url }}\n**Network:** \`${{ needs.determine-environment.outputs.hyperliquid-network }}\`\n\n_This environment will be automatically cleaned up when the PR is closed._`
+            })
+
+      - name: Summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ needs.determine-environment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Function App:** ${{ needs.provision-infrastructure.outputs.function-app-name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** ${{ steps.get-url.outputs.function-url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Network:** ${{ needs.determine-environment.outputs.hyperliquid-network }}" >> $GITHUB_STEP_SUMMARY
