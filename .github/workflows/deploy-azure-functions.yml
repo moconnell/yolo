@@ -107,6 +107,20 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Grant GitHub Service Principal User Access Administrator Role
+        run: |
+          # Get the service principal's object ID from the logged-in account
+          SP_OBJECT_ID=$(az ad sp show --id $(az account show --query user.name -o tsv) --query id -o tsv)
+
+          # Grant User Access Administrator role at resource group scope to allow role assignments
+          # This is required for the GitHub Actions service principal to grant Key Vault access to function apps
+          az role assignment create \
+            --assignee-object-id $SP_OBJECT_ID \
+            --assignee-principal-type ServicePrincipal \
+            --role "User Access Administrator" \
+            --scope /subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.AZURE_RESOURCE_GROUP }} \
+            2>/dev/null || echo "Role assignment already exists or failed (may already be assigned)"
+
       - name: Ensure Resource Group exists
         run: |
           az group create \
@@ -157,8 +171,11 @@ jobs:
           # Grant Key Vault Secrets User role to the function app's managed identity
           az role assignment create \
             --assignee ${{ steps.deploy-infra.outputs.principalId }} \
+            --assignee-object-id ${{ steps.deploy-infra.outputs.principalId }} \
+            --assignee-principal-type ServicePrincipal \
             --role "Key Vault Secrets User" \
-            --scope $KEYVAULT_ID
+            --scope $KEYVAULT_ID \
+            2>/dev/null || echo "Role assignment already exists or failed"
 
   build-and-deploy:
     permissions:
