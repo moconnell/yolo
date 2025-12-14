@@ -22,6 +22,12 @@ public class RebalanceCommand : ICommand
 
     public RebalanceCommand(ICalcWeights weightsService, ITradeFactory tradeFactory, IYoloBroker broker, IOptions<YoloConfig> options, ILogger<RebalanceCommand> logger)
     {
+        ArgumentNullException.ThrowIfNull(weightsService, nameof(weightsService));
+        ArgumentNullException.ThrowIfNull(tradeFactory, nameof(tradeFactory));
+        ArgumentNullException.ThrowIfNull(broker, nameof(broker));
+        ArgumentNullException.ThrowIfNull(options, nameof(options));
+        ArgumentNullException.ThrowIfNull(logger, nameof(logger));
+
         _weightsService = weightsService;
         _tradeFactory = tradeFactory;
         _broker = broker;

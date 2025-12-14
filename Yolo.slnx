@@ -24,6 +24,7 @@
     <Project Path="test/Robotwealth.Api.Test/Robotwealth.Api.Test.csproj" />
     <Project Path="test/Unravel.Api.Test/Unravel.Api.Test.csproj" />
     <Project Path="test/YoloAbstractions.Test/YoloAbstractions.Test.csproj" />
+    <Project Path="test/YoloApp.Test/YoloApp.Test.csproj" />
     <Project Path="test/YoloBroker.Hyperliquid.Test/YoloBroker.Hyperliquid.Test.csproj" />
     <Project Path="test/YoloBroker.Test/YoloBroker.Test.csproj" />
     <Project Path="test/YoloTest.Util/YoloTest.Util.csproj" />

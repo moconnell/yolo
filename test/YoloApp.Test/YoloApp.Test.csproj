@@ -1,0 +1,6 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\YoloApp\YoloApp.csproj" />
+    <ProjectReference Include="..\YoloTest.Util\YoloTest.Util.csproj" />
+  </ItemGroup>
+</Project>
