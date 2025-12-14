@@ -1,5 +1,7 @@
 name: Cleanup Azure Functions
 
+permissions: {}
+
 on:
     pull_request:
         types: [closed]
@@ -15,6 +17,8 @@ env:
 
 jobs:
     cleanup:
+        permissions:
+            pull-requests: write
         runs-on: ubuntu-latest
         steps:
             - name: Determine environment to cleanup
