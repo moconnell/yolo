@@ -262,13 +262,18 @@ public class RebalanceCommandTest
     public async Task GivenTrades_WhenExecuting_ShouldManageOrders()
     {
         // arrange
-        var weights = new Dictionary<string, decimal> { { "BTC/USDT", 0.5m } };
+        var weights = new Dictionary<string, decimal> { { "BTC/USDT", 0.5m }, { "ETH/USDT", 0.5m }, { "BCH/USDT", 0.5m } };
         var positions = new Dictionary<string, IReadOnlyList<Position>>();
         var markets = new Dictionary<string, IReadOnlyList<MarketInfo>>();
-        var trades = new[] { new Trade("BTC", AssetType.Future, 10) };
+        var trades = new[] { new Trade("BTC", AssetType.Future, 10), new Trade("ETH", AssetType.Future, 10), new Trade("BCH", AssetType.Future, 10) };
 
         var channel = Channel.CreateUnbounded<OrderUpdate>();
-        await channel.Writer.WriteAsync(new OrderUpdate("BTC", OrderUpdateType.Filled, new Order(1, "BTC/USDT", AssetType.Future, DateTime.UtcNow, OrderSide.Buy, OrderStatus.Filled, 10)));
+        await channel.Writer.WriteAsync(new OrderUpdate("BTC", OrderUpdateType.Created, new Order(1, "BTC", AssetType.Future, DateTime.UtcNow, OrderSide.Buy, OrderStatus.Open, 10)));
+        await channel.Writer.WriteAsync(new OrderUpdate("ETH", OrderUpdateType.Created, new Order(2, "ETH", AssetType.Future, DateTime.UtcNow, OrderSide.Buy, OrderStatus.Open, 10)));
+        await channel.Writer.WriteAsync(new OrderUpdate("BCH", OrderUpdateType.Created, new Order(3, "BCH", AssetType.Future, DateTime.UtcNow, OrderSide.Buy, OrderStatus.Open, 10)));
+        await channel.Writer.WriteAsync(new OrderUpdate("BTC", OrderUpdateType.Filled, new Order(1, "BTC", AssetType.Future, DateTime.UtcNow, OrderSide.Buy, OrderStatus.Filled, 10)));
+        await channel.Writer.WriteAsync(new OrderUpdate("ETH", OrderUpdateType.Filled, new Order(2, "ETH", AssetType.Future, DateTime.UtcNow, OrderSide.Buy, OrderStatus.Filled, 10)));
+        await channel.Writer.WriteAsync(new OrderUpdate("BCH", OrderUpdateType.Filled, new Order(3, "BCH", AssetType.Future, DateTime.UtcNow, OrderSide.Buy, OrderStatus.Filled, 10)));
         channel.Writer.Complete();
 
         var mockWeightsService = new Mock<ICalcWeights>();
@@ -311,7 +316,7 @@ public class RebalanceCommandTest
 
         // assert
         mockBroker.Verify(x => x.ManageOrdersAsync(
-            It.Is<Trade[]>(t => t.Length == 1),
+            It.Is<Trade[]>(t => t.Length == 3),
             It.IsAny<OrderManagementSettings>(),
             It.IsAny<CancellationToken>()), Times.Once);
     }
