@@ -73,13 +73,12 @@ public static class AddStrategyServices
             });
 
             var tickerAliasService = new TickerAliasService(hyperliquidConfig.Aliases);
-            var vaultAddress = !string.IsNullOrEmpty(hyperliquidConfig.VaultAddress) ? hyperliquidConfig.VaultAddress : null;
 
             return new HyperliquidBroker(
                 restClient,
                 socketClient,
                 tickerAliasService,
-                vaultAddress,
+                hyperliquidConfig,
                 sp.GetRequiredService<ILogger<HyperliquidBroker>>());
         });
 

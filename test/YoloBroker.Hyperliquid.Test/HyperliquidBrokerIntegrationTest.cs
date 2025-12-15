@@ -5,7 +5,6 @@ using HyperLiquid.Net;
 using HyperLiquid.Net.Clients;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Shouldly;
 using Xunit.Abstractions;
 using YoloAbstractions;
 using YoloBroker.Hyperliquid.Extensions;
@@ -508,7 +507,7 @@ public class HyperliquidBrokerIntegrationTest
                 options.Environment = HyperLiquidEnvironment.Testnet;
             }),
             GetTickerAliasService(aliases),
-            null,
+            "0x0", // Dummy vault address for testing
             logger
         );
         return broker;

@@ -9,7 +9,10 @@ using HyperLiquid.Net.Enums;
 using HyperLiquid.Net.Interfaces.Clients;
 using HyperLiquid.Net.Objects.Models;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Nethereum.Util;
 using YoloAbstractions;
+using YoloBroker.Hyperliquid.Config;
 using YoloBroker.Hyperliquid.CustomSigning;
 using YoloBroker.Hyperliquid.Exceptions;
 using YoloBroker.Hyperliquid.Extensions;
@@ -40,15 +43,46 @@ public sealed class HyperliquidBroker : IYoloBroker
         IHyperLiquidRestClient hyperliquidClient,
         IHyperLiquidSocketClient hyperliquidSocketClient,
         ITickerAliasService tickerAliasService,
+        IOptions<HyperliquidConfig> options,
+        ILogger<HyperliquidBroker> logger) : this(
+            hyperliquidClient,
+            hyperliquidSocketClient,
+            tickerAliasService,
+            options.Value,
+            logger)
+    {
+    }
+
+    public HyperliquidBroker(
+        IHyperLiquidRestClient hyperliquidClient,
+        IHyperLiquidSocketClient hyperliquidSocketClient,
+        ITickerAliasService tickerAliasService,
+        HyperliquidConfig config,
+        ILogger<HyperliquidBroker> logger) : this(
+            hyperliquidClient,
+            hyperliquidSocketClient,
+            tickerAliasService,
+            config.VaultAddress,
+            logger)
+    {
+    }
+
+    public HyperliquidBroker(
+        IHyperLiquidRestClient hyperliquidClient,
+        IHyperLiquidSocketClient hyperliquidSocketClient,
+        ITickerAliasService tickerAliasService,
         string? vaultAddress,
         ILogger<HyperliquidBroker> logger)
     {
         _hyperliquidClient = hyperliquidClient;
         _hyperliquidSocketClient = hyperliquidSocketClient;
         _tickerAliasService = tickerAliasService;
-        _vaultAddress = vaultAddress;
+        _vaultAddress = vaultAddress.IsValidEthereumAddressHexFormat() && !vaultAddress.IsAnEmptyAddress()
+            ? vaultAddress
+            : null;
         _logger = logger;
     }
+
 
     public void Dispose()
     {

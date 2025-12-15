@@ -7,8 +7,6 @@ using HyperLiquid.Net.Interfaces.Clients.FuturesApi;
 using HyperLiquid.Net.Interfaces.Clients.SpotApi;
 using HyperLiquid.Net.Objects.Models;
 using Microsoft.Extensions.Logging;
-using Moq;
-using Shouldly;
 using Xunit.Abstractions;
 using YoloAbstractions;
 using YoloBroker.Hyperliquid.Exceptions;
@@ -1001,7 +999,7 @@ public class HyperliquidBrokerTest
             restClient,
             mockSocketClient.Object,
             GetTickerAliasService(aliases),
-            null,
+            "0x0",
             logger);
     }
 

@@ -11,12 +11,23 @@ param location string = resourceGroup().location
 ])
 param hyperliquidNetwork string = 'testnet'
 
+@description('Key Vault name for secrets (optional)')
+param keyVaultName string = ''
+
 @description('Tags to apply to all resources')
 param tags object = {}
 
 var functionAppName = 'yolo-funk-${environmentName}'
 var storageAccountName = 'yolofunk${uniqueString(resourceGroup().id, environmentName)}'
 var appInsightsName = 'yolo-funk-insights'
+
+// Determine secret suffix based on network (testnet or mainnet)
+var secretEnv = hyperliquidNetwork == 'mainnet' ? 'prod' : 'dev'
+var useTestnet = hyperliquidNetwork == 'mainnet' ? 'false' : 'true'
+
+// Key Vault reference helper
+var keyVaultId = !empty(keyVaultName) ? resourceId('Microsoft.KeyVault/vaults', keyVaultName) : ''
+var keyVaultUri = !empty(keyVaultName) ? 'https://${keyVaultName}.vault.azure.net' : ''
 
 // Storage Account (required for Azure Functions)
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
@@ -98,6 +109,62 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
         {
           name: 'HyperliquidNetwork'
           value: hyperliquidNetwork
+        }
+        // Hyperliquid configuration from Key Vault (for both strategies)
+        {
+          name: 'Strategies__YoloDaily__Hyperliquid__Address'
+          value: !empty(keyVaultName)
+            ? '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/hyperliquid-${secretEnv}-agent-address/)'
+            : ''
+        }
+        {
+          name: 'Strategies__YoloDaily__Hyperliquid__PrivateKey'
+          value: !empty(keyVaultName)
+            ? '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/hyperliquid-${secretEnv}-privatekey/)'
+            : ''
+        }
+        {
+          name: 'Strategies__YoloDaily__Hyperliquid__VaultAddress'
+          value: !empty(keyVaultName)
+            ? '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/hyperliquid-${secretEnv}-vault-yolodaily/)'
+            : ''
+        }
+        {
+          name: 'Strategies__YoloDaily__Hyperliquid__UseTestnet'
+          value: useTestnet
+        }
+        {
+          name: 'Strategies__UnravelDaily__Hyperliquid__Address'
+          value: !empty(keyVaultName)
+            ? '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/hyperliquid-${secretEnv}-agent-address/)'
+            : ''
+        }
+        {
+          name: 'Strategies__UnravelDaily__Hyperliquid__PrivateKey'
+          value: !empty(keyVaultName)
+            ? '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/hyperliquid-${secretEnv}-privatekey/)'
+            : ''
+        }
+        {
+          name: 'Strategies__UnravelDaily__Hyperliquid__VaultAddress'
+          value: !empty(keyVaultName)
+            ? '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/hyperliquid-${secretEnv}-vault-unraveldaily/)'
+            : ''
+        }
+        {
+          name: 'Strategies__UnravelDaily__Hyperliquid__UseTestnet'
+          value: useTestnet
+        }
+        // API Keys from Key Vault
+        {
+          name: 'Strategies__YoloDaily__RobotWealth__ApiKey'
+          value: !empty(keyVaultName)
+            ? '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/robotwealth-api-key/)'
+            : ''
+        }
+        {
+          name: 'Strategies__UnravelDaily__Unravel__ApiKey'
+          value: !empty(keyVaultName) ? '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/unravel-api-key/)' : ''
         }
       ]
       netFrameworkVersion: 'v10.0'
