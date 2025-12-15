@@ -4,8 +4,6 @@ namespace YoloBroker.Interface;
 
 public interface IYoloBroker : IDisposable
 {
-    void ConfigureSigning(Func<string, string, Dictionary<string, object>> requestSigningFunction);
-
     Task CancelOrderAsync(Order order, CancellationToken ct = default);
 
     Task<IReadOnlyDictionary<string, IReadOnlyList<MarketInfo>>> GetMarketsAsync(

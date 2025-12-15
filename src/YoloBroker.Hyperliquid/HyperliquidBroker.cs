@@ -61,11 +61,6 @@ public sealed class HyperliquidBroker : IYoloBroker
         Dispose(false);
     }
 
-    public void ConfigureSigning(Func<string, string, Dictionary<string, object>> requestSigningFunction)
-    {
-        HyperLiquidExchange.SignRequestDelegate = requestSigningFunction;
-    }
-
     public async Task<TradeResult> PlaceTradeAsync(Trade trade, CancellationToken ct = default)
     {
         var result = trade switch
