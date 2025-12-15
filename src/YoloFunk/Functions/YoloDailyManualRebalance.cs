@@ -24,7 +24,7 @@ public class YoloDailyManualRebalance
 
     [Function(nameof(YoloDailyManualRebalance))]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "rebalance/yolo-daily")]
+        [HttpTrigger(AuthorizationLevel.Function, "post", Route = $"rebalance/{StrategyKey}")]
         HttpRequestData req,
         CancellationToken cancellationToken)
     {

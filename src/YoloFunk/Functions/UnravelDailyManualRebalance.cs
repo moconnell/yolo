@@ -24,7 +24,7 @@ public class UnravelDailyManualRebalance
 
     [Function(nameof(UnravelDailyManualRebalance))]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "rebalance/unravel-daily")]
+        [HttpTrigger(AuthorizationLevel.Function, "post", Route = $"rebalance/{StrategyKey}")]
         HttpRequestData req,
         CancellationToken cancellationToken)
     {
