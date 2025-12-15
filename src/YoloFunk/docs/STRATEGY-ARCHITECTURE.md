@@ -58,7 +58,7 @@ Add a new section under `Strategies` in your `appsettings.json`.
 
 ### 2. Create Function Classes
 
-Create scheduled and/or manual function classes following the pattern in [YoloScheduledRebalance.cs](YoloScheduledRebalance.cs) and [YoloManualRebalance.cs](YoloManualRebalance.cs).
+Create scheduled and/or manual function classes following the pattern in [YoloDailyScheduledRebalance.cs](YoloDailyScheduledRebalance.cs) and [YoloDailyManualRebalance.cs](YoloDailyManualRebalance.cs).
 
 The key is to use `[FromKeyedServices("strategykey")]` to inject the correct command instance.
 
