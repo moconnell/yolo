@@ -518,6 +518,7 @@ public class HyperliquidBrokerIntegrationTest
         var config = new ConfigurationBuilder()
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
             .AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true)
+            .AddEnvironmentVariables()
             .Build();
 
         return (config["Hyperliquid:Address"], config["Hyperliquid:PrivateKey"]);

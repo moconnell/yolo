@@ -1,8 +1,6 @@
 ﻿using System.Net;
 using Microsoft.Extensions.Configuration;
-using Moq;
 using Moq.Contrib.HttpClient;
-using Shouldly;
 using RobotWealth.Api.Config;
 
 namespace RobotWealth.Api.Test;
@@ -128,7 +126,8 @@ public class RobotWealthApiServiceTest
     {
         var builder = new ConfigurationBuilder()
             .AddJsonFile("appsettings.json")
-            .AddJsonFile($"appsettings.local.json", true);
+            .AddJsonFile($"appsettings.local.json", true)
+            .AddEnvironmentVariables();
         var config = builder.Build();
         var rwConfig = config.GetRequiredSection("RobotWealth").Get<RobotWealthConfig>();
         rwConfig.ShouldNotBeNull();

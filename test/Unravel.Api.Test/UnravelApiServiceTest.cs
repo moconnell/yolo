@@ -1,8 +1,6 @@
 ﻿using System.Net;
 using Microsoft.Extensions.Configuration;
-using Moq;
 using Moq.Contrib.HttpClient;
-using Shouldly;
 using Unravel.Api.Config;
 using Xunit.Abstractions;
 using YoloAbstractions;
@@ -153,8 +151,9 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         var tickers = "ADA,AVAX,BCH,BNB,BTC,DOGE,DOT,ETH,HBAR,HYPE,LINK,LTC,MNT,SHIB,SOL,SUI,TON,TRX,XLM,XRP".Split(',');
 
         var builder = new ConfigurationBuilder()
-            .AddJsonFile("appsettings.json", true, true)
-            .AddJsonFile($"appsettings.local.json", true, true);
+            .AddJsonFile("appsettings.json")
+            .AddJsonFile($"appsettings.local.json", true)
+            .AddEnvironmentVariables();
         var config = builder.Build();
         var unravelConfig = config.GetChildren().First().Get<UnravelConfig>();
         unravelConfig.ShouldNotBeNull();

@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.Configuration" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" />
+    </ItemGroup>
+    <ItemGroup>
         <ProjectReference Include="..\..\src\YoloBroker.Hyperliquid\YoloBroker.Hyperliquid.csproj" />
         <ProjectReference Include="..\YoloTest.Util\YoloTest.Util.csproj" />
     </ItemGroup>
