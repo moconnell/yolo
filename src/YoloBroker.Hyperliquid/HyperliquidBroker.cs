@@ -9,7 +9,10 @@ using HyperLiquid.Net.Enums;
 using HyperLiquid.Net.Interfaces.Clients;
 using HyperLiquid.Net.Objects.Models;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Nethereum.Util;
 using YoloAbstractions;
+using YoloBroker.Hyperliquid.Config;
 using YoloBroker.Hyperliquid.CustomSigning;
 using YoloBroker.Hyperliquid.Exceptions;
 using YoloBroker.Hyperliquid.Extensions;
@@ -33,19 +36,53 @@ public sealed class HyperliquidBroker : IYoloBroker
     private readonly IHyperLiquidRestClient _hyperliquidClient;
     private readonly IHyperLiquidSocketClient _hyperliquidSocketClient;
     private readonly ITickerAliasService _tickerAliasService;
+    private readonly string? _vaultAddress;
     private readonly ILogger<HyperliquidBroker> _logger;
 
     public HyperliquidBroker(
         IHyperLiquidRestClient hyperliquidClient,
         IHyperLiquidSocketClient hyperliquidSocketClient,
         ITickerAliasService tickerAliasService,
+        IOptions<HyperliquidConfig> options,
+        ILogger<HyperliquidBroker> logger) : this(
+            hyperliquidClient,
+            hyperliquidSocketClient,
+            tickerAliasService,
+            options.Value,
+            logger)
+    {
+    }
+
+    public HyperliquidBroker(
+        IHyperLiquidRestClient hyperliquidClient,
+        IHyperLiquidSocketClient hyperliquidSocketClient,
+        ITickerAliasService tickerAliasService,
+        HyperliquidConfig config,
+        ILogger<HyperliquidBroker> logger) : this(
+            hyperliquidClient,
+            hyperliquidSocketClient,
+            tickerAliasService,
+            config.VaultAddress,
+            logger)
+    {
+    }
+
+    public HyperliquidBroker(
+        IHyperLiquidRestClient hyperliquidClient,
+        IHyperLiquidSocketClient hyperliquidSocketClient,
+        ITickerAliasService tickerAliasService,
+        string? vaultAddress,
         ILogger<HyperliquidBroker> logger)
     {
         _hyperliquidClient = hyperliquidClient;
         _hyperliquidSocketClient = hyperliquidSocketClient;
         _tickerAliasService = tickerAliasService;
+        _vaultAddress = vaultAddress.IsValidEthereumAddressHexFormat() && !vaultAddress.IsAnEmptyAddress()
+            ? vaultAddress
+            : null;
         _logger = logger;
     }
+
 
     public void Dispose()
     {
@@ -96,7 +133,7 @@ public sealed class HyperliquidBroker : IYoloBroker
     {
         ArgumentNullException.ThrowIfNull(trades);
 
-        var tradeArray = trades as Trade[] ?? trades.ToArray();
+        var tradeArray = trades as Trade[] ?? [.. trades];
         if (tradeArray.Length == 0)
         {
             yield break;
@@ -187,7 +224,7 @@ public sealed class HyperliquidBroker : IYoloBroker
     {
         ArgumentException.ThrowIfNullOrEmpty(ticker, nameof(ticker));
         var klines = await GetDailyPriceHistoryAsync(ticker, periods, includeToday, ct);
-        return klines.Select(x => x.ClosePrice).ToArray();
+        return [.. klines.Select(x => x.ClosePrice)];
     }
 
     public async IAsyncEnumerable<OrderUpdate> ManageOrdersAsync(
@@ -198,7 +235,7 @@ public sealed class HyperliquidBroker : IYoloBroker
         ArgumentNullException.ThrowIfNull(trades);
         ArgumentNullException.ThrowIfNull(settings);
 
-        var tradeArray = trades as Trade[] ?? trades.ToArray();
+        var tradeArray = trades as Trade[] ?? [.. trades];
         if (tradeArray.Length == 0)
         {
             yield break;
@@ -507,14 +544,14 @@ public sealed class HyperliquidBroker : IYoloBroker
         {
             _logger.LogInformation("Cancelling spot order {OrderId} for symbol {Symbol}", order.Id, order.Symbol);
             await CallAsync(
-                () => _hyperliquidClient.SpotApi.Trading.CancelOrderAsync(order.Symbol, order.Id, ct: ct),
+                () => _hyperliquidClient.SpotApi.Trading.CancelOrderAsync(order.Symbol, order.Id, _vaultAddress, ct: ct),
                 "Could not cancel spot order");
         }
         else if (order.AssetType == AssetType.Future)
         {
             _logger.LogInformation("Cancelling futures order {OrderId} for symbol {Symbol}", order.Id, order.Symbol);
             await CallAsync(
-                () => _hyperliquidClient.FuturesApi.Trading.CancelOrderAsync(order.Symbol, order.Id, ct: ct),
+                () => _hyperliquidClient.FuturesApi.Trading.CancelOrderAsync(order.Symbol, order.Id, _vaultAddress, ct: ct),
                 "Could not cancel order");
         }
         else
@@ -538,6 +575,7 @@ public sealed class HyperliquidBroker : IYoloBroker
                 order.OrderType.ToHyperLiquid(),
                 order.Amount,
                 order.LimitPrice.GetValueOrDefault(),
+                vaultAddress: _vaultAddress,
                 ct: ct),
             $"Could not update order {order.Id} for symbol {order.Symbol}");
     }
@@ -546,7 +584,7 @@ public sealed class HyperliquidBroker : IYoloBroker
     {
         var orders =
             await GetDataAsync(
-                () => _hyperliquidClient.FuturesApi.Trading.GetOpenOrdersExtendedAsync(ct: ct),
+                () => _hyperliquidClient.FuturesApi.Trading.GetOpenOrdersExtendedAsync(_vaultAddress, ct: ct),
                 "Could not get orders");
 
         return orders.ToDictionary(
@@ -568,10 +606,10 @@ public sealed class HyperliquidBroker : IYoloBroker
         CancellationToken ct = default)
     {
         var futuresAccount = await GetDataAsync(
-            () => _hyperliquidClient.FuturesApi.Account.GetAccountInfoAsync(ct: ct),
+            () => _hyperliquidClient.FuturesApi.Account.GetAccountInfoAsync(_vaultAddress, ct: ct),
             "Could not get futures balances");
         var spotBalances = await GetDataAsync(
-            () => _hyperliquidClient.SpotApi.Account.GetBalancesAsync(ct: ct),
+            () => _hyperliquidClient.SpotApi.Account.GetBalancesAsync(_vaultAddress, ct: ct),
             "Could not get spot balances");
 
         var futuresPositions = GetPositionsFromPositions(futuresAccount.Positions);
@@ -682,7 +720,7 @@ public sealed class HyperliquidBroker : IYoloBroker
     }
 
     private async Task<Dictionary<string, IReadOnlyList<MarketInfo>>> GetSpotMarketsAsync(
-        ISet<string>? baseAssetFilter,
+        HashSet<string>? baseAssetFilter,
         string quoteCurrency,
         CancellationToken ct = default)
     {
@@ -746,7 +784,7 @@ public sealed class HyperliquidBroker : IYoloBroker
     }
 
     private async Task<Dictionary<string, IReadOnlyList<MarketInfo>>> GetFuturesMarketsAsync(
-        ISet<string>? baseAssetFilter,
+        HashSet<string>? baseAssetFilter,
         string quoteCurrency,
         CancellationToken ct = default)
     {
@@ -889,6 +927,7 @@ public sealed class HyperliquidBroker : IYoloBroker
             trade.AbsoluteAmount,
             trade.LimitPrice.GetValueOrDefault(),
             clientOrderId: trade.ClientOrderId,
+            vaultAddress: _vaultAddress,
             ct: ct);
 
         return Wrap(result);
@@ -903,6 +942,7 @@ public sealed class HyperliquidBroker : IYoloBroker
             trade.AbsoluteAmount,
             trade.LimitPrice.GetValueOrDefault(),
             clientOrderId: trade.ClientOrderId,
+            vaultAddress: _vaultAddress,
             ct: ct);
 
         return Wrap(result);
@@ -920,6 +960,7 @@ public sealed class HyperliquidBroker : IYoloBroker
                 trade.AbsoluteAmount,
                 trade.LimitPrice.GetValueOrDefault(),
                 clientOrderId: trade.ClientOrderId)),
+            vaultAddress: _vaultAddress,
             ct: ct);
 
         return Wrap(result);
@@ -937,6 +978,7 @@ public sealed class HyperliquidBroker : IYoloBroker
                 trade.AbsoluteAmount,
                 trade.LimitPrice.GetValueOrDefault(),
                 clientOrderId: trade.ClientOrderId)),
+            vaultAddress: _vaultAddress,
             ct: ct);
 
         return Wrap(result);

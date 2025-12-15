@@ -54,7 +54,106 @@ If you get execution policy errors:
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
-## Logging/PathFormat
+## appsettings.json
+
+There is an example of this file included in the build. You will need to add config as follows to either run the RobotWealth YOLO strategy or a combination of single factors from Unravel.
+
+### Example for RobotWealth YOLO
+
+As per the original intention, the app supports running the [RobotWealth YOLO](https://robotwealth.com/yolo-strategy-cheat-sheet/) crypto strategy.
+
+The relevant config elements to include in this case are as follows:
+
+```JSON
+{
+  "RobotWealth": {
+    "ApiBaseUrl": "https://api.robotwealth.com/v1/yolo",
+    "ApiKey": ""
+  },
+  "Yolo": {
+    "FactorWeights": {
+      "Carry": 1,
+      "Momentum": 1,
+      "Trend": 1
+    },
+  }
+}
+```
+
+### Unravel Example
+
+The app also supports combining multiple single factors from [Unravel](https://unravel.finance/home).
+
+The relevant config elements to include in this case are as follows (note the required `Aliases` config for SHIB - there may be other tickers in future that require similar treatment):
+
+```JSON
+{
+  "Hyperliquid": {
+    "Aliases": {
+      "SHIB": "kSHIB"
+    }
+  },
+  "Unravel": {
+    "ApiBaseUrl": "https://unravel.finance/api/v1",
+    "ApiKey": "",
+    "Factors": [
+      "Carry",
+      "Momentum",
+      "OpenInterestDivergence",
+      "RelativeIlliquidity",
+      "RetailFlow",
+      "SupplyVelocity",
+      "TrendLongonlyAdaptive"
+    ]
+  },
+  "Yolo": {
+    "FactorWeights": {
+      "Carry": 1,
+      "Momentum": 1,
+      "OpenInterestDivergence": 1,
+      "RelativeIlliquidity": 1,
+      "RetailFlow": 1,
+      "SupplyVelocity": 1,
+      "TrendLongonlyAdaptive": 1
+    },
+    "FactorNormalizationMethod": "CrossSectionalZScore",
+  }
+}
+```
+
+Factor normalisation is currently cross-sectional rank / quantile normalisation (TODO: time-series normalisation).
+
+## Hyperliquid
+
+The app currently only supports [Hyperliquid](https://hyperliquid.xyz/) - even if the architecture would easily allow the implementation of further brokers.
+
+`Address` and `PrivateKey` can be configure directly in `appsettings.json` for e.g. testing - or via single-file secrets configured by the script `setup-secrets.ps1`
+
+```JSON
+  "Hyperliquid": {
+    "Address": "",
+    "PrivateKey": "",
+    "UseTestnet": false
+  },
+```
+
+## Azure Key Vault Signing
+
+The app also now supports signing via a private key stored in an [Azure Key Vault](https://azure.microsoft.com/products/key-vault) - in this case omit `Hyperliquid` config for `PrivateKey` detailed above, as it will be ignored even if present.
+
+```JSON
+  "AzureVault": {
+    "VaultUri": "",
+    "KeyName": "",
+    "ExpectedAddress": ""  // optional verification
+  },
+```
+
+The key must be created in Azure Key Vault as EC (elliptic curve) and P256K in order to be compatible with Ethereum wallet signing (see: [Key types, algorithms, and operations](https://learn.microsoft.com/en-us/azure/key-vault/keys/about-keys-details)).
+
+You will need to install [Azure Command-Line Interface](https://learn.microsoft.com/cli/azure/) and [authenticate](https://learn.microsoft.com/cli/azure/authenticate-azure-cli) on the host machine in order to facilitate this.
+
+### Logging/PathFormat
 
 This determines where the application will write logs to. Windows paths using `\` must be escaped as `\\` as below. The substitution token `{Date}` included in the path means that a new file will be written each day. You can omit this if you would prefer to have a single file.
 
@@ -66,11 +165,11 @@ This determines where the application will write logs to. Windows paths using `\
 }
 ```
 
-## Yolo/BaseAsset
+### Yolo/BaseAsset
 
-This is the token that the application will trade in and out of. It defaults to `USD` but you could equally change to `USDT` etc. if preferred.
+This is the token that the application will trade in and out of. It defaults to `USDC` as this is what Hyperliquid supports.
 
-## Yolo/AssetPermissions
+### Yolo/AssetPermissions
 
 In case your account does not have margin trading or futures enabled, it is possible to configure accordingly via the `AssetPermissions` setting - possible settings of which are currently:
 
@@ -86,7 +185,9 @@ In case your account does not have margin trading or futures enabled, it is poss
     All
 ```
 
-## Yolo/RebalanceMode
+N.B. only `PerpetualFutures` has been fully implemented and tested for use with Hyperliquid.
+
+### Yolo/RebalanceMode
 
 This setting determines the target weight when rebalancing positions that are outside the tolerance band (TradeBuffer).
 
@@ -106,12 +207,12 @@ For example, with a target weight of 10% and a TradeBuffer of 4%:
 
 Possible values:
 
-```
-Center  (default)
+```JSON
+Center  // (default)
 Edge
 ```
 
-## Yolo/SpreadSplit
+### Yolo/SpreadSplit
 
 This setting determines the placement of the limit price within the bid-ask price spread and can take any value between 0 and 1 (values greater than 1 will be treated as 1).
 

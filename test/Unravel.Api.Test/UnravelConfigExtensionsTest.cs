@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Configuration;
-using Shouldly;
 using Unravel.Api.Extensions;
 
 namespace Unravel.Api.Test;

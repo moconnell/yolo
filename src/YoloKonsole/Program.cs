@@ -10,14 +10,15 @@ using YoloAbstractions.Extensions;
 using YoloAbstractions.Exceptions;
 using YoloAbstractions.Interfaces;
 using YoloBroker.Interface;
-using YoloKonsole.Extensions;
+using YoloApp.Extensions;
 using YoloTrades;
-using static YoloKonsole.Constants.WellKnown.TradeEventIds;
+using YoloKonsole.Extensions;
 
 namespace YoloKonsole;
 
 internal class Program
 {
+    private const int OpenOrders = 3;
     private const int Error = 1;
     private const int Success = 0;
     private const string F5 = "F5";
@@ -72,9 +73,7 @@ __  ______  __    ____  __
                 .AddLogging(loggingBuilder => loggingBuilder
                     .AddFile(config.GetSection("Logging:File")))
                 .AddBroker(config)
-                .AddWeightsServices(config)
-                .AddSingleton<ITradeFactory, TradeFactory>()
-                .AddSingleton<IConfiguration>(config)
+                .AddServices(config)
                 .BuildServiceProvider();
 
             _logger = serviceProvider.GetService<ILoggerFactory>()!

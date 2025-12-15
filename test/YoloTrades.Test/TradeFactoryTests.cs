@@ -3,7 +3,6 @@ using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using Shouldly;
 using Snapshooter.Xunit;
 using Xunit.Abstractions;
 using YoloAbstractions;
@@ -57,7 +56,7 @@ public class TradeFactoryTests
                 { FactorType.Carry, carryMultiplier }
             }
         };
-        var tradeFactory = new TradeFactory(logger, config);
+        var tradeFactory = new TradeFactory(config, logger);
 
         var (weights, positions, markets, expectedTrades) =
             DeserializeCsv(
@@ -119,7 +118,7 @@ public class TradeFactoryTests
             NominalCash = nominalCash,
             TradeBuffer = tradeBuffer
         };
-        var tradeFactory = new TradeFactory(logger, config);
+        var tradeFactory = new TradeFactory(config, logger);
 
         var (weights, positions, markets) = await DeserializeInputsAsync(path);
 
@@ -208,7 +207,7 @@ public class TradeFactoryTests
             TradeBuffer = tradeBuffer,
             RebalanceMode = rebalanceMode
         };
-        var tradeFactory = new TradeFactory(logger, config);
+        var tradeFactory = new TradeFactory(config, logger);
 
         var (weights, positions, markets) =
             await DeserializeInputsAsync(path);
@@ -263,7 +262,7 @@ public class TradeFactoryTests
             TradeBuffer = tradeBuffer,
             MinOrderValue = null // No minimum order value restriction
         };
-        var tradeFactory = new TradeFactory(logger, config);
+        var tradeFactory = new TradeFactory(config, logger);
 
         var (weights, positions, markets) = await DeserializeInputsAsync(path);
 
@@ -281,7 +280,7 @@ public class TradeFactoryTests
         // Should generate a trade to close the MNT position even though it's small
         var mntTrade = trades.FirstOrDefault(t => t.Symbol == "MNT");
         Assert.NotNull(mntTrade);
-        
+
         // The trade should close the entire MNT position (sell 50 MNT)
         mntTrade.Amount.ShouldBe(-50.0m, 0.1m);
         mntTrade.OrderSide.ShouldBe(OrderSide.Sell);
@@ -305,7 +304,7 @@ public class TradeFactoryTests
             TradeBuffer = 0.04m,
             MinOrderValue = minOrderValue // Set minimum order value
         };
-        var tradeFactory = new TradeFactory(logger, config);
+        var tradeFactory = new TradeFactory(config, logger);
 
         var (weights, positions, markets) = await DeserializeInputsAsync(path);
 
@@ -324,7 +323,7 @@ public class TradeFactoryTests
         // because the token dropped from the universe
         var mntTrade = trades.FirstOrDefault(t => t.Symbol == "MNT");
         Assert.NotNull(mntTrade);
-        
+
         // The trade should close the entire MNT position (sell 5 MNT)
         mntTrade.Amount.ShouldBe(-5.0m, 0.1m);
         mntTrade.OrderSide.ShouldBe(OrderSide.Sell);

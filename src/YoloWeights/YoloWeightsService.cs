@@ -16,11 +16,11 @@ public class YoloWeightsService : ICalcWeights
 
     public YoloWeightsService(IEnumerable<IGetFactors> inner, YoloConfig config, ILogger<YoloWeightsService> logger)
     {
-        _logger = logger;
         ArgumentNullException.ThrowIfNull(inner);
         ArgumentNullException.ThrowIfNull(config);
+        ArgumentNullException.ThrowIfNull(logger);
 
-        _inner = inner.ToArray();
+        _inner = [.. inner];
         if (_inner.Length == 0)
         {
             throw new ArgumentException($"{nameof(inner)}: must have at least one factor provider");
@@ -31,6 +31,7 @@ public class YoloWeightsService : ICalcWeights
                 new KeyValuePair<FactorType, double>(kvp.Key, Convert.ToDouble(kvp.Value))));
         _maxWeightingAbs = config.MaxWeightingAbs;
         _normalizationMethod = config.FactorNormalizationMethod;
+        _logger = logger;
     }
 
     public async Task<IReadOnlyDictionary<string, decimal>> CalculateWeightsAsync(
@@ -46,8 +47,8 @@ public class YoloWeightsService : ICalcWeights
         _logger.LogInformation("weights:\n{Weights}", weights);
 
         var weightsDict = weights.Rows.ToDictionary(
-            r => (string) r["Ticker"],
-            r => Convert.ToDecimal((double) r["Weight"]));
+            r => (string)r["Ticker"],
+            r => Convert.ToDecimal((double)r["Weight"]));
 
         return weightsDict;
     }
@@ -68,7 +69,7 @@ public class YoloWeightsService : ICalcWeights
             var df = await svc.GetFactorsAsync(baseAssets, factors, cancellationToken);
             if (df.IsEmpty)
                 continue;
-            
+
             result.Add(df);
             factors.UnionWith(df.FactorTypes);
 

@@ -10,8 +10,9 @@ public record YoloConfig
     public string BaseAsset { get; init; } = "USDC";
     public decimal SpreadSplit { get; init; } = 0.5m;
     public decimal? MinOrderValue { get; init; } = 10;
+    public bool KillOpenOrders { get; init; } = false;
     public string UnfilledOrderTimeout { get; init; } = "00:05:00"; // Default 5 minutes
-    public double? MaxWeightingAbs { get; init; } 
+    public double? MaxWeightingAbs { get; init; }
     public IReadOnlyDictionary<FactorType, decimal> FactorWeights { get; init; } = new Dictionary<FactorType, decimal>();
     public NormalizationMethod FactorNormalizationMethod { get; init; } = NormalizationMethod.None;
 }

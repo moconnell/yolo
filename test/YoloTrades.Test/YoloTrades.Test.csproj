@@ -1,24 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <IsPackable>false</IsPackable>
-    <AssemblyName>YoloTrades.Test</AssemblyName>
-    <RootNamespace>YoloTrades.Test</RootNamespace>
-  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="CsvHelper" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="Moq" />
-    <PackageReference Include="Shouldly" />
     <PackageReference Include="Snapshooter.Xunit" />
-    <PackageReference Include="xunit" />
-    <PackageReference Include="xunit.runner.visualstudio">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
-    <PackageReference Include="coverlet.collector">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\YoloTrades\YoloTrades.csproj" />
@@ -142,8 +125,5 @@
     <None Update="Data\json\010_UniverseChange_BelowMinOrderValue\weights.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-  </ItemGroup>
-  <ItemGroup>
-    <Using Include="Xunit" />
   </ItemGroup>
 </Project>

@@ -10,7 +10,7 @@ public class TradeFactory : ITradeFactory
 {
     private readonly ILogger<TradeFactory> _logger;
 
-    public TradeFactory(ILogger<TradeFactory> logger, YoloConfig yoloConfig)
+    public TradeFactory(YoloConfig yoloConfig, ILogger<TradeFactory> logger)
     {
         _logger = logger;
         AssetPermissions = yoloConfig.AssetPermissions;

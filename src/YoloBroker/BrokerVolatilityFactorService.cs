@@ -5,7 +5,7 @@ using YoloBroker.Interface;
 
 namespace YoloBroker;
 
-public class BrokerVolatilityFactorService(IYoloBroker broker) : IGetFactors
+public class BrokerVolatilityFactorService(IYoloBroker broker, bool throwOnMissingData = true) : IGetFactors
 {
     private const int Periods = 30;
 
@@ -24,9 +24,19 @@ public class BrokerVolatilityFactorService(IYoloBroker broker) : IGetFactors
         if (tickerArray.Length == 0 || existingFactors?.Contains(FactorType.Volatility) == true)
             return FactorDataFrame.Empty;
 
-        var tasks = tickerArray.Select(t => broker.GetDailyClosePricesAsync(t, Periods, ct: cancellationToken));
-        var priceArrays = await Task.WhenAll(tasks);
-        var volatilities = priceArrays.Select(prices => prices.AnnualizedVolatility()).ToArray();
+        var priceArrays = await Task.WhenAll(tickerArray.Select(async t =>
+        {
+            try
+            {
+                return await broker.GetDailyClosePricesAsync(t, Periods, ct: cancellationToken);
+            }
+            catch (Exception) when (!throwOnMissingData)
+            {
+                return [];
+            }
+        }));
+
+        var volatilities = priceArrays.Select(prices => prices.AnnualizedVolatility(throwOnMissingData: throwOnMissingData)).ToArray();
         var df = FactorDataFrame.NewFrom(tickerArray, DateTime.Today, (FactorType.Volatility, volatilities));
 
         return df;

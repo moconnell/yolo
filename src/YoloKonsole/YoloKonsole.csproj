@@ -20,6 +20,7 @@
     <PackageReference Include="Utility.CommandLine.Arguments" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\YoloApp\YoloApp.csproj" />
     <ProjectReference Include="..\YoloBroker.Hyperliquid\YoloBroker.Hyperliquid.csproj" />
     <ProjectReference Include="..\YoloTrades\YoloTrades.csproj" />
     <ProjectReference Include="..\RobotWealth.Api\RobotWealth.Api.csproj" />

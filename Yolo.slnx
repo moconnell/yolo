@@ -1,0 +1,34 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/Solution items/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/RobotWealth.Api/RobotWealth.Api.csproj" />
+    <Project Path="src/Unravel.Api/Unravel.Api.csproj" />
+    <Project Path="src/YoloAbstractions/YoloAbstractions.csproj" />
+    <Project Path="src/YoloApp/YoloApp.csproj" />
+    <Project Path="src/YoloBroker.Hyperliquid/YoloBroker.Hyperliquid.csproj" />
+    <Project Path="src/YoloBroker/YoloBroker.csproj" />
+    <Project Path="src/YoloFunk/YoloFunk.csproj" />
+    <Project Path="src/YoloKonsole/YoloKonsole.csproj" />
+    <Project Path="src/YoloTrades/YoloTrades.csproj" />
+    <Project Path="src/YoloWeights/YoloWeights.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/Robotwealth.Api.Test/Robotwealth.Api.Test.csproj" />
+    <Project Path="test/Unravel.Api.Test/Unravel.Api.Test.csproj" />
+    <Project Path="test/YoloAbstractions.Test/YoloAbstractions.Test.csproj" />
+    <Project Path="test/YoloApp.Test/YoloApp.Test.csproj" />
+    <Project Path="test/YoloBroker.Hyperliquid.Test/YoloBroker.Hyperliquid.Test.csproj" />
+    <Project Path="test/YoloBroker.Test/YoloBroker.Test.csproj" />
+    <Project Path="test/YoloTest.Util/YoloTest.Util.csproj" />
+    <Project Path="test/YoloTrades.Test/YoloTrades.Test.csproj" />
+    <Project Path="test/YoloWeights.Test/YoloWeights.Test.csproj" />
+  </Folder>
+</Solution>

@@ -5,7 +5,6 @@ using HyperLiquid.Net;
 using HyperLiquid.Net.Clients;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Shouldly;
 using Xunit.Abstractions;
 using YoloAbstractions;
 using YoloBroker.Hyperliquid.Extensions;
@@ -508,6 +507,7 @@ public class HyperliquidBrokerIntegrationTest
                 options.Environment = HyperLiquidEnvironment.Testnet;
             }),
             GetTickerAliasService(aliases),
+            "0x0", // Dummy vault address for testing
             logger
         );
         return broker;
@@ -518,6 +518,7 @@ public class HyperliquidBrokerIntegrationTest
         var config = new ConfigurationBuilder()
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
             .AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true)
+            .AddEnvironmentVariables()
             .Build();
 
         return (config["Hyperliquid:Address"], config["Hyperliquid:PrivateKey"]);

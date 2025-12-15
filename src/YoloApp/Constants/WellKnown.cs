@@ -1,4 +1,4 @@
-namespace YoloKonsole.Constants;
+namespace YoloApp.Constants;
 
 public static class WellKnown
 {
@@ -8,5 +8,6 @@ public static class WellKnown
         internal const int OrderError = 052;
         internal const int OpenOrders = 053;
         internal const int CancelledOrders = 054;
+        internal const int OrderUpdate = 055;
     }
 }

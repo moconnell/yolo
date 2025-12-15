@@ -1,5 +1,11 @@
 {
   "dotnet.server.useOmnisharp": false,
   "dotnet.completion.showCompletionItemsFromUnimportedNamespaces": true,
-  "dotnet.codeLens.enableReferencesCodeLens": true
+  "dotnet.codeLens.enableReferencesCodeLens": true,
+  "azureFunctions.deploySubpath": "src/YoloFunk/bin/Release/net10.0/publish",
+  "azureFunctions.projectLanguage": "C#",
+  "azureFunctions.projectRuntime": "~4",
+  "debug.internalConsoleOptions": "neverOpen",
+  "azureFunctions.preDeployTask": "publish (functions)",
+  "azureFunctions.projectSubpath": "src/YoloFunk"
 }

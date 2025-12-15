@@ -1,5 +1,3 @@
-using Shouldly;
-
 namespace YoloBroker.Test;
 
 public class TickerAliasServiceTest

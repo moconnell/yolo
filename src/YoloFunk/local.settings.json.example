@@ -1,0 +1,20 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    
+    "COMMENT": "NOTE: Most configuration is in appsettings.json and appsettings.Development.json",
+    "COMMENT2": "Only override secrets here for local development",
+    
+    "Strategies__YoloDaily__Hyperliquid__Address": "0x...",
+    "Strategies__YoloDaily__Hyperliquid__PrivateKey": "0x...",
+    "Strategies__YoloDaily__Hyperliquid__VaultAddress": "0x...",
+    "Strategies__YoloDaily__RobotWealth__ApiKey": "your-api-key",
+    
+    "Strategies__UnravelDaily__Hyperliquid__Address": "0x...",
+    "Strategies__UnravelDaily__Hyperliquid__PrivateKey": "0x...",
+    "Strategies__UnravelDaily__Hyperliquid__VaultAddress": "0x...",
+    "Strategies__UnravelDaily__Unravel__ApiKey": "your-api-key"
+  }
+}

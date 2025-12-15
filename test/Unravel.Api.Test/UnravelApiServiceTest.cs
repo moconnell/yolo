@@ -1,8 +1,6 @@
 ﻿using System.Net;
 using Microsoft.Extensions.Configuration;
-using Moq;
 using Moq.Contrib.HttpClient;
-using Shouldly;
 using Unravel.Api.Config;
 using Xunit.Abstractions;
 using YoloAbstractions;
@@ -152,18 +150,12 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         // arrange
         var tickers = "ADA,AVAX,BCH,BNB,BTC,DOGE,DOT,ETH,HBAR,HYPE,LINK,LTC,MNT,SHIB,SOL,SUI,TON,TRX,XLM,XRP".Split(',');
 
-        var builder = new ConfigurationBuilder()
-            .AddJsonFile("appsettings.json", true, true)
-            .AddJsonFile($"appsettings.local.json", true, true);
-        var config = builder.Build();
-        var unravelConfig = config.GetChildren().First().Get<UnravelConfig>();
-        unravelConfig.ShouldNotBeNull();
 
         var cancellationTokenSource = new CancellationTokenSource();
         cancellationTokenSource.CancelAfter(TimeSpan.FromMinutes(1));
 
         using var httpClient = new HttpClient();
-
+        var unravelConfig = GetConfig();
         var svc = new UnravelApiService(httpClient, unravelConfig);
 
         // act
@@ -191,18 +183,11 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
     public async Task GivenGoodConfig_WhenLiveData_ShouldGetUniverse()
     {
         // arrange
-        var builder = new ConfigurationBuilder()
-            .AddJsonFile("appsettings.json", true, true)
-            .AddJsonFile($"appsettings.local.json", true, true);
-        var config = builder.Build();
-        var unravelConfig = config.GetChildren().First().Get<UnravelConfig>();
-        unravelConfig.ShouldNotBeNull();
-
         var cancellationTokenSource = new CancellationTokenSource();
         cancellationTokenSource.CancelAfter(TimeSpan.FromMinutes(1));
 
         using var httpClient = new HttpClient();
-
+        var unravelConfig = GetConfig();
         var svc = new UnravelApiService(httpClient, unravelConfig);
 
         // act
@@ -221,18 +206,11 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
     public async Task GivenTickerUniverse_WhenNotAllReturned_ShouldPopulateNull()
     {
         // arrange
-        var builder = new ConfigurationBuilder()
-            .AddJsonFile("appsettings.json", true, true)
-            .AddJsonFile($"appsettings.local.json", true, true);
-        var config = builder.Build();
-        var unravelConfig = config.GetChildren().First().Get<UnravelConfig>();
-        unravelConfig.ShouldNotBeNull();
-
         var cancellationTokenSource = new CancellationTokenSource();
         cancellationTokenSource.CancelAfter(TimeSpan.FromMinutes(1));
 
         using var httpClient = new HttpClient();
-
+        var unravelConfig = GetConfig();
         var svc = new UnravelApiService(httpClient, unravelConfig);
 
         var tickers = "ADA,AVAX,BCH,BNB,BTC,DOGE,DOT,ETH,HBAR,HYPE,LINK,LTC,MNT,SHIB,SOL,SUI,TON,TRX,XLM,XRP".Split(',');
@@ -696,5 +674,21 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         // assert
         result.ShouldNotBeNull();
         result.Tickers.ShouldBe(normalizedTickers);
+    }
+
+    private static UnravelConfig GetConfig()
+    {
+        var builder = new ConfigurationBuilder()
+            .AddJsonFile("appsettings.json")
+            .AddJsonFile($"appsettings.local.json", true)
+            .AddEnvironmentVariables();
+
+        var unravelConfig = builder
+            .Build()
+            .GetRequiredSection("Unravel")
+            .Get<UnravelConfig>()
+            .ShouldNotBeNull();
+
+        return unravelConfig;
     }
 }
