@@ -48,7 +48,7 @@ Each trading strategy is independently configured and can be triggered via:
 
 ### Example: Multiple Strategies
 
-See [appsettings.example.json](appsettings.example.json) for a complete example.
+See [appsettings.json](../appsettings.json) for a complete example.
 
 ## Adding a New Strategy
 
