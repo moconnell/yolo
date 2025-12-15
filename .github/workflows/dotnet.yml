@@ -18,6 +18,11 @@ jobs:
       - name: Build
         run: dotnet build --no-restore
       - name: Test
+        env:
+          HYPERLIQUID__ADDRESS: ${{ secrets.HYPERLIQUID__ADDRESS }}
+          HYPERLIQUID__PRIVATEKEY: ${{ secrets.HYPERLIQUID__PRIVATEKEY }}
+          ROBOTWEALTH__APIKEY: ${{ secrets.ROBOTWEALTH__APIKEY }}
+          UNRAVEL__APIKEY: ${{ secrets.UNRAVEL__APIKEY }}
         run: dotnet test --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage
       - name: Merge coverage reports
         run: |
