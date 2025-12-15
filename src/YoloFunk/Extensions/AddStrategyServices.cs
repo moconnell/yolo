@@ -138,10 +138,6 @@ public static class AddStrategyServices
         // Register ITradeFactory for this strategy
         services.AddKeyedSingleton<ITradeFactory>(strategyKey, (sp, key) =>
         {
-            var factors = factorProviders
-                .Select(fpKey => sp.GetRequiredKeyedService<IGetFactors>(fpKey))
-                .ToArray();
-
             return new TradeFactory(
                 sp.GetRequiredKeyedService<YoloConfig>(strategyKey),
                 sp.GetRequiredService<ILogger<TradeFactory>>());
