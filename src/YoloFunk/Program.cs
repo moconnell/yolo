@@ -17,7 +17,6 @@ var config = builder.Configuration;
 
 builder.Services.AddLogging()
                 .AddHttpClient()
-                .AddTradeFactory()
                 .AddSingleton<IConfiguration>(config);
 
 // Register each strategy from configuration

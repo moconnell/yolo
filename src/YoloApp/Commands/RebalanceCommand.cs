@@ -19,19 +19,23 @@ public class RebalanceCommand : ICommand
     private readonly IYoloBroker _broker;
     private readonly YoloConfig _yoloConfig;
     private readonly ILogger<RebalanceCommand> _logger;
-
     public RebalanceCommand(ICalcWeights weightsService, ITradeFactory tradeFactory, IYoloBroker broker, IOptions<YoloConfig> options, ILogger<RebalanceCommand> logger)
+        : this(weightsService, tradeFactory, broker, options.Value, logger)
+    {
+    }
+
+    public RebalanceCommand(ICalcWeights weightsService, ITradeFactory tradeFactory, IYoloBroker broker, YoloConfig yoloConfig, ILogger<RebalanceCommand> logger)
     {
         ArgumentNullException.ThrowIfNull(weightsService, nameof(weightsService));
         ArgumentNullException.ThrowIfNull(tradeFactory, nameof(tradeFactory));
         ArgumentNullException.ThrowIfNull(broker, nameof(broker));
-        ArgumentNullException.ThrowIfNull(options, nameof(options));
+        ArgumentNullException.ThrowIfNull(yoloConfig, nameof(yoloConfig));
         ArgumentNullException.ThrowIfNull(logger, nameof(logger));
 
         _weightsService = weightsService;
         _tradeFactory = tradeFactory;
         _broker = broker;
-        _yoloConfig = options.Value;
+        _yoloConfig = yoloConfig;
         _logger = logger;
     }
 

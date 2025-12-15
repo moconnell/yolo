@@ -4,7 +4,6 @@ using HyperLiquid.Net.Clients;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using RobotWealth.Api;
 using RobotWealth.Api.Config;
 using Unravel.Api;
@@ -17,6 +16,7 @@ using YoloBroker;
 using YoloBroker.Hyperliquid;
 using YoloBroker.Hyperliquid.Config;
 using YoloBroker.Interface;
+using YoloTrades;
 using YoloWeights;
 
 namespace YoloFunk.Extensions;
@@ -134,16 +134,26 @@ public static class AddStrategyServices
                 sp.GetRequiredService<ILogger<YoloWeightsService>>());
         });
 
+        // Register ICalcWeights for this strategy
+        services.AddKeyedSingleton<ITradeFactory>(strategyKey, (sp, key) =>
+        {
+            var factors = factorProviders
+                .Select(fpKey => sp.GetRequiredKeyedService<IGetFactors>(fpKey))
+                .ToArray();
+
+            return new TradeFactory(
+                sp.GetRequiredKeyedService<YoloConfig>(strategyKey),
+                sp.GetRequiredService<ILogger<TradeFactory>>());
+        });
+
         // Register RebalanceCommand for this strategy
         services.AddKeyedScoped<ICommand>(strategyKey, (sp, key) =>
         {
-            var yoloConfigOptions = Options.Create(sp.GetRequiredKeyedService<YoloConfig>(strategyKey));
-
             return new RebalanceCommand(
                 sp.GetRequiredKeyedService<ICalcWeights>(strategyKey),
-                sp.GetRequiredService<ITradeFactory>(),
+                sp.GetRequiredKeyedService<ITradeFactory>(strategyKey),
                 sp.GetRequiredKeyedService<IYoloBroker>(strategyKey),
-                yoloConfigOptions,
+                sp.GetRequiredKeyedService<YoloConfig>(strategyKey),
                 sp.GetRequiredService<ILogger<RebalanceCommand>>());
         });
 
