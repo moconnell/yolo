@@ -63,7 +63,7 @@ echo "------------------------------------------"
 cd "$(dirname "$0")"
 az deployment group create \
   --resource-group $RESOURCE_GROUP \
-  --template-file .azure/app-insights.bicep \
+  --template-file ../.azure/app-insights.bicep \
   --parameters location=$LOCATION
 echo "✅ Application Insights created"
 
