@@ -683,7 +683,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
             .AddJsonFile($"appsettings.local.json", true)
             .AddEnvironmentVariables();
         var config = builder.Build();
-        var unravelConfig = config.GetChildren().First().Get<UnravelConfig>();
+        var unravelConfig = config.GetRequiredSection("Unravel").Get<UnravelConfig>();
         unravelConfig.ShouldNotBeNull();
         return unravelConfig;
     }
