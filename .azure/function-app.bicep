@@ -120,7 +120,7 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
         {
           name: 'Strategies__YoloDaily__Hyperliquid__PrivateKey'
           value: !empty(keyVaultName)
-            ? '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/hyperliquid-${secretEnv}-privatekey/)'
+            ? '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/hyperliquid-${secretEnv}-agent-privatekey/)'
             : ''
         }
         {
@@ -142,7 +142,7 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
         {
           name: 'Strategies__UnravelDaily__Hyperliquid__PrivateKey'
           value: !empty(keyVaultName)
-            ? '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/hyperliquid-${secretEnv}-privatekey/)'
+            ? '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/hyperliquid-${secretEnv}-agent-privatekey/)'
             : ''
         }
         {
