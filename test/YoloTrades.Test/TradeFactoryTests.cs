@@ -3,7 +3,6 @@ using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using Shouldly;
 using Snapshooter.Xunit;
 using Xunit.Abstractions;
 using YoloAbstractions;

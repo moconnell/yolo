@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Configuration;
 using RobotWealth.Api.Extensions;
-using Shouldly;
 
 namespace RobotWealth.Api.Test;
 

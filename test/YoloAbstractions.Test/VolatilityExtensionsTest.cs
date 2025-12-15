@@ -1,4 +1,3 @@
-using Shouldly;
 using YoloAbstractions.Extensions;
 
 namespace YoloAbstractions.Test;
@@ -170,7 +169,7 @@ public class VolatilityExtensionsTest
         decimal price = 100m;
         for (int i = 0; i < 100; i++)
         {
-            price *= (decimal) (1 + (random.NextDouble() - 0.5) * 0.02); // +/- 1% daily
+            price *= (decimal)(1 + (random.NextDouble() - 0.5) * 0.02); // +/- 1% daily
             closes.Add(price);
         }
 
@@ -250,7 +249,7 @@ public class VolatilityExtensionsTest
             Assert.Throws<ArgumentOutOfRangeException>(() => closes.AnnualizedVolatility(periodsPerYear));
             return;
         }
-        
+
         // Act
         var volatility = closes.AnnualizedVolatility(periodsPerYear);
 

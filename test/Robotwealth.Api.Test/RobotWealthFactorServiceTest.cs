@@ -1,6 +1,4 @@
-﻿using Moq;
-using Shouldly;
-using RobotWealth.Api.Data;
+﻿using RobotWealth.Api.Data;
 using RobotWealth.Api.Interfaces;
 using YoloAbstractions;
 using YoloAbstractions.Exceptions;
@@ -10,17 +8,17 @@ namespace RobotWealth.Api.Test;
 public class RobotWealthFactorServiceTest
 {
     private const string BtcUsdt = "BTCUSDT";
-    
+
     [Fact]
     public void GivenApiService_ShouldReturnFixedUniverse()
     {
         // arrange
         var mockApiSvc = new Mock<IRobotWealthApiService>();
         var svc = new RobotWealthFactorService(mockApiSvc.Object);
-        
+
         // act
         var isFixedUniverse = svc.IsFixedUniverse;
-        
+
         // assert
         isFixedUniverse.ShouldBeTrue();
     }

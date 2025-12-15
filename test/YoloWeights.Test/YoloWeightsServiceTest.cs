@@ -1,6 +1,4 @@
 ﻿using Microsoft.Extensions.Logging;
-using Moq;
-using Shouldly;
 using Xunit.Abstractions;
 using YoloAbstractions;
 using YoloAbstractions.Config;
@@ -50,7 +48,7 @@ public class YoloWeightsServiceTest
         };
 
         var testDate = new DateTime(2025, 10, 13, 0, 0, 0, DateTimeKind.Utc);
-        
+
         var mockFactorService1 = new Mock<IGetFactors>();
         mockFactorService1.Setup(x => x.GetFactorsAsync(
                 It.IsAny<IEnumerable<string>>(),

@@ -1,4 +1,3 @@
-using Moq;
 using YoloAbstractions;
 
 namespace YoloTrades.Test;

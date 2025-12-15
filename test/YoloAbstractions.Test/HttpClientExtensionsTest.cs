@@ -2,7 +2,6 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using Moq.Protected;
-using Shouldly;
 using YoloAbstractions.Exceptions;
 using YoloAbstractions.Extensions;
 using YoloAbstractions.Interfaces;
