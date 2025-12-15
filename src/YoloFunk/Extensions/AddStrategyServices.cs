@@ -135,7 +135,7 @@ public static class AddStrategyServices
                 sp.GetRequiredService<ILogger<YoloWeightsService>>());
         });
 
-        // Register ICalcWeights for this strategy
+        // Register ITradeFactory for this strategy
         services.AddKeyedSingleton<ITradeFactory>(strategyKey, (sp, key) =>
         {
             var factors = factorProviders
