@@ -21,7 +21,10 @@ public class YoloDailyScheduledRebalance
     }
 
     [Function(nameof(YoloDailyScheduledRebalance))]
-    public async Task Run([TimerTrigger("0 30 0 * * *")] TimerInfo myTimer, CancellationToken cancellationToken)
+    [ExponentialBackoffRetry(3, "00:05:00", "00:30:00")]
+    public async Task Run(
+        [TimerTrigger("%Strategies:YoloDaily:Schedule%")] TimerInfo myTimer,
+        CancellationToken cancellationToken)
     {
         _logger.LogInformation("{Strategy} scheduled rebalance executed at: {executionTime}",
             StrategyKey, DateTime.UtcNow);

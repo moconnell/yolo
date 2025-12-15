@@ -21,8 +21,9 @@ public class UnravelDailyScheduledRebalance
     }
 
     [Function(nameof(UnravelDailyScheduledRebalance))]
+    [ExponentialBackoffRetry(3, "00:05:00", "00:30:00")]
     public async Task Run(
-        [TimerTrigger("0 30 0 * * *")] TimerInfo myTimer, // Daily at 12:30am
+        [TimerTrigger("%Strategies:UnravelDaily:Schedule%")] TimerInfo myTimer,
         CancellationToken cancellationToken)
     {
         _logger.LogInformation("{Strategy} scheduled rebalance executed at: {executionTime}",
