@@ -3,119 +3,127 @@ name: Cleanup Azure Functions
 permissions: {}
 
 on:
-    pull_request:
-        types: [closed]
-    workflow_dispatch:
-        inputs:
-            environment:
-                description: "Environment to cleanup (pr-{number}, feat-{name}, or dev)"
-                required: true
-                type: string
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to cleanup (pr-{number}, feat-{name}, or dev)"
+        required: true
+        type: string
 
 env:
-    AZURE_RESOURCE_GROUP: "ResourceGroup1"
+  AZURE_RESOURCE_GROUP: "ResourceGroup1"
 
 jobs:
-    cleanup:
-        permissions:
-            pull-requests: write
-        runs-on: ubuntu-latest
-        steps:
-            - name: Determine environment to cleanup
-              id: set-env
-              run: |
-                  if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-                    ENV="${{ github.event.inputs.environment }}"
-                  elif [ "${{ github.event_name }}" = "pull_request" ]; then
-                    ENV="pr-${{ github.event.pull_request.number }}"
-                  else
-                    echo "Unknown event type"
-                    exit 1
-                  fi
+  cleanup:
+    permissions:
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine environment to cleanup
+        id: set-env
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ENV="${{ github.event.inputs.environment }}"
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            ENV="pr-${{ github.event.pull_request.number }}"
+          else
+            echo "Unknown event type"
+            exit 1
+          fi
 
-                  # Never allow cleanup of production
-                  if [ "$ENV" = "prod" ]; then
-                    echo "❌ Cannot cleanup production environment via automation"
-                    exit 1
-                  fi
+          # Never allow cleanup of production
+          if [ "$ENV" = "prod" ]; then
+            echo "❌ Cannot cleanup production environment via automation"
+            exit 1
+          fi
 
-                  echo "environment=$ENV" >> $GITHUB_OUTPUT
-                  echo "function-app-name=yolo-funk-$ENV" >> $GITHUB_OUTPUT
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+          echo "function-app-name=yolo-funk-$ENV" >> $GITHUB_OUTPUT
 
-            - name: Azure Login
-              uses: azure/login@v2
-              with:
-                  creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-            - name: Delete Function App and related resources
-              run: |
-                  FUNCTION_APP_NAME="${{ steps.set-env.outputs.function-app-name }}"
+      - name: Delete Function App and related resources
+        run: |
+          FUNCTION_APP_NAME="${{ steps.set-env.outputs.function-app-name }}"
 
-                  # Check if Function App exists
-                  if az functionapp show \
-                    --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-                    --name $FUNCTION_APP_NAME 2>/dev/null; then
-                    
-                    echo "Deleting Function App: $FUNCTION_APP_NAME"
-                    
-                    # Get associated resources
-                    PLAN_ID=$(az functionapp show \
-                      --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-                      --name $FUNCTION_APP_NAME \
-                      --query 'serverFarmId' \
-                      --output tsv)
-                    
-                    PLAN_NAME=$(basename $PLAN_ID)
-                    
-                    # Delete Function App
-                    az functionapp delete \
-                      --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-                      --name $FUNCTION_APP_NAME
-                    
-                    # Delete App Service Plan
-                    az appservice plan delete \
-                      --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-                      --name $PLAN_NAME \
-                      --yes
-                    
-                    # Delete Storage Account (find by tag or naming convention)
-                    STORAGE_ACCOUNTS=$(az storage account list \
-                      --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-                      --query "[?starts_with(name, 'yolofunk')].name" \
-                      --output tsv)
-                    
-                    for STORAGE in $STORAGE_ACCOUNTS; do
-                      # Check if storage is associated with this environment
-                      TAGS=$(az storage account show \
-                        --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-                        --name $STORAGE \
-                        --query 'tags' \
-                        --output json 2>/dev/null || echo '{}')
-                      
-                      # Delete storage accounts with no tags (likely ephemeral) or matching environment
-                      if [ "$TAGS" = "{}" ] || [[ "$STORAGE" == *"${{ steps.set-env.outputs.environment }}"* ]]; then
-                        echo "Deleting storage account: $STORAGE"
-                        az storage account delete \
-                          --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-                          --name $STORAGE \
-                          --yes
-                      fi
-                    done
-                    
-                    echo "✅ Cleanup complete for $FUNCTION_APP_NAME"
-                  else
-                    echo "Function App $FUNCTION_APP_NAME not found, skipping cleanup"
-                  fi
+          # Check if Function App exists
+          if az functionapp show \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --name $FUNCTION_APP_NAME 2>/dev/null; then
+            
+            echo "Deleting Function App: $FUNCTION_APP_NAME"
+            
+            # Get associated resources
+            PLAN_ID=$(az functionapp show \
+              --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+              --name $FUNCTION_APP_NAME \
+              --query 'serverFarmId' \
+              --output tsv)
+            
+            PLAN_NAME=$(basename $PLAN_ID)
+            
+            # Delete Function App
+            az functionapp delete \
+              --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+              --name $FUNCTION_APP_NAME
+            
+            # Delete App Service Plan
+            az appservice plan delete \
+              --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+              --name $PLAN_NAME \
+              --yes
+            
+            # Delete Storage Account (find by tag or naming convention)
+            STORAGE_ACCOUNTS=$(az storage account list \
+              --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+              --query "[?starts_with(name, 'yolofunk')].name" \
+              --output tsv)
+            
+            for STORAGE in $STORAGE_ACCOUNTS; do
+              # Check if storage is associated with this environment
+              STORAGE_ENV=$(az storage account show \
+                --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+                --name $STORAGE \
+                --query 'tags.Environment' \
+                --output tsv 2>/dev/null || echo '')
+              
+              # Only delete storage accounts with explicit environment tag matching this environment
+              if [ -n "$STORAGE_ENV" ] && [ "$STORAGE_ENV" = "${{ steps.set-env.outputs.environment }}" ]; then
+                echo "Deleting storage account: $STORAGE (Environment=$STORAGE_ENV)"
+                az storage account delete \
+                  --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+                  --name $STORAGE \
+                  --yes
+              elif [ -z "$STORAGE_ENV" ] && [ "${ALLOW_UNTAGGED_DELETE:-false}" = "true" ]; then
+                echo "Deleting untagged storage account: $STORAGE (ALLOW_UNTAGGED_DELETE=true)"
+                az storage account delete \
+                  --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+                  --name $STORAGE \
+                  --yes
+              else
+                echo "Skipping storage account: $STORAGE (Environment=${STORAGE_ENV:-untagged})"
+              fi
+            done
+            
+            echo "✅ Cleanup complete for $FUNCTION_APP_NAME"
+          else
+            echo "Function App $FUNCTION_APP_NAME not found, skipping cleanup"
+          fi
 
-            - name: Comment on PR
-              if: github.event_name == 'pull_request'
-              uses: actions/github-script@v7
-              with:
-                  github-token: ${{ secrets.GITHUB_TOKEN }}
-                  script: |
-                      github.rest.issues.createComment({
-                        issue_number: context.issue.number,
-                        owner: context.repo.owner,
-                        repo: context.repo.repo,
-                        body: `### 🧹 Environment Cleaned Up\n\nThe ephemeral Azure Functions environment \`${{ steps.set-env.outputs.function-app-name }}\` has been deleted.\n\nAll associated resources (Function App, App Service Plan, Storage Account) have been removed.`
-                      })
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `### 🧹 Environment Cleaned Up\n\nThe ephemeral Azure Functions environment \`${{ steps.set-env.outputs.function-app-name }}\` has been deleted.\n\nAll associated resources (Function App, App Service Plan, Storage Account) have been removed.`
+            })
