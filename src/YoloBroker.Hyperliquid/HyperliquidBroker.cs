@@ -720,7 +720,7 @@ public sealed class HyperliquidBroker : IYoloBroker
     }
 
     private async Task<Dictionary<string, IReadOnlyList<MarketInfo>>> GetSpotMarketsAsync(
-        ISet<string>? baseAssetFilter,
+        HashSet<string>? baseAssetFilter,
         string quoteCurrency,
         CancellationToken ct = default)
     {
@@ -784,7 +784,7 @@ public sealed class HyperliquidBroker : IYoloBroker
     }
 
     private async Task<Dictionary<string, IReadOnlyList<MarketInfo>>> GetFuturesMarketsAsync(
-        ISet<string>? baseAssetFilter,
+        HashSet<string>? baseAssetFilter,
         string quoteCurrency,
         CancellationToken ct = default)
     {

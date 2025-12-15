@@ -47,6 +47,8 @@ public static class AddStrategyServices
             throw new ConfigException($"Strategy '{strategyKey}' missing Hyperliquid broker configuration");
         }
 
+        var throwOnMissingData = !hyperliquidConfig.UseTestnet;
+
         services.AddKeyedSingleton<IYoloBroker>(strategyKey, (sp, key) =>
         {
             // Create strategy-specific HyperLiquid clients
@@ -105,8 +107,7 @@ public static class AddStrategyServices
             var bvKey = $"{strategyKey}-broker-volatility";
             services.AddKeyedSingleton<IGetFactors>(bvKey, (sp, key) =>
             {
-                return new BrokerVolatilityFactorService(
-                    sp.GetRequiredKeyedService<IYoloBroker>(strategyKey));
+                return new BrokerVolatilityFactorService(sp.GetRequiredKeyedService<IYoloBroker>(strategyKey), throwOnMissingData);
             });
             factorProviders.Add(bvKey);
 

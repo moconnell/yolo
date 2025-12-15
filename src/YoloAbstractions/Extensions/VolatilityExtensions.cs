@@ -9,11 +9,15 @@ public static class VolatilityExtensions
     /// <param name="periodsPerYear">
     /// Number of periods per year (252 for equities, 365 for crypto daily data).
     /// </param>
-    public static double AnnualizedVolatility(this IEnumerable<decimal> closes, int periodsPerYear = 365)
+    public static double AnnualizedVolatility(this IEnumerable<decimal> closes, int periodsPerYear = 365, bool throwOnMissingData = true)
     {
         var prices = closes.ToList();
         if (prices.Count < 2)
-            throw new ArgumentException("At least two closing prices are required.");
+        {
+            if (throwOnMissingData)
+                throw new ArgumentException("At least two closing prices are required.");
+            return double.NaN;
+        }
         if (prices.Any(x => x <= 0))
             throw new ArgumentException("All closing prices must be positive.");
         if (periodsPerYear <= 0)
@@ -26,7 +30,7 @@ public static class VolatilityExtensions
         for (var i = 1; i < prices.Count; i++)
         {
 
-            var r = Math.Log((double) (prices[i] / prices[i - 1]));
+            var r = Math.Log((double)(prices[i] / prices[i - 1]));
             logReturns.Add(r);
         }
 

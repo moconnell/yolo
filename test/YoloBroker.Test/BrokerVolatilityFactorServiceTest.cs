@@ -282,4 +282,49 @@ public class BrokerVolatilityFactorServiceTest
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task GetFactorsAsync_WhenBrokerThrows_ShouldReturnNaN(bool throwOnMissingData)
+    {
+        // arrange
+        var mockBroker = new Mock<IYoloBroker>();
+        var prices = new List<decimal> { 100m, 102m, 98m, 101m, 99m, 103m, 97m, 100m, 104m, 96m };
+
+        mockBroker.Setup(b => b.GetDailyClosePricesAsync(
+                BtcUsdt,
+                30,
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(prices);
+
+        mockBroker.Setup(b => b.GetDailyClosePricesAsync(
+                EthUsdt,
+                30,
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Exception("Data not found"));
+
+        var service = new BrokerVolatilityFactorService(mockBroker.Object, throwOnMissingData);
+
+        if (throwOnMissingData)
+        {
+            // act & assert
+            await Should.ThrowAsync<Exception>(async () =>
+            {
+                await service.GetFactorsAsync([BtcUsdt, EthUsdt]);
+            });
+        }
+        else
+        {
+            // act
+            var result = await service.GetFactorsAsync([BtcUsdt, EthUsdt]);
+
+            // assert
+            result.ShouldNotBeNull();
+            result.ShouldNotBe(FactorDataFrame.Empty);
+            result[FactorType.Volatility, EthUsdt].ShouldBe(double.NaN);
+        }
+    }
 }
