@@ -43,7 +43,7 @@ public static partial class LoggerExtensions
         int? errorCode);
 
     [LoggerMessage(
-        EventId = WellKnown.TradeEventIds.OrderError,
+        EventId = WellKnown.TradeEventIds.OrderUpdate,
         Level = LogLevel.Information,
         Message = "({Token}): {Type} {Message}")]
     public static partial void OrderUpdate(
