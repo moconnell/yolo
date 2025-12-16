@@ -58,14 +58,21 @@ jobs:
             
             echo "Deleting Function App: $FUNCTION_APP_NAME"
             
-            # Get associated resources
+            # Get associated resources (App Service Plan name from resource ID)
             PLAN_ID=$(az functionapp show \
               --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
               --name $FUNCTION_APP_NAME \
-              --query 'serverFarmId' \
+              --query 'appServicePlanId' \
               --output tsv)
             
-            PLAN_NAME=$(basename $PLAN_ID)
+            # Extract plan name from resource ID (format: /subscriptions/.../serverfarms/PLAN_NAME)
+            if [ -n "$PLAN_ID" ]; then
+              PLAN_NAME=$(echo "$PLAN_ID" | awk -F'/' '{print $NF}')
+            else
+              PLAN_NAME="${FUNCTION_APP_NAME}-plan"
+            fi
+            
+            echo "App Service Plan: $PLAN_NAME"
             
             # Delete Function App
             az functionapp delete \
