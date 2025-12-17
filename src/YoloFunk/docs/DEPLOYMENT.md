@@ -26,7 +26,7 @@ Or use VS Code debugger (F5).
 **Manual HTTP triggers:**
 
 ```bash
-curl -X POST http://localhost:7071/api/rebalance/yolo-daily
+curl -X POST http://localhost:7071/api/rebalance/yolodaily
 ```
 
 ---
@@ -87,12 +87,12 @@ Instead of using `local.settings.json`, set Application Settings in Azure:
 ```bash
 # Example: Configure strategy settings
 az functionapp config appsettings set \
-  --name yolo-funk \
+  --name yolo-funk-prod \
   --resource-group yolo-rg \
   --settings \
-    "Strategies__YoloDaily__Hyperliquid__Address=@Microsoft.KeyVault(VaultName=my-vault;SecretName=yolo-daily-address)" \
-    "Strategies__YoloDaily__Hyperliquid__PrivateKey=@Microsoft.KeyVault(VaultName=my-vault;SecretName=yolo-daily-key)" \
-    "Strategies__YoloDaily__Yolo__MaxLeverage=2" \
+    "Strategies__YoloDaily__Yolo__MaxLeverage=1.5" \
+    "Strategies__YoloDaily__Yolo__NotionalCash=25000" \
+    "Strategies__YoloDaily__Schedule=0 15 9 * * *" \
     # ... add all other settings
 ```
 
