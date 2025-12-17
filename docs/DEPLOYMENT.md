@@ -17,7 +17,6 @@ This document describes how to deploy the YOLO trading application to Azure Func
 The YOLO trading application uses a GitOps approach with automated deployments:
 
 - **Feature branches / PRs** → Ephemeral test environments (auto-created, auto-deleted)
-- **`develop` branch** → Development environment (Hyperliquid testnet)
 - **`master` branch** → Production environment (Hyperliquid mainnet, requires approval)
 
 All infrastructure is provisioned automatically using Azure Bicep templates.
@@ -27,7 +26,6 @@ All infrastructure is provisioned automatically using Azure Bicep templates.
 | Environment  | Branch            | Azure Function App      | Hyperliquid Network | Auto-Deploy            | Auto-Cleanup   |
 | ------------ | ----------------- | ----------------------- | ------------------- | ---------------------- | -------------- |
 | PR / Feature | `feature/*` or PR | `yolo-funk-pr-{number}` | testnet             | ✅                     | ✅ on PR close |
-| Development  | `develop`         | `yolo-funk-dev`         | testnet             | ✅                     | ❌             |
 | Production   | `master`          | `yolo-funk-prod`        | mainnet             | ✅ (approval required) | ❌             |
 
 ## Prerequisites
@@ -85,27 +83,43 @@ az keyvault create \
   --resource-group rg-yolo-funk \
   --location australiaeast
 
-# Add secrets for development environment
+# Add API secrets as applicable
 az keyvault secret set \
   --vault-name yolo-vault \
-  --name "yolo-dev-hyperliquid-address" \
-  --value "0xYourTestnetAddress"
+  --name "robotwealth-api-key" \
+  --value "YourApiKey"
 
 az keyvault secret set \
   --vault-name yolo-vault \
-  --name "yolo-dev-hyperliquid-privatekey" \
-  --value "YourTestnetPrivateKey"
+  --name "unravel-api-key" \
+  --value "YourApiKey"
+
+# Add secrets for development environment
+az keyvault secret set \
+  --vault-name yolo-vault \
+  --name "hyperliquid-dev-agent-address" \
+  --value "0xYourTestnetAgentAddress"
+
+az keyvault secret set \
+  --vault-name yolo-vault \
+  --name "hyperliquid-dev-agent-privatekey" \
+  --value "YourTestnetAgentPrivateKey"
 
 # Add secrets for production environment
 az keyvault secret set \
   --vault-name yolo-vault \
-  --name "yolo-prod-hyperliquid-address" \
-  --value "0xYourMainnetAddress"
+  --name "hyperliquid-prod-agent-address" \
+  --value "0xYourMainnetAgentAddress"
 
 az keyvault secret set \
   --vault-name yolo-vault \
-  --name "yolo-prod-hyperliquid-privatekey" \
-  --value "YourMainnetPrivateKey"
+  --name "hyperliquid-prod-agent-privatekey" \
+  --value "YourMainnetAgentPrivateKey"
+
+az keyvault secret set \
+  --vault-name yolo-vault \
+  --name "hyperliquid-prod-vaultaddress" \
+  --value "OxYourMainnetHyperliquidSubaccount"
 ```
 
 ### 5. Create GitHub Environments (for manual approvals)
@@ -114,14 +128,6 @@ az keyvault secret set \
 2. Create environment named `production`
 3. Enable "Required reviewers" and add yourself
 4. (Optional) Create `development` environment without restrictions
-
-### 6. Create `develop` Branch
-
-```bash
-# Create and push develop branch
-git checkout -b develop
-git push -u origin develop
-```
 
 ## Configuration
 
@@ -132,25 +138,23 @@ After first deployment, configure each Function App with application settings. S
 1. **Azure Portal**: Function App → Configuration → Application settings
 2. **Azure CLI**: See examples below
 
-#### Development Environment Settings
+#### Development/PR Environment Settings
+
+Probably no overrides required - other than schedule MUST be set for each strategy or else the timed job will fail, if testing thereof is desired:
 
 ```bash
-FUNCTION_APP="yolo-funk-dev"
+FUNCTION_APP="yolo-funk-pr-83"
 
-# Strategy configurations
 az functionapp config appsettings set \
   --name $FUNCTION_APP \
   --resource-group rg-yolo-funk \
   --settings \
-    "Strategies__MomentumDaily__Yolo__MaxLeverage=1.0" \
-    "Strategies__MomentumDaily__Yolo__MaxNumAssets=10" \
-    "Strategies__MomentumDaily__Hyperliquid__Address=@Microsoft.KeyVault(VaultName=yolo-vault;SecretName=yolo-dev-hyperliquid-address)" \
-    "Strategies__MomentumDaily__Hyperliquid__PrivateKey=@Microsoft.KeyVault(VaultName=yolo-vault;SecretName=yolo-dev-hyperliquid-privatekey)" \
-    "Strategies__MomentumDaily__RobotWealth__ApiKey=@Microsoft.KeyVault(VaultName=yolo-vault;SecretName=robotwealth-api-key)" \
-    "Strategies__MomentumDaily__Schedule=0 0 2 * * *"
+    "Strategies__MomentumDaily__Schedule=*/5 * * * *"
 ```
 
 #### Production Environment Settings
+
+Can be overridden as desired - schedule MUST be set for each strategy or else the timed job will fail:
 
 ```bash
 FUNCTION_APP="yolo-funk-prod"
@@ -160,11 +164,8 @@ az functionapp config appsettings set \
   --resource-group rg-yolo-funk \
   --settings \
     "Strategies__MomentumDaily__Yolo__MaxLeverage=3.0" \
-    "Strategies__MomentumDaily__Yolo__MaxNumAssets=20" \
-    "Strategies__MomentumDaily__Hyperliquid__Address=@Microsoft.KeyVault(VaultName=yolo-vault;SecretName=yolo-prod-hyperliquid-address)" \
-    "Strategies__MomentumDaily__Hyperliquid__PrivateKey=@Microsoft.KeyVault(VaultName=yolo-vault;SecretName=yolo-prod-hyperliquid-privatekey)" \
-    "Strategies__MomentumDaily__RobotWealth__ApiKey=@Microsoft.KeyVault(VaultName=yolo-vault;SecretName=robotwealth-api-key)" \
-    "Strategies__MomentumDaily__Schedule=0 0 1 * * *"
+    "Strategies__MomentumDaily__Yolo__NotionalCash=20000" \
+    "Strategies__MomentumDaily__Schedule=0 30 0 * * *"
 ```
 
 ### Local Development
@@ -178,10 +179,11 @@ Create `src/YoloFunk/local.settings.json` (git-ignored):
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
     "Strategies__MomentumDaily__Yolo__MaxLeverage": "1.0",
-    "Strategies__MomentumDaily__Yolo__MaxNumAssets": "5",
-    "Strategies__MomentumDaily__Hyperliquid__Address": "0xYourTestnetAddress",
-    "Strategies__MomentumDaily__Hyperliquid__PrivateKey": "YourTestnetPrivateKey",
+    "Strategies__MomentumDaily__Yolo__NotionalCash": "1000",
+    "Strategies__MomentumDaily__Hyperliquid__Dev__Agent__Address": "0xYourTestnetAddress",
+    "Strategies__MomentumDaily__Hyperliquid__Dev__Agent__PrivateKey": "YourTestnetPrivateKey",
     "Strategies__MomentumDaily__RobotWealth__ApiKey": "YourApiKey",
+    "Strategies__MomentumDaily__Unravel__ApiKey": "YourApiKey",
     "Strategies__MomentumDaily__Schedule": "0 */5 * * * *"
   }
 }
@@ -199,13 +201,7 @@ Create `src/YoloFunk/local.settings.json` (git-ignored):
 4. **Automatic**: Infrastructure provisioned and code deployed to `yolo-funk-pr-{number}`
 5. PR receives comment with deployment URL
 6. Test your changes in isolated environment
-7. When PR is closed/merged: **Automatic cleanup** deletes all resources
-
-#### Development Environment
-
-1. Merge to `develop` branch
-2. **Automatic**: Deploys to `yolo-funk-dev` (testnet)
-3. No approval required
+7. When PR is closed/merged to `master`: **Automatic cleanup** deletes all resources
 
 #### Production Environment
 
@@ -290,6 +286,7 @@ Ephemeral PR environments are automatically cleaned up to minimize costs.
 1. Check Application Insights logs for errors
 2. Verify configuration settings (especially Key Vault references)
 3. Check that managed identity has Key Vault access:
+
    ```bash
    az functionapp identity show --name yolo-funk-dev --resource-group rg-yolo-funk
    az keyvault show --name yolo-vault --query properties.accessPolicies
