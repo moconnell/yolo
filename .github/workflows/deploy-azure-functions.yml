@@ -88,9 +88,10 @@ jobs:
             echo "function-app-name=yolo-funk-dev" >> $GITHUB_OUTPUT
             echo "hyperliquid-network=testnet" >> $GITHUB_OUTPUT
             echo "deploy=true" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.ref }}" == refs/heads/feature/* ]]; then
+          elif [[ "${{ github.ref }}" == refs/heads/feat* ]]; then
             # Extract branch name and sanitize for Azure naming
-            BRANCH_NAME=$(echo "${{ github.ref }}" | sed 's/refs\/heads\/feature\///' | sed 's/[^a-zA-Z0-9-]/-/g' | cut -c1-20)
+            # Handles both feat/* and feature/* patterns
+            BRANCH_NAME=$(echo "${{ github.ref }}" | sed 's/refs\/heads\/feat[^\/]*\///' | sed 's/[^a-zA-Z0-9-]/-/g' | cut -c1-20)
             ENV="feat-$BRANCH_NAME"
             echo "environment=$ENV" >> $GITHUB_OUTPUT
             echo "function-app-name=yolo-funk-$ENV" >> $GITHUB_OUTPUT
