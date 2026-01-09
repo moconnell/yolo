@@ -2,9 +2,14 @@ name: .NET
 
 on: [push, pull_request]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   build:
-    environment: development
+    # Skip environment requirement for Dependabot PRs (they can't access secrets)
+    environment: ${{ github.actor != 'dependabot[bot]' && 'development' || '' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -18,12 +23,18 @@ jobs:
       - name: Build
         run: dotnet build --no-restore
       - name: Test
+        # Only run integration tests if secrets are available (not Dependabot)
+        if: github.actor != 'dependabot[bot]'
         env:
           HYPERLIQUID__ADDRESS: ${{ secrets.HYPERLIQUID__ADDRESS }}
           HYPERLIQUID__PRIVATEKEY: ${{ secrets.HYPERLIQUID__PRIVATEKEY }}
           ROBOTWEALTH__APIKEY: ${{ secrets.ROBOTWEALTH__APIKEY }}
           UNRAVEL__APIKEY: ${{ secrets.UNRAVEL__APIKEY }}
         run: dotnet test --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage
+      - name: Test (Dependabot - skip integration tests)
+        # Run tests without secrets for Dependabot PRs
+        if: github.actor == 'dependabot[bot]'
+        run: dotnet test --no-build --verbosity normal --filter "Category!=Integration" --collect:"XPlat Code Coverage" --results-directory ./coverage
       - name: Merge coverage reports
         run: |
           dotnet tool install -g dotnet-reportgenerator-globaltool
@@ -34,3 +45,16 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           file: ./coverage/merged/Cobertura.xml
           format: cobertura
+
+      - name: Comment on Dependabot PR
+        if: github.actor == 'dependabot[bot]' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `### ✅ Build Successful (Dependabot)\n\n**Note:** Integration tests requiring secrets were skipped for security.\n\n- ✅ Build completed\n- ✅ Unit tests passed\n- ⏭️ Integration tests skipped (no secrets)\n- ⏭️ Azure deployment skipped\n\nOnce merged, full integration tests and deployment will run automatically.`
+            })

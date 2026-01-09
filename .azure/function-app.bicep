@@ -26,14 +26,20 @@ var secretEnv = hyperliquidNetwork == 'mainnet' ? 'prod' : 'dev'
 var useTestnet = hyperliquidNetwork == 'mainnet' ? 'false' : 'true'
 
 // Key Vault reference helper
-var keyVaultId = !empty(keyVaultName) ? resourceId('Microsoft.KeyVault/vaults', keyVaultName) : ''
-var keyVaultUri = !empty(keyVaultName) ? 'https://${keyVaultName}.vault.azure.net' : ''
+var keyVaultUri = !empty(keyVaultName) ? 'https://${keyVaultName}.${environment().suffixes.keyvaultDns}' : ''
+
+// Merge environment tags with provided tags
+var resourceTags = union(tags, {
+  Environment: environmentName
+  ManagedBy: 'GitHub'
+  FunctionApp: functionAppName
+})
 
 // Storage Account (required for Azure Functions)
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   name: storageAccountName
   location: location
-  tags: tags
+  tags: resourceTags
   sku: {
     name: 'Standard_LRS'
   }
@@ -53,7 +59,7 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' existing = {
 resource hostingPlan 'Microsoft.Web/serverfarms@2023-01-01' = {
   name: '${functionAppName}-plan'
   location: location
-  tags: tags
+  tags: resourceTags
   sku: {
     name: 'Y1'
     tier: 'Dynamic'
@@ -65,7 +71,7 @@ resource hostingPlan 'Microsoft.Web/serverfarms@2023-01-01' = {
 resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
   name: functionAppName
   location: location
-  tags: tags
+  tags: resourceTags
   kind: 'functionapp'
   identity: {
     type: 'SystemAssigned'
@@ -110,7 +116,6 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
           name: 'HyperliquidNetwork'
           value: hyperliquidNetwork
         }
-        // Hyperliquid configuration from Key Vault (for both strategies)
         {
           name: 'Strategies__YoloDaily__Hyperliquid__Address'
           value: !empty(keyVaultName)
@@ -155,7 +160,6 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
           name: 'Strategies__UnravelDaily__Hyperliquid__UseTestnet'
           value: useTestnet
         }
-        // API Keys from Key Vault
         {
           name: 'Strategies__YoloDaily__RobotWealth__ApiKey'
           value: !empty(keyVaultName)
@@ -165,6 +169,14 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
         {
           name: 'Strategies__UnravelDaily__Unravel__ApiKey'
           value: !empty(keyVaultName) ? '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/unravel-api-key/)' : ''
+        }
+        {
+          name: 'Strategies__YoloDaily__Schedule'
+          value: '0 30 9 * * *'
+        }
+        {
+          name: 'Strategies__UnravelDaily__Schedule'
+          value: '0 30 0 * * *'
         }
       ]
       netFrameworkVersion: 'v10.0'
@@ -183,3 +195,4 @@ output functionAppName string = functionApp.name
 output functionAppId string = functionApp.id
 output functionAppUrl string = 'https://${functionApp.properties.defaultHostName}'
 output principalId string = functionApp.identity.principalId
+output storageAccountName string = storageAccount.name

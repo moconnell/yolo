@@ -50,6 +50,7 @@ jobs:
       - name: Delete Function App and related resources
         run: |
           FUNCTION_APP_NAME="${{ steps.set-env.outputs.function-app-name }}"
+          ENV="${{ steps.set-env.outputs.environment }}"
 
           # Check if Function App exists
           if az functionapp show \
@@ -85,37 +86,23 @@ jobs:
               --name $PLAN_NAME \
               --yes
             
-            # Delete Storage Account (find by tag or naming convention)
+            # Delete Storage Account using tags for precise identification
             STORAGE_ACCOUNTS=$(az storage account list \
               --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-              --query "[?starts_with(name, 'yolofunk')].name" \
+              --query "[?tags.Environment=='$ENV' && tags.FunctionApp=='$FUNCTION_APP_NAME'].name" \
               --output tsv)
             
-            for STORAGE in $STORAGE_ACCOUNTS; do
-              # Check if storage is associated with this environment
-              STORAGE_ENV=$(az storage account show \
-                --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-                --name $STORAGE \
-                --query 'tags.Environment' \
-                --output tsv 2>/dev/null || echo '')
-              
-              # Only delete storage accounts with explicit environment tag matching this environment
-              if [ -n "$STORAGE_ENV" ] && [ "$STORAGE_ENV" = "${{ steps.set-env.outputs.environment }}" ]; then
-                echo "Deleting storage account: $STORAGE (Environment=$STORAGE_ENV)"
+            if [ -n "$STORAGE_ACCOUNTS" ]; then
+              for STORAGE in $STORAGE_ACCOUNTS; do
+                echo "Deleting storage account: $STORAGE (Environment=$ENV, FunctionApp=$FUNCTION_APP_NAME)"
                 az storage account delete \
                   --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
                   --name $STORAGE \
                   --yes
-              elif [ -z "$STORAGE_ENV" ] && [ "${ALLOW_UNTAGGED_DELETE:-false}" = "true" ]; then
-                echo "Deleting untagged storage account: $STORAGE (ALLOW_UNTAGGED_DELETE=true)"
-                az storage account delete \
-                  --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-                  --name $STORAGE \
-                  --yes
-              else
-                echo "Skipping storage account: $STORAGE (Environment=${STORAGE_ENV:-untagged})"
-              fi
-            done
+              done
+            else
+              echo "No storage accounts found with Environment=$ENV and FunctionApp=$FUNCTION_APP_NAME tags"
+            fi
             
             echo "✅ Cleanup complete for $FUNCTION_APP_NAME"
           else
