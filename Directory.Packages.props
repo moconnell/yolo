@@ -28,8 +28,8 @@
     <PackageVersion Include="Moq" Version="4.20.72" />
     <PackageVersion Include="Moq.Contrib.HttpClient" Version="1.4.0" />
     <PackageVersion Include="Nethereum.Signer" Version="5.0.0" />
-    <PackageVersion Include="Nethereum.Signer.EIP712" Version="5.0.0" />
-    <PackageVersion Include="Nethereum.Util" Version="5.0.0" />
+    <PackageVersion Include="Nethereum.Signer.EIP712" Version="5.8.0" />
+    <PackageVersion Include="Nethereum.Util" Version="5.8.0" />
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageVersion Include="Serilog.Extensions.Logging" Version="10.0.0" />
     <PackageVersion Include="Serilog.Extensions.Logging.File" Version="3.0.0" />
