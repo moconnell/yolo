@@ -79,7 +79,9 @@ public static class DataFrameExtensions
 
         int maxBin = bins.Max();
         if (maxBin <= 0)
-            return [.. Enumerable.Repeat(0.0, (int)col.Length)];
+        {
+            return EmptyArray(col, items, n);
+        }
 
         var weights = new double[n];
         for (int k = 0; k < n; k++)
@@ -88,7 +90,9 @@ public static class DataFrameExtensions
         // L1 normalisation
         var denom = weights.Sum(w => Math.Abs(w));
         if (denom <= 0)
-            return [.. Enumerable.Repeat(0.0, (int)col.Length)];
+        {
+            return EmptyArray(col, items, n);
+        }
 
         for (int k = 0; k < n; k++)
             weights[k] /= denom;
@@ -98,5 +102,13 @@ public static class DataFrameExtensions
             result[items[k].Index] = weights[k];
 
         return result;
+
+        static double[] EmptyArray(DoubleDataFrameColumn col, List<(double Value, int Index)> items, int n)
+        {
+            double[] result = [.. Enumerable.Repeat(double.NaN, (int)col.Length)];
+            for (int k = 0; k < n; k++)
+                result[items[k].Index] = 0.0;
+            return result;
+        }
     }
 }
