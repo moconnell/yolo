@@ -47,8 +47,7 @@ public class TradeFactory : ITradeFactory
 
         var unconstrainedTargetLeverage = factorsDict
             .Values
-            .Select(w => Math.Abs(w.Weight))
-            .Sum();
+            .Sum(w => Math.Abs(w.Weight));
 
         var weightConstraint = unconstrainedTargetLeverage < MaxLeverage
             ? 1
@@ -218,7 +217,8 @@ public class TradeFactory : ITradeFactory
                 continue;
 
             var rawSize = delta * nominal / price.Value;
-            var size = market.QuantityStep is null
+            var reduceOnly = rebalanceTarget == 0 || projectedPosition.HasPosition && Math.Sign(weight) != Math.Sign(delta);
+            var size = market.QuantityStep is null || reduceOnly
                 ? rawSize
                 : Math.Floor(rawSize / market.QuantityStep.Value) * market.QuantityStep.Value;
 
@@ -230,14 +230,16 @@ public class TradeFactory : ITradeFactory
                     size,
                     CalcLimitPrice(),
                     OrderType.Limit,
-                    true),
+                    true,
+                    reduceOnly),
                 _ => new Trade(
                     market.Name,
                     market.AssetType,
                     size,
                     isBuy ? market.Ask!.Value : market.Bid!.Value,
                     OrderType.Market,
-                    false)
+                    false,
+                    reduceOnly)
             };
 
             if (trade.IsTradable())
