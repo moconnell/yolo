@@ -752,7 +752,7 @@ public class HyperliquidBrokerTest
         };
 
         mockFuturesTrading
-            .Setup(x => x.GetOpenOrdersExtendedAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetOpenOrdersExtendedAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(WebCallResult(hlOrders));
 
         var broker = GetBrokerWithMockedClient(mockRestClient.Object);
@@ -783,7 +783,7 @@ public class HyperliquidBrokerTest
         mockFuturesApi.Setup(x => x.Trading).Returns(mockFuturesTrading.Object);
 
         mockFuturesTrading
-            .Setup(x => x.GetOpenOrdersExtendedAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetOpenOrdersExtendedAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(WebCallResult(Array.Empty<HyperLiquidOrder>()));
 
         var broker = GetBrokerWithMockedClient(mockRestClient.Object);
@@ -808,7 +808,7 @@ public class HyperliquidBrokerTest
 
         var error = new TestError("500", new ErrorInfo(ErrorType.SystemError, "Internal server error"), null);
         mockFuturesTrading
-            .Setup(x => x.GetOpenOrdersExtendedAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetOpenOrdersExtendedAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(
                 WebCallResult<HyperLiquidOrder[]>(
                     null,
