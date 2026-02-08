@@ -51,8 +51,8 @@ public record Trade(
         bool? reduceOnly = one.ReduceOnly switch
         {
             true => two.ReduceOnly == true,
-            false => false,
-            null => null
+            false => two.ReduceOnly == false,
+            _ => null
         };
 
         return new Trade(
