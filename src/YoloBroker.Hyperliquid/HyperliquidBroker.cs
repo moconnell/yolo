@@ -927,6 +927,7 @@ public sealed class HyperliquidBroker : IYoloBroker
             trade.AbsoluteAmount,
             trade.LimitPrice.GetValueOrDefault(),
             clientOrderId: trade.ClientOrderId,
+            reduceOnly: trade.ReduceOnly,
             vaultAddress: _vaultAddress,
             ct: ct);
 
@@ -942,6 +943,7 @@ public sealed class HyperliquidBroker : IYoloBroker
             trade.AbsoluteAmount,
             trade.LimitPrice.GetValueOrDefault(),
             clientOrderId: trade.ClientOrderId,
+            reduceOnly: trade.ReduceOnly,
             vaultAddress: _vaultAddress,
             ct: ct);
 
@@ -959,7 +961,8 @@ public sealed class HyperliquidBroker : IYoloBroker
                 trade.OrderType.ToHyperLiquid(),
                 trade.AbsoluteAmount,
                 trade.LimitPrice.GetValueOrDefault(),
-                clientOrderId: trade.ClientOrderId)),
+                clientOrderId: trade.ClientOrderId,
+                reduceOnly: trade.ReduceOnly)),
             vaultAddress: _vaultAddress,
             ct: ct);
 
@@ -977,7 +980,8 @@ public sealed class HyperliquidBroker : IYoloBroker
                 trade.OrderType.ToHyperLiquid(),
                 trade.AbsoluteAmount,
                 trade.LimitPrice.GetValueOrDefault(),
-                clientOrderId: trade.ClientOrderId)),
+                clientOrderId: trade.ClientOrderId,
+                reduceOnly: trade.ReduceOnly)),
             vaultAddress: _vaultAddress,
             ct: ct);
 

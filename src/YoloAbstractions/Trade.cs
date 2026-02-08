@@ -7,6 +7,7 @@ public record Trade(
     decimal? LimitPrice = null,
     OrderType OrderType = OrderType.Limit,
     bool? PostPrice = null,
+    bool? ReduceOnly = null,
     DateTime? Expiry = null,
     string? ClientOrderId = null)
 {
@@ -26,7 +27,7 @@ public record Trade(
             return false;
 
         // Ensure the order value meets the minimum requirement
-        return !minOrderValue.HasValue || !LimitPrice.HasValue || !(AbsoluteAmount * LimitPrice.Value < minOrderValue);
+        return ReduceOnly == true || !minOrderValue.HasValue || !LimitPrice.HasValue || !(AbsoluteAmount * LimitPrice.Value < minOrderValue);
     }
 
     public decimal AbsoluteAmount => Math.Abs(Amount);
@@ -47,6 +48,12 @@ public record Trade(
         var totalAmount = one.Amount + two.Amount;
         var postPrice = one.PostPrice == true && Math.Abs(totalAmount) >= Math.Abs(one.Amount) ||
                        two.PostPrice == true && Math.Abs(totalAmount) >= Math.Abs(two.Amount);
+        bool? reduceOnly = one.ReduceOnly switch
+        {
+            true => two.ReduceOnly == true,
+            false => false,
+            null => null
+        };
 
         return new Trade(
             one.Symbol,
@@ -55,6 +62,7 @@ public record Trade(
             one.LimitPrice,
             one.OrderType,
             postPrice,
+            reduceOnly,
             one.Expiry);
     }
 }

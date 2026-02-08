@@ -4,27 +4,27 @@ public class TradeTest
 {
     [Theory]
     [InlineData(
-        "BTC-PERP", AssetType.Future, 10, 45789, OrderType.Limit, true, null,
-        "BTC-PERP", AssetType.Future, -2, 45789, OrderType.Limit, true, null)]
+        "BTC-PERP", AssetType.Future, 10, 45789, OrderType.Limit, true, null, null,
+        "BTC-PERP", AssetType.Future, -2, 45789, OrderType.Limit, true, null, null)]
     [InlineData(
-        "BTC-PERP", AssetType.Future, 10, 45789, OrderType.Limit, true, null,
-        "BTC/USD", AssetType.Spot, -2, 45789, OrderType.Limit, true, null,
+        "BTC-PERP", AssetType.Future, 10, 45789, OrderType.Limit, true, null, null,
+        "BTC/USD", AssetType.Spot, -2, 45789, OrderType.Limit, true, null, null,
         true)]
     [InlineData(
-        "BTC-PERP", AssetType.Future, 10, 45789, OrderType.Limit, true, null,
-        "BTC-PERP", AssetType.Future, -2, 45987, OrderType.Limit, true, null,
+        "BTC-PERP", AssetType.Future, 10, 45789, OrderType.Limit, true, null, null,
+        "BTC-PERP", AssetType.Future, -2, 45987, OrderType.Limit, true, null, null,
         true)]
     [InlineData(
-        "BTC-PERP", AssetType.Future, 10, 45789, OrderType.Limit, true, null,
-        "BTC-PERP", AssetType.Future, -2, 45789, OrderType.Limit, true, 1640179478L,
+        "BTC-PERP", AssetType.Future, 10, 45789, OrderType.Limit, true, null, null,
+        "BTC-PERP", AssetType.Future, -2, 45789, OrderType.Limit, true, null, 1640179478L,
         true)]
     public void ShouldAddTrades(
-        string assetName1, AssetType assetType1, decimal amount1, decimal limitPrice1, OrderType orderType1, bool? postPrice1, long? expiry1,
-        string assetName2, AssetType assetType2, decimal amount2, decimal limitPrice2, OrderType orderType2, bool? postPrice2, long? expiry2,
+        string assetName1, AssetType assetType1, decimal amount1, decimal limitPrice1, OrderType orderType1, bool? postPrice1, bool? reduceOnly1, long? expiry1,
+        string assetName2, AssetType assetType2, decimal amount2, decimal limitPrice2, OrderType orderType2, bool? postPrice2, bool? reduceOnly2, long? expiry2,
         bool shouldThrow = false)
     {
-        var trade1 = new Trade(assetName1, assetType1, amount1, limitPrice1, orderType1, postPrice1, ToDateTime(expiry1));
-        var trade2 = new Trade(assetName2, assetType2, amount2, limitPrice2, orderType2, postPrice2, ToDateTime(expiry2));
+        var trade1 = new Trade(assetName1, assetType1, amount1, limitPrice1, orderType1, postPrice1, reduceOnly1, ToDateTime(expiry1));
+        var trade2 = new Trade(assetName2, assetType2, amount2, limitPrice2, orderType2, postPrice2, reduceOnly2, ToDateTime(expiry2));
 
         if (shouldThrow)
         {
