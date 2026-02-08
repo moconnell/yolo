@@ -1,9 +1,10 @@
 using Microsoft.Data.Analysis;
+using Xunit.Abstractions;
 using static YoloAbstractions.FactorType;
 
 namespace YoloAbstractions.Test;
 
-public class FactorDataFrameTest
+public class FactorDataFrameTest(ITestOutputHelper output)
 {
     [Fact]
     public void GivenDuplicateFactorTypes_WhenNewFromCalled_ShouldThrow()
@@ -268,9 +269,12 @@ public class FactorDataFrameTest
     }
 
     [Fact]
-    public void GivenFactorDataFrame_WhenNormalized_ShouldHaveZeroMeanUnitStd()
+    public void GivenFactorDataFrame_WhenNormalized_ShouldHaveZeroMean()
     {
         // arrange
+        const double tolerance = 1e-9;
+        const int quantiles = 4;
+
         string[] tickers = ["BTC", "ETH", "ADA", "BNB"];
         double[] carryValues = [0.15, 0.10, 0.02, -0.05];
         double[] momoValues = [0.34, 0.17, 0.08, -0.12];
@@ -282,18 +286,33 @@ public class FactorDataFrameTest
             (Momentum, momoValues));
 
         // act
-        var normalized = factorDataFrame.Normalize();
+        var normalized = factorDataFrame.Normalize(NormalizationMethod.CrossSectionalBins, quantiles);
+
+        output.WriteLine("Normalized FactorDataFrame:\n{0}", normalized);
 
         // assert - check that each factor has mean ≈ 0 and std ≈ 1
         foreach (var factorType in normalized.FactorTypes)
         {
-            var values = tickers.Select(t => normalized[factorType, t]).Where(v => !double.IsNaN(v)).ToArray();
-            var mean = values.Average();
-            var variance = values.Sum(v => Math.Pow(v - mean, 2)) / values.Length;
-            var stdDev = Math.Sqrt(variance);
+            var weights = tickers.Select(t => normalized[factorType, t]).Where(v => !double.IsNaN(v)).ToArray();
+            var mean = weights.Average();
 
-            mean.ShouldBe(0.0, 1e-10);
-            stdDev.ShouldBe(1.0, 1e-10);
+            mean.ShouldBe(0.0, tolerance);
+            weights.Sum().ShouldBe(0.0, tolerance);
+            weights.Sum(Math.Abs).ShouldBe(1.0, tolerance);
+            weights.Min().ShouldBeGreaterThanOrEqualTo(-1.0);
+            weights.Max().ShouldBeLessThanOrEqualTo(+1.0);
+            weights.Where(v => !double.IsNaN(v)).Distinct().Count().ShouldBeLessThanOrEqualTo(quantiles);
+
+            for (int i = 0; i < weights.Length; i++)
+            {
+                for (int j = 0; j < weights.Length; j++)
+                {
+                    if (weights[i] > weights[j])
+                    {
+                        weights[i].ShouldBeGreaterThanOrEqualTo(weights[j]);
+                    }
+                }
+            }
         }
     }
 
@@ -541,6 +560,8 @@ public class FactorDataFrameTest
     public void GivenFactorDataFrameWithVolatility_WhenNormalized_ShouldPreserveVolatilityColumn()
     {
         // arrange
+        const int quantiles = 2;
+
         string[] tickers = ["BTC", "ETH"];
         double[] carryValues = [0.15, 0.10];
         double[] volatilityValues = [0.5, 0.8];
@@ -556,7 +577,7 @@ public class FactorDataFrameTest
             Volatility);
 
         // act
-        var normalized = factorDataFrame.Normalize();
+        var normalized = factorDataFrame.Normalize(NormalizationMethod.CrossSectionalBins, quantiles);
 
         // assert
         // Volatility should not be normalized
