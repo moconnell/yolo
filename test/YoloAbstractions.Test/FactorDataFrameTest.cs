@@ -303,15 +303,9 @@ public class FactorDataFrameTest(ITestOutputHelper output)
             weights.Max().ShouldBeLessThanOrEqualTo(+1.0);
             weights.Where(v => !double.IsNaN(v)).Distinct().Count().ShouldBeLessThanOrEqualTo(quantiles);
 
-            for (int i = 0; i < weights.Length; i++)
+            for (int i = 1; i < weights.Length; i++)
             {
-                for (int j = 0; j < weights.Length; j++)
-                {
-                    if (weights[i] > weights[j])
-                    {
-                        weights[i].ShouldBeGreaterThanOrEqualTo(weights[j]);
-                    }
-                }
+                weights[i].ShouldBeLessThanOrEqualTo(weights[i - 1]);
             }
         }
     }
