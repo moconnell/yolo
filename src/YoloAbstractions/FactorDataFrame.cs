@@ -120,10 +120,15 @@ public sealed record FactorDataFrame
         return new FactorDataFrame(df, joinedFactorTypes);
     }
 
-    public FactorDataFrame Normalize(NormalizationMethod method = NormalizationMethod.CrossSectionalZScore)
+    public FactorDataFrame Normalize(NormalizationMethod method = NormalizationMethod.None, int? quantiles = null)
     {
         if (method == NormalizationMethod.None)
             return this;
+
+        if (method == NormalizationMethod.CrossSectionalBins && (!quantiles.HasValue || quantiles <= 0))
+        {
+            throw new ArgumentException($"{nameof(quantiles)}: quantiles must be a positive integer when using CrossSectionalBins normalization.");
+        }
 
         var normalizedColumns = new List<DataFrameColumn>
         {
@@ -138,6 +143,7 @@ public sealed record FactorDataFrame
 
             var normalizedCol = method switch
             {
+                NormalizationMethod.CrossSectionalBins => NormalizeBins(col, quantiles!.Value),
                 NormalizationMethod.CrossSectionalZScore => NormalizeZScore(col),
                 NormalizationMethod.MinMax => NormalizeMinMax(col),
                 NormalizationMethod.Rank => NormalizeRank(col),
@@ -158,6 +164,62 @@ public sealed record FactorDataFrame
 
         var normalizedDf = new DataFrame(normalizedColumns);
         return new FactorDataFrame(normalizedDf, [.. FactorTypes]);
+    }
+
+    private static IEnumerable<double> NormalizeBins(DoubleDataFrameColumn col, int quantiles = 20)
+    {
+        // Collect valid (value, index) pairs
+        var items = new List<(double Value, int Index)>();
+        for (int i = 0; i < col.Length; i++)
+        {
+            var v = col[i];
+            if (v.HasValue && !double.IsNaN(v.Value))
+                items.Add((v.Value, i));
+        }
+
+        // No usable data
+        if (items.Count == 0)
+            return col.Select(_ => double.NaN);
+
+        // Sort ascending by value (qcut behaviour)
+        items.Sort((a, b) => a.Value.CompareTo(b.Value));
+
+        int n = items.Count;
+        var bins = new int[n];
+
+        // Assign qcut-style bins: [0 .. quantiles-1]
+        for (int k = 0; k < n; k++)
+        {
+            var b = (int)Math.Floor(((k + 1) / (double)n) * quantiles) - 1;
+            if (b < 0) b = 0;
+            if (b > quantiles - 1) b = quantiles - 1;
+            bins[k] = b;
+        }
+
+        // pandas qcut(..., duplicates="drop")
+        int maxBin = bins.Max();
+        if (maxBin <= 0)
+            return col.Select(_ => 0.0);
+
+        // Map bins → [-1, +1]
+        var weights = new double[n];
+        for (int k = 0; k < n; k++)
+            weights[k] = 2.0 * (bins[k] / (double)maxBin) - 1.0;
+
+        // L1 normalisation: sum(|w|) = 1
+        var denom = weights.Sum(w => Math.Abs(w));
+        if (denom <= 0)
+            return col.Select(_ => 0.0);
+
+        for (int k = 0; k < n; k++)
+            weights[k] /= denom;
+
+        // Write back to full-length result, preserving NaNs
+        var result = Enumerable.Repeat(double.NaN, (int)col.Length).ToArray();
+        for (int k = 0; k < n; k++)
+            result[items[k].Index] = weights[k];
+
+        return result;
     }
 
     private static IEnumerable<double> NormalizeZScore(DoubleDataFrameColumn col)

@@ -172,7 +172,8 @@ public class YoloWeightsServiceTest
         {
             BaseAsset = "USDC",
             FactorWeights = new Dictionary<FactorType, decimal> { { Carry, 1m } },
-            FactorNormalizationMethod = NormalizationMethod.MinMax
+            NormalizationMethod = NormalizationMethod.CrossSectionalBins,
+            QuantilesForNormalization = 2 // Simple binary split for test
         };
 
         var mockFactorService = new Mock<IGetFactors>();
@@ -195,6 +196,8 @@ public class YoloWeightsServiceTest
         // assert
         weights.ShouldNotBeNull();
         weights.Count.ShouldBe(2);
+        weights[btcUsdt].ShouldBe(-0.5m); // Lower value should get negative weight
+        weights[ethUsdt].ShouldBe(0.5m);  // Higher value
     }
 
     [Fact]
