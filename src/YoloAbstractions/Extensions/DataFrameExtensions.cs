@@ -1,35 +1,24 @@
 using Microsoft.Data.Analysis;
 
+using static YoloAbstractions.NormalizationMethod;
+
 namespace YoloAbstractions.Extensions;
 
 public static class DataFrameExtensions
 {
     public static DataFrame Normalize(
         this DataFrame df,
-        NormalizationMethod method = NormalizationMethod.None,
+        NormalizationMethod method = None,
         int? quantiles = null)
     {
-        if (method == NormalizationMethod.CrossSectionalBins && (!quantiles.HasValue || quantiles <= 0))
+        if (method == None)
+            return df;
+
+        if (method == CrossSectionalBins && (!quantiles.HasValue || quantiles <= 0))
         {
-            throw new ArgumentException($"{nameof(quantiles)}: quantiles must be a positive integer when using CrossSectionalBins normalization.");
+            throw new ArgumentOutOfRangeException(nameof(quantiles), quantiles, $"Quantiles must be a positive integer when using {CrossSectionalBins} normalization.");
         }
 
-        return method switch
-        {
-            NormalizationMethod.None => df,
-            NormalizationMethod.CrossSectionalBins => df.NormalizeBins(quantiles!.Value),
-            _ => throw new ArgumentException($"Unsupported normalization method: {method}")
-        };
-    }
-
-    /// <summary>
-    /// Cross-sectional q-tile binning across rows (tickers) for each numeric column.
-    /// This matches Unravel create_cross_sectional_bins()[0].
-    /// </summary>
-    public static DataFrame NormalizeBins(
-        this DataFrame df,
-        int quantiles = 10)
-    {
         var result = df.Clone();
 
         foreach (var col in df.Columns)
@@ -37,7 +26,15 @@ public static class DataFrameExtensions
             if (col is not DoubleDataFrameColumn numeric)
                 continue;
 
-            var normalized = numeric.NormalizeBinsColumn(quantiles);
+            var normalized = method switch
+            {
+                CrossSectionalBins => numeric.NormalizeBins(quantiles!.Value),
+                CrossSectionalZScore => numeric.NormalizeZScore(),
+                MinMax => numeric.NormalizeMinMax(),
+                Rank => numeric.NormalizeRank(),
+                _ => throw new ArgumentOutOfRangeException(nameof(method), method, $"Unknown normalization method: {method}")
+            };
+
             result.Columns[col.Name] = new DoubleDataFrameColumn(col.Name, normalized);
         }
 
@@ -45,9 +42,9 @@ public static class DataFrameExtensions
     }
 
     // -------------------------------
-    // Internal helper (column-level)
+    // Internal helpers (column-level)
     // -------------------------------
-    internal static double[] NormalizeBinsColumn(
+    internal static double[] NormalizeBins(
         this DoubleDataFrameColumn col,
         int quantiles)
     {
@@ -110,5 +107,66 @@ public static class DataFrameExtensions
                 result[items[k].Index] = 0.0;
             return result;
         }
+    }
+
+    internal static IEnumerable<double> NormalizeZScore(this DoubleDataFrameColumn col)
+    {
+        var values = col.Where(v => v.HasValue && !double.IsNaN(v.Value)).Select(v => v!.Value).ToArray();
+
+        if (values.Length == 0)
+            return col.Select(v => double.NaN);
+
+        var mean = values.Average();
+        var variance = values.Sum(v => Math.Pow(v - mean, 2)) / values.Length;
+        var stdDev = Math.Sqrt(variance);
+
+        if (stdDev < 1e-10) // Avoid division by zero for constant columns
+            return col.Select(v => 0.0);
+
+        return col.Select(v => v.HasValue && !double.IsNaN(v.Value)
+            ? (v.Value - mean) / stdDev
+            : double.NaN);
+    }
+
+    internal static IEnumerable<double> NormalizeMinMax(this DoubleDataFrameColumn col)
+    {
+        var values = col.Where(v => v.HasValue && !double.IsNaN(v.Value)).Select(v => v!.Value).ToArray();
+
+        if (values.Length == 0)
+            return col.Select(v => double.NaN);
+
+        var min = values.Min();
+        var max = values.Max();
+        var range = max - min;
+
+        if (range < 1e-10) // Avoid division by zero
+            return col.Select(v => 0.0);
+
+        return col.Select(v => v.HasValue && !double.IsNaN(v.Value)
+            ? 2 * ((v.Value - min) / range) - 1 // Scale to [-1, 1]
+            : double.NaN);
+    }
+
+    internal static IEnumerable<double> NormalizeRank(this DoubleDataFrameColumn col)
+    {
+        var values = col.Select((v, i) => (Value: v, Index: i)).ToArray();
+        var validValues = values
+            .Where(x => x.Value.HasValue && !double.IsNaN(x.Value.Value))
+            .OrderBy(x => x.Value!.Value)
+            .ToArray();
+
+        if (validValues.Length == 0)
+            return col.Select(v => double.NaN);
+
+        var ranks = new Dictionary<int, double>();
+        for (var i = 0; i < validValues.Length; i++)
+        {
+            // Scale to [-1, 1] range
+            ranks[validValues[i].Index] = validValues.Length > 1
+                ? 2.0 * i / (validValues.Length - 1) - 1
+                : 0.0;
+        }
+
+        return values.Select(x => ranks.TryGetValue(x.Index, out var rank) ? rank : double.NaN);
     }
 }
