@@ -28,7 +28,7 @@ public static class DataFrameExtensions
     /// </summary>
     public static DataFrame NormalizeBins(
         this DataFrame df,
-        int quantiles = 20)
+        int quantiles = 10)
     {
         var result = df.Clone();
 
@@ -37,7 +37,7 @@ public static class DataFrameExtensions
             if (col is not DoubleDataFrameColumn numeric)
                 continue;
 
-            var normalized = NormalizeBinsColumn(numeric, quantiles).ToArray();
+            var normalized = numeric.NormalizeBinsColumn(quantiles);
             result.Columns[col.Name] = new DoubleDataFrameColumn(col.Name, normalized);
         }
 
@@ -47,8 +47,8 @@ public static class DataFrameExtensions
     // -------------------------------
     // Internal helper (column-level)
     // -------------------------------
-    private static double[] NormalizeBinsColumn(
-        DoubleDataFrameColumn col,
+    internal static double[] NormalizeBinsColumn(
+        this DoubleDataFrameColumn col,
         int quantiles)
     {
         var items = new List<(double Value, int Index)>();
