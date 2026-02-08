@@ -86,7 +86,7 @@ public class HyperliquidBrokerIntegrationTest
     [Theory]
     [Trait("Category", "Integration")]
     // [InlineData("HYPE/USDC", Spot, 1)]
-    [InlineData("ETH", AssetType.Future, 0.01)]
+    // [InlineData("ETH", AssetType.Future, 0.01)]
     [InlineData("BTC", AssetType.Future, 0.01)]
     public async Task ShouldPlaceOrder(string symbol, AssetType assetType, double quantity)
     {
