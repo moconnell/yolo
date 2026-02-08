@@ -121,7 +121,7 @@ public sealed record FactorDataFrame
         return new FactorDataFrame(df, joinedFactorTypes);
     }
 
-    public FactorDataFrame Normalize(NormalizationMethod method = NormalizationMethod.None, int? quantiles = null)
+    public FactorDataFrame Normalize(NormalizationMethod method = NormalizationMethod.None, int? quantiles = null, params FactorType[] preserveFactors)
     {
         if (method == NormalizationMethod.None)
             return this;
@@ -137,10 +137,16 @@ public sealed record FactorDataFrame
             _dataFrame["Ticker"]
         };
 
-        foreach (var factorType in FactorTypes.Except([Volatility]))
+        foreach (var factorType in FactorTypes)
         {
             var colName = factorType.ToString();
             DoubleDataFrameColumn col = (DoubleDataFrameColumn)_dataFrame[colName];
+
+            if (preserveFactors.Contains(factorType))
+            {
+                normalizedColumns.Add(col);
+                continue;
+            }
 
             var normalizedCol = method switch
             {
@@ -157,13 +163,8 @@ public sealed record FactorDataFrame
             normalizedColumns.Add(new DoubleDataFrameColumn(colName, normalizedCol));
         }
 
-        // Add volatility column if it exists (don't normalize it)
-        if (_dataFrame.Columns.FirstOrDefault(c => c.Name == nameof(Volatility)) is DoubleDataFrameColumn volCol)
-        {
-            normalizedColumns.Add(volCol);
-        }
-
         var normalizedDf = new DataFrame(normalizedColumns);
+
         return new FactorDataFrame(normalizedDf, [.. FactorTypes]);
     }
 

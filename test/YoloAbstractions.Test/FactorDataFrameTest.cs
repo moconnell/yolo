@@ -571,7 +571,7 @@ public class FactorDataFrameTest(ITestOutputHelper output)
             Volatility);
 
         // act
-        var normalized = factorDataFrame.Normalize(NormalizationMethod.CrossSectionalBins, quantiles);
+        var normalized = factorDataFrame.Normalize(NormalizationMethod.CrossSectionalBins, quantiles, Volatility);
 
         // assert
         // Volatility should not be normalized

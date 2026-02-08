@@ -47,7 +47,7 @@ public class YoloWeightsService : ICalcWeights
         var factorDataFrame = await GetFactorsAsync(cancellationToken);
         _logger.LogInformation("Factors (raw):\n{Factors}", factorDataFrame);
 
-        var normalizedFactors = factorDataFrame.Normalize(_normalizationMethod, _quantilesForNormalization);
+        var normalizedFactors = factorDataFrame.Normalize(_normalizationMethod, _quantilesForNormalization, FactorType.Volatility);
         _logger.LogInformation("Factors (normalised):\n{Factors}", normalizedFactors);
 
         var weights = normalizedFactors.ApplyWeights(_factorWeights, _maxWeightingAbs);
