@@ -14,5 +14,6 @@ public record YoloConfig
     public string UnfilledOrderTimeout { get; init; } = "00:05:00"; // Default 5 minutes
     public double? MaxWeightingAbs { get; init; }
     public IReadOnlyDictionary<FactorType, decimal> FactorWeights { get; init; } = new Dictionary<FactorType, decimal>();
-    public NormalizationMethod FactorNormalizationMethod { get; init; } = NormalizationMethod.None;
+    public NormalizationMethod NormalizationMethod { get; init; } = NormalizationMethod.None;
+    public int? QuantilesForNormalization { get; init; }
 }

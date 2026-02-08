@@ -12,6 +12,7 @@ public class YoloWeightsService : ICalcWeights
     private readonly IReadOnlyDictionary<FactorType, double> _factorWeights;
     private readonly double? _maxWeightingAbs;
     private readonly NormalizationMethod _normalizationMethod;
+    private readonly int? _quantilesForNormalization;
     private readonly ILogger<YoloWeightsService> _logger;
 
     public YoloWeightsService(IEnumerable<IGetFactors> inner, YoloConfig config, ILogger<YoloWeightsService> logger)
@@ -26,11 +27,17 @@ public class YoloWeightsService : ICalcWeights
             throw new ArgumentException($"{nameof(inner)}: must have at least one factor provider");
         }
 
+        if (config.NormalizationMethod == NormalizationMethod.CrossSectionalBins && (!config.QuantilesForNormalization.HasValue || config.QuantilesForNormalization <= 0))
+        {
+            throw new ArgumentException($"{nameof(config)}: QuantilesForNormalization must be a positive integer when using CrossSectionalBins normalization.");
+        }
+
         _factorWeights = new Dictionary<FactorType, double>(
             config.FactorWeights.Select(kvp =>
                 new KeyValuePair<FactorType, double>(kvp.Key, Convert.ToDouble(kvp.Value))));
         _maxWeightingAbs = config.MaxWeightingAbs;
-        _normalizationMethod = config.FactorNormalizationMethod;
+        _normalizationMethod = config.NormalizationMethod;
+        _quantilesForNormalization = config.QuantilesForNormalization!;
         _logger = logger;
     }
 
@@ -40,13 +47,16 @@ public class YoloWeightsService : ICalcWeights
         var factorDataFrame = await GetFactorsAsync(cancellationToken);
         _logger.LogInformation("Factors (raw):\n{Factors}", factorDataFrame);
 
-        var normalizedFactors = factorDataFrame.Normalize(_normalizationMethod);
+        var normalizedFactors = factorDataFrame.Normalize(_normalizationMethod, _quantilesForNormalization);
         _logger.LogInformation("Factors (normalised):\n{Factors}", normalizedFactors);
 
         var weights = normalizedFactors.ApplyWeights(_factorWeights, _maxWeightingAbs);
         _logger.LogInformation("weights:\n{Weights}", weights);
 
-        var weightsDict = weights.Rows.ToDictionary(
+        var normalizedWeights = weights.Normalize(_normalizationMethod, _quantilesForNormalization);
+        _logger.LogInformation("weights (normalised):\n{Weights}", normalizedWeights);
+
+        var weightsDict = normalizedWeights.Rows.ToDictionary(
             r => (string)r["Ticker"],
             r => Convert.ToDecimal((double)r["Weight"]));
 
