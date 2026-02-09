@@ -172,7 +172,9 @@ public sealed record FactorDataFrame
         IReadOnlyDictionary<FactorType, double> weights,
         double? maxWeightAbs = null,
         bool volatilityScaling = true,
-        bool normalizePerAsset = true)
+        bool normalizePerAsset = true,
+        NormalizationMethod normalizationMethod = NormalizationMethod.None,
+        int? quantilesForNormalization = null)
     {
         ArgumentNullException.ThrowIfNull(weights);
 
@@ -191,23 +193,27 @@ public sealed record FactorDataFrame
 
         var tickerWeightsVector = GetWeights();
 
+        var normalizedWeights = Vector<double>.Build.DenseOfArray(
+            [.. new DoubleDataFrameColumn("Weight", tickerWeightsVector)
+                .Normalize(normalizationMethod, quantilesForNormalization)
+                .Select(x => x.GetValueOrDefault())]);
+
         if (volatilityScaling &&
             _dataFrame.Columns.FirstOrDefault(c => c.Name == nameof(Volatility)) is DoubleDataFrameColumn volCol)
         {
-            var vol = Vector<double>.Build.DenseOfArray(
-                volCol.Select(x => x is > 0d ? x.Value : 1d).ToArray());
-            tickerWeightsVector = tickerWeightsVector.PointwiseDivide(vol);
+            var vol = Vector<double>.Build.DenseOfArray([.. volCol.Select(x => x is > 0d ? x.Value : 1d)]);
+            normalizedWeights = normalizedWeights.PointwiseDivide(vol);
         }
 
         if (maxWeightAbs.HasValue)
         {
-            tickerWeightsVector.MapInplace(x => Math.Clamp(x, -maxWeightAbs.Value, maxWeightAbs.Value));
+            normalizedWeights.MapInplace(x => Math.Clamp(x, -maxWeightAbs.Value, maxWeightAbs.Value));
         }
 
         var resultDf = new DataFrame();
         resultDf.Columns.Add(_dataFrame["Date"]);
         resultDf.Columns.Add(_dataFrame["Ticker"]);
-        resultDf.Columns.Add(new DoubleDataFrameColumn("Weight", tickerWeightsVector));
+        resultDf.Columns.Add(new DoubleDataFrameColumn("Weight", normalizedWeights));
 
         return resultDf;
 

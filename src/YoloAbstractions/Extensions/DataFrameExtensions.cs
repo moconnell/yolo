@@ -14,11 +14,6 @@ public static class DataFrameExtensions
         if (method == None)
             return df;
 
-        if (method == CrossSectionalBins && (!quantiles.HasValue || quantiles <= 0))
-        {
-            throw new ArgumentOutOfRangeException(nameof(quantiles), quantiles, $"Quantiles must be a positive integer when using {CrossSectionalBins} normalization.");
-        }
-
         var result = df.Clone();
 
         foreach (var col in df.Columns)
@@ -26,19 +21,32 @@ public static class DataFrameExtensions
             if (col is not DoubleDataFrameColumn numeric)
                 continue;
 
-            var normalized = method switch
-            {
-                CrossSectionalBins => numeric.NormalizeBins(quantiles!.Value),
-                CrossSectionalZScore => numeric.NormalizeZScore(),
-                MinMax => numeric.NormalizeMinMax(),
-                Rank => numeric.NormalizeRank(),
-                _ => throw new ArgumentOutOfRangeException(nameof(method), method, $"Unknown normalization method: {method}")
-            };
-
-            result.Columns[col.Name] = new DoubleDataFrameColumn(col.Name, normalized);
+            result.Columns[col.Name] = numeric.Normalize(method, quantiles);
         }
 
         return result;
+    }
+
+    public static DoubleDataFrameColumn Normalize(this DoubleDataFrameColumn col, NormalizationMethod method, int? quantiles = null)
+    {
+        if (method == None)
+            return col;
+
+        if (method == CrossSectionalBins && (!quantiles.HasValue || quantiles <= 0))
+        {
+            throw new ArgumentOutOfRangeException(nameof(quantiles), quantiles, $"Quantiles must be a positive integer when using {CrossSectionalBins} normalization.");
+        }
+
+        var normalizedValues = method switch
+        {
+            CrossSectionalBins => col.NormalizeBins(quantiles!.Value),
+            CrossSectionalZScore => col.NormalizeZScore(),
+            MinMax => col.NormalizeMinMax(),
+            Rank => col.NormalizeRank(),
+            _ => throw new ArgumentOutOfRangeException(nameof(method), method, $"Unknown normalization method: {method}")
+        };
+
+        return new DoubleDataFrameColumn(col.Name, normalizedValues);
     }
 
     // -------------------------------
