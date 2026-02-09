@@ -50,13 +50,10 @@ public class YoloWeightsService : ICalcWeights
         var normalizedFactors = factorDataFrame.Normalize(_normalizationMethod, _quantilesForNormalization, FactorType.Volatility);
         _logger.LogInformation("Factors (normalised):\n{Factors}", normalizedFactors);
 
-        var weights = normalizedFactors.ApplyWeights(_factorWeights, _maxWeightingAbs);
+        var weights = normalizedFactors.ApplyWeights(_factorWeights, _maxWeightingAbs, normalizationMethod: _normalizationMethod, quantilesForNormalization: _quantilesForNormalization);
         _logger.LogInformation("weights:\n{Weights}", weights);
 
-        var normalizedWeights = weights.Normalize(_normalizationMethod, _quantilesForNormalization);
-        _logger.LogInformation("weights (normalised):\n{Weights}", normalizedWeights);
-
-        var weightsDict = normalizedWeights.Rows.ToDictionary(
+        var weightsDict = weights.Rows.ToDictionary(
             r => (string)r["Ticker"],
             r => Convert.ToDecimal((double)r["Weight"]));
 
