@@ -53,7 +53,10 @@ public static class DataFrameExtensions
 
     public static DoubleDataFrameColumn PointwiseDivide(this DoubleDataFrameColumn col, MathNet.Numerics.LinearAlgebra.Vector<double> divisor)
     {
-        var vec = MathNet.Numerics.LinearAlgebra.Vector<double>.Build.DenseOfArray([.. col.Select(x => x.GetValueOrDefault())]);
+        if (col.Length != divisor.Count)
+            throw new ArgumentException($"Column length ({col.Length}) must match divisor length ({divisor.Count}).", nameof(divisor));
+
+        var vec = MathNet.Numerics.LinearAlgebra.Vector<double>.Build.DenseOfArray([.. col.Select(x => x ?? double.NaN)]);
         var resultVec = vec.PointwiseDivide(divisor);
 
         return new DoubleDataFrameColumn(col.Name, resultVec);

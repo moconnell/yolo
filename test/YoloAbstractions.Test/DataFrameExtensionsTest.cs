@@ -1,4 +1,5 @@
 using Microsoft.Data.Analysis;
+using MathNet.Numerics.LinearAlgebra;
 using YoloAbstractions.Extensions;
 using static YoloAbstractions.NormalizationMethod;
 
@@ -48,5 +49,31 @@ public class DataFrameExtensionsTest
         values[0].ShouldBe(1.0);
         double.IsNaN(values[1].GetValueOrDefault()).ShouldBeTrue();
         values[2].ShouldBe(-1.0);
+    }
+
+    [Fact]
+    public void GivenMismatchedLengths_WhenPointwiseDivideCalled_ShouldThrow()
+    {
+        var col = new DoubleDataFrameColumn("Value", [1.0, 2.0]);
+        var divisor = Vector<double>.Build.DenseOfArray([1.0]);
+
+        var exception = Should.Throw<ArgumentException>(() => col.PointwiseDivide(divisor));
+
+        exception.Message.ShouldContain("Column length");
+        exception.Message.ShouldContain("divisor length");
+    }
+
+    [Fact]
+    public void GivenNulls_WhenPointwiseDivideCalled_ShouldPreserveNaN()
+    {
+        var col = new DoubleDataFrameColumn("Value", [10.0, null, 30.0]);
+        var divisor = Vector<double>.Build.DenseOfArray([2.0, 2.0, 3.0]);
+
+        var result = col.PointwiseDivide(divisor);
+        var values = result.ToArray();
+
+        values[0].ShouldBe(5.0);
+        double.IsNaN(values[1].GetValueOrDefault()).ShouldBeTrue();
+        values[2].ShouldBe(10.0);
     }
 }
