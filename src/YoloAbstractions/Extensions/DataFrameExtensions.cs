@@ -1,3 +1,5 @@
+using System.Numerics;
+using MathNet.Numerics.LinearAlgebra;
 using Microsoft.Data.Analysis;
 
 using static YoloAbstractions.NormalizationMethod;
@@ -47,6 +49,14 @@ public static class DataFrameExtensions
         };
 
         return new DoubleDataFrameColumn(col.Name, normalizedValues);
+    }
+
+    public static DoubleDataFrameColumn PointwiseDivide(this DoubleDataFrameColumn col, MathNet.Numerics.LinearAlgebra.Vector<double> divisor)
+    {
+        var vec = MathNet.Numerics.LinearAlgebra.Vector<double>.Build.DenseOfArray([.. col.Select(x => x.GetValueOrDefault())]);
+        var resultVec = vec.PointwiseDivide(divisor);
+
+        return new DoubleDataFrameColumn(col.Name, resultVec);
     }
 
     // -------------------------------

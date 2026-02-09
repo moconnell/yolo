@@ -7,6 +7,9 @@ namespace YoloAbstractions;
 
 public sealed record FactorDataFrame
 {
+    private const string Date = nameof(Date);
+    private const string Ticker = nameof(Ticker);
+    private const string Weight = nameof(Weight);
     private readonly DataFrame _dataFrame;
     private readonly Dictionary<string, int> _tickerIndex;
 
@@ -15,14 +18,14 @@ public sealed record FactorDataFrame
         _dataFrame = dataFrame;
         FactorTypes = factorTypes;
         var i = 0;
-        var tickerCol = (StringDataFrameColumn)dataFrame["Ticker"];
+        var tickerCol = (StringDataFrameColumn)dataFrame[Ticker];
         var kvps = tickerCol.Select(x => KeyValuePair.Create(x, i++));
         _tickerIndex = new Dictionary<string, int>(kvps, StringComparer.OrdinalIgnoreCase);
     }
 
     public IReadOnlyList<FactorType> FactorTypes { get; init; }
 
-    public IReadOnlyList<string> Tickers => ((StringDataFrameColumn)_dataFrame["Ticker"]).ToArray();
+    public IReadOnlyList<string> Tickers => [.. (StringDataFrameColumn)_dataFrame[Ticker]];
 
     public bool IsEmpty => _dataFrame.Rows.Count == 0 || FactorTypes.Count == 0 || Tickers.Count == 0;
 
@@ -48,8 +51,8 @@ public sealed record FactorDataFrame
 
         var df = new DataFrame(
         [
-            new PrimitiveDataFrameColumn<DateTime>("Date", Enumerable.Repeat(timestamp, tickers.Count)),
-            new StringDataFrameColumn("Ticker", tickers),
+            new PrimitiveDataFrameColumn<DateTime>(Date, Enumerable.Repeat(timestamp, tickers.Count)),
+            new StringDataFrameColumn(Ticker, tickers),
             ..values.Select(tuple => new DoubleDataFrameColumn(tuple.FactorType.ToString(), tuple.Values))
         ]);
         var factorTypes = values.Select(tuple => tuple.FactorType).ToArray();
@@ -105,8 +108,8 @@ public sealed record FactorDataFrame
         var sharedCols = one._dataFrame.Columns
             .Select(c => c.Name)
             .Intersect(two._dataFrame.Columns.Select(c => c.Name))
-            .Where(name => !string.Equals(name, "Ticker", StringComparison.Ordinal) &&
-                           !string.Equals(name, "Date", StringComparison.Ordinal))
+            .Where(name => !string.Equals(name, Ticker, StringComparison.Ordinal) &&
+                           !string.Equals(name, Date, StringComparison.Ordinal))
             .ToArray();
         if (sharedCols.Length != 0)
             throw new ArgumentException(
@@ -133,8 +136,8 @@ public sealed record FactorDataFrame
 
         var normalizedColumns = new List<DataFrameColumn>
         {
-            _dataFrame["Date"],
-            _dataFrame["Ticker"]
+            _dataFrame[Date],
+            _dataFrame[Ticker]
         };
 
         foreach (var factorType in FactorTypes)
@@ -193,27 +196,26 @@ public sealed record FactorDataFrame
 
         var tickerWeightsVector = GetWeights();
 
-        var normalizedWeights = Vector<double>.Build.DenseOfArray(
-            [.. new DoubleDataFrameColumn("Weight", tickerWeightsVector)
-                .Normalize(normalizationMethod, quantilesForNormalization)
-                .Select(x => x.GetValueOrDefault())]);
+        var weightsCol = new DoubleDataFrameColumn(Weight, tickerWeightsVector)
+                .Normalize(normalizationMethod, quantilesForNormalization);
 
         if (volatilityScaling &&
             _dataFrame.Columns.FirstOrDefault(c => c.Name == nameof(Volatility)) is DoubleDataFrameColumn volCol)
         {
             var vol = Vector<double>.Build.DenseOfArray([.. volCol.Select(x => x is > 0d ? x.Value : 1d)]);
-            normalizedWeights = normalizedWeights.PointwiseDivide(vol);
+            weightsCol = weightsCol.PointwiseDivide(vol);
         }
 
         if (maxWeightAbs.HasValue)
         {
-            normalizedWeights.MapInplace(x => Math.Clamp(x, -maxWeightAbs.Value, maxWeightAbs.Value));
+            var clampedWeights = weightsCol.Select(x => Math.Clamp(x.GetValueOrDefault(), -maxWeightAbs.Value, maxWeightAbs.Value));
+            weightsCol = new DoubleDataFrameColumn(Weight, clampedWeights);
         }
 
         var resultDf = new DataFrame();
-        resultDf.Columns.Add(_dataFrame["Date"]);
-        resultDf.Columns.Add(_dataFrame["Ticker"]);
-        resultDf.Columns.Add(new DoubleDataFrameColumn("Weight", normalizedWeights));
+        resultDf.Columns.Add(_dataFrame[Date]);
+        resultDf.Columns.Add(_dataFrame[Ticker]);
+        resultDf.Columns.Add(weightsCol);
 
         return resultDf;
 
