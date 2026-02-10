@@ -26,7 +26,7 @@ var secretEnv = hyperliquidNetwork == 'mainnet' ? 'prod' : 'dev'
 var useTestnet = hyperliquidNetwork == 'mainnet' ? 'false' : 'true'
 
 // Key Vault reference helper
-var keyVaultUri = !empty(keyVaultName) ? 'https://${keyVaultName}.${environment().suffixes.keyvaultDns}' : ''
+var keyVaultUri = !empty(keyVaultName) ? 'https://${keyVaultName}${environment().suffixes.keyvaultDns}' : ''
 
 // Merge environment tags with provided tags
 var resourceTags = union(tags, {
