@@ -41,6 +41,13 @@
       }
     },
     {
+      "name": "Azure Functions (host + attach)",
+      "type": "coreclr",
+      "request": "attach",
+      "preLaunchTask": "func: host start",
+      "processId": "${command:azureFunctions.pickProcess}"
+    },
+    {
       "name": "Attach to .NET Functions",
       "type": "coreclr",
       "request": "attach",
