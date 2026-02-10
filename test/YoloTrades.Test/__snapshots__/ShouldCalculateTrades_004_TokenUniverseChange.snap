@@ -2,14 +2,14 @@
   {
     "Symbol": "BTC",
     "AssetType": "Future",
-    "Amount": -0.0154410964393754785475574933,
+    "Amount": -0.01544,
     "LimitPrice": 111014.0,
     "OrderType": "Limit",
     "PostPrice": true,
     "ReduceOnly": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "AbsoluteAmount": 0.0154410964393754785475574933,
+    "AbsoluteAmount": 0.01544,
     "OrderSide": "Sell"
   },
   {
@@ -119,14 +119,14 @@
   {
     "Symbol": "UNI",
     "AssetType": "Future",
-    "Amount": 3.20056165000,
+    "Amount": 3.21,
     "LimitPrice": 9.40750,
     "OrderType": "Limit",
     "PostPrice": true,
     "ReduceOnly": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "AbsoluteAmount": 3.20056165000,
+    "AbsoluteAmount": 3.21,
     "OrderSide": "Buy"
   }
 ]

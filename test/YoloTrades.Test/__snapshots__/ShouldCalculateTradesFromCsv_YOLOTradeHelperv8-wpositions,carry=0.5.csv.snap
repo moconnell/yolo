@@ -28,27 +28,27 @@
   {
     "Symbol": "DOGE/USDC",
     "AssetType": "Future",
-    "Amount": 1014.5271479645968753508230193,
+    "Amount": 1014.5272,
     "LimitPrice": 0.2174,
     "OrderType": "Limit",
     "PostPrice": true,
     "ReduceOnly": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "AbsoluteAmount": 1014.5271479645968753508230193,
+    "AbsoluteAmount": 1014.5272,
     "OrderSide": "Buy"
   },
   {
     "Symbol": "TRX/USDC",
     "AssetType": "Future",
-    "Amount": -8125.92270,
+    "Amount": -8125.9227,
     "LimitPrice": 0.3271,
     "OrderType": "Limit",
     "PostPrice": true,
     "ReduceOnly": false,
     "Expiry": null,
     "ClientOrderId": null,
-    "AbsoluteAmount": 8125.92270,
+    "AbsoluteAmount": 8125.9227,
     "OrderSide": "Sell"
   }
 ]
