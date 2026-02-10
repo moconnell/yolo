@@ -602,8 +602,7 @@ public sealed class HyperliquidBroker : IYoloBroker
                 o.ClientOrderId));
     }
 
-    public async Task<IReadOnlyDictionary<string, IReadOnlyList<Position>>> GetPositionsAsync(
-        CancellationToken ct = default)
+    public async Task<IReadOnlyDictionary<string, IReadOnlyList<Position>>> GetPositionsAsync(CancellationToken ct = default)
     {
         var futuresAccount = await GetDataAsync(
             () => _hyperliquidClient.FuturesApi.Account.GetAccountInfoAsync(_vaultAddress, ct: ct),
@@ -954,15 +953,19 @@ public sealed class HyperliquidBroker : IYoloBroker
         IEnumerable<Trade> trades,
         CancellationToken ct)
     {
-        var result = await _hyperliquidClient.SpotApi.Trading.PlaceMultipleOrdersAsync(
-            trades.Select(trade => new HyperLiquidOrderRequest(
+        var orders = trades.Select(trade => new HyperLiquidOrderRequest(
                 trade.Symbol,
                 trade.OrderSide.ToHyperLiquid(),
                 trade.OrderType.ToHyperLiquid(),
                 trade.AbsoluteAmount,
                 trade.LimitPrice.GetValueOrDefault(),
                 clientOrderId: trade.ClientOrderId,
-                reduceOnly: trade.ReduceOnly)),
+                reduceOnly: trade.ReduceOnly)).ToArray();
+
+        _logger.LogDebug("Placing {Count} spot orders: {Orders}", orders.Length, orders);
+
+        var result = await _hyperliquidClient.SpotApi.Trading.PlaceMultipleOrdersAsync(
+            orders,
             vaultAddress: _vaultAddress,
             ct: ct);
 
@@ -973,42 +976,64 @@ public sealed class HyperliquidBroker : IYoloBroker
         IEnumerable<Trade> trades,
         CancellationToken ct)
     {
-        var result = await _hyperliquidClient.FuturesApi.Trading.PlaceMultipleOrdersAsync(
-            trades.Select(trade => new HyperLiquidOrderRequest(
+        var orders = trades.Select(trade => new HyperLiquidOrderRequest(
                 trade.Symbol,
                 trade.OrderSide.ToHyperLiquid(),
                 trade.OrderType.ToHyperLiquid(),
                 trade.AbsoluteAmount,
                 trade.LimitPrice.GetValueOrDefault(),
                 clientOrderId: trade.ClientOrderId,
-                reduceOnly: trade.ReduceOnly)),
-            vaultAddress: _vaultAddress,
-            ct: ct);
+                reduceOnly: trade.ReduceOnly)).ToArray();
+
+        _logger.LogDebug("Placing {Count} futures orders: {Orders}", orders.Length, orders);
+
+        var result = await _hyperliquidClient.FuturesApi.Trading.PlaceMultipleOrdersAsync(orders, vaultAddress: _vaultAddress, ct: ct);
 
         return Wrap(result);
     }
 
-    private static WebCallResultWrapper<OrderResult> Wrap(WebCallResult<HyperLiquidOrderResult> result) =>
-        new(
+    private WebCallResultWrapper<OrderResult> Wrap(WebCallResult<HyperLiquidOrderResult> result)
+    {
+        _logger.LogDebug(
+            "Wrapping result for single order with Success: {Success}, Error: {Error}, ResponseStatusCode: {ResponseStatusCode}, Data: {Data}",
             result.Success,
             result.Error,
             result.ResponseStatusCode,
-            ToOrderResult(result.Data));
+            result.Data);
 
-    private static WebCallResultWrapper<IReadOnlyList<OrderResult>> Wrap(
-        WebCallResult<CallResult<HyperLiquidOrderResult>[]> result) =>
-        new(
+        return new(
+            result.Success,
+            result.Error,
+            result.ResponseStatusCode,
+            ToOrderResult(result.Success, result.Error, result.Data));
+    }
+
+    private WebCallResultWrapper<IReadOnlyList<OrderResult>> Wrap(
+        WebCallResult<CallResult<HyperLiquidOrderResult>[]> result)
+    {
+        _logger.LogDebug(
+            "Wrapping result for multiple orders with Success: {Success}, Error: {Error}, ResponseStatusCode: {ResponseStatusCode}, Data: {Data}",
+            result.Success,
+            result.Error,
+            result.ResponseStatusCode,
+            result.Data);
+
+        return new(
             result.Success,
             result.Error,
             result.ResponseStatusCode,
             [
                 .. result.Data
-                    .Where(x => x.Success)
-                    .Select(x => ToOrderResult(x.Data))
+                    .Where(x => x != null && x.Success)
+                    .Select(x => ToOrderResult(x.Success, x.Error, x.Data))
             ]);
+    }
 
-    private static OrderResult ToOrderResult(HyperLiquidOrderResult? data) =>
+    private static OrderResult ToOrderResult(bool success, Error? error, HyperLiquidOrderResult? data) =>
         new(
+            success,
+            error?.Message,
+            error?.Code,
             data?.OrderId,
             data?.Status.ToYoloOrderStatus() ?? OrderStatus.NotSet,
             data?.AveragePrice,
