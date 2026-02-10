@@ -221,8 +221,8 @@ public class TradeFactory : ITradeFactory
             var size = market.QuantityStep is null
                 ? rawSize
                 : reduceOnly
-                    ? Math.Ceiling(rawSize / market.QuantityStep.Value) * market.QuantityStep.Value
-                    : Math.Floor(rawSize / market.QuantityStep.Value) * market.QuantityStep.Value;
+                    ? Math.Ceiling(Math.Abs(rawSize) / market.QuantityStep.Value) * market.QuantityStep.Value * Math.Sign(rawSize)
+                    : Math.Floor(Math.Abs(rawSize) / market.QuantityStep.Value) * market.QuantityStep.Value * Math.Sign(rawSize);
 
             var trade = market.MinProvideSize switch
             {

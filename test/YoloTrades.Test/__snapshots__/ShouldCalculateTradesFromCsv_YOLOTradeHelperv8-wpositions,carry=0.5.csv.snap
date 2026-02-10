@@ -41,14 +41,14 @@
   {
     "Symbol": "TRX/USDC",
     "AssetType": "Future",
-    "Amount": -8125.9227,
+    "Amount": -8125.9226,
     "LimitPrice": 0.3271,
     "OrderType": "Limit",
     "PostPrice": true,
     "ReduceOnly": false,
     "Expiry": null,
     "ClientOrderId": null,
-    "AbsoluteAmount": 8125.9227,
+    "AbsoluteAmount": 8125.9226,
     "OrderSide": "Sell"
   }
 ]

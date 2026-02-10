@@ -1,6 +1,7 @@
 using System.Globalization;
 using CsvHelper;
 using CsvHelper.Configuration;
+using MathNet.Numerics;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Snapshooter.Xunit;
@@ -84,7 +85,7 @@ public class TradeFactoryTests
             .Select(t =>
             {
                 var baseAsset = t.Symbol.Split('-', '/')[0];
-                var expectedTradeQuantity = expectedTrades[baseAsset];
+                var expectedTradeQuantity = expectedTrades[baseAsset].RoundToMultiple(stepSize);
 
                 return (baseAsset, expectedTradeQuantity, t.Amount,
                     deviation: t.Amount - expectedTradeQuantity);
@@ -209,8 +210,7 @@ public class TradeFactoryTests
         };
         var tradeFactory = new TradeFactory(config, logger);
 
-        var (weights, positions, markets) =
-            await DeserializeInputsAsync(path);
+        var (weights, positions, markets) = await DeserializeInputsAsync(path);
 
         // act
         var trades = tradeFactory.CalculateTrades(weights, positions, markets).ToArray();
