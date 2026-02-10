@@ -115,7 +115,7 @@ public class HyperliquidBrokerIntegrationTest
     [Trait("Category", "Integration")]
     // [InlineData("HYPE/USDC", Spot, 1)]
     [InlineData("ETH", AssetType.Future, 0.01)]
-    [InlineData("ETH", AssetType.Future, 0.0001, OrderType.Market)]
+    [InlineData("ETH", AssetType.Future, 0.01, OrderType.Market)]
     [InlineData("BTC", AssetType.Future, 0.001)]
     public async Task ShouldPlaceOrders(
         string symbol,
@@ -125,10 +125,8 @@ public class HyperliquidBrokerIntegrationTest
     {
         // arrange
         var broker = GetTestBroker();
-        decimal? limitPrice = orderType == OrderType.Limit
-            ? await GetLimitPrice(broker, symbol, assetType, quantity)
-            : null;
-        var trade = CreateTrade(symbol, assetType, quantity, limitPrice);
+        var limitPrice = await GetLimitPrice(broker, symbol, assetType, quantity);
+        var trade = CreateTrade(symbol, assetType, quantity, limitPrice, orderType);
 
         // act
         var tradeResults = broker.PlaceTradesAsync([trade]);
