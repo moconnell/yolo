@@ -218,9 +218,11 @@ public class TradeFactory : ITradeFactory
 
             var rawSize = delta * nominal / price.Value;
             var reduceOnly = rebalanceTarget == 0 || projectedPosition.HasPosition && Math.Sign(weight) != Math.Sign(delta);
-            var size = market.QuantityStep is null || reduceOnly
+            var size = market.QuantityStep is null
                 ? rawSize
-                : Math.Floor(rawSize / market.QuantityStep.Value) * market.QuantityStep.Value;
+                : reduceOnly
+                    ? Math.Ceiling(rawSize / market.QuantityStep.Value) * market.QuantityStep.Value
+                    : Math.Floor(rawSize / market.QuantityStep.Value) * market.QuantityStep.Value;
 
             var trade = market.MinProvideSize switch
             {
