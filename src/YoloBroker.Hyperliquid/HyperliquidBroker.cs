@@ -1008,8 +1008,7 @@ public sealed class HyperliquidBroker : IYoloBroker
             ToOrderResult(result.Success, result.Error, result.Data));
     }
 
-    private WebCallResultWrapper<IReadOnlyList<OrderResult>> Wrap(
-        WebCallResult<CallResult<HyperLiquidOrderResult>[]> result)
+    private WebCallResultWrapper<IReadOnlyList<OrderResult>> Wrap(WebCallResult<CallResult<HyperLiquidOrderResult>[]> result)
     {
         _logger.LogDebug(
             "Wrapping result for multiple orders with Success: {Success}, Error: {Error}, ResponseStatusCode: {ResponseStatusCode}, Data: {Data}",
@@ -1018,15 +1017,16 @@ public sealed class HyperliquidBroker : IYoloBroker
             result.ResponseStatusCode,
             result.Data);
 
+        if (result.Data is null)
+        {
+            return new(result.Success, result.Error, result.ResponseStatusCode, []);
+        }
+
         return new(
             result.Success,
             result.Error,
             result.ResponseStatusCode,
-            [
-                .. result.Data
-                    .Where(x => x != null && x.Success)
-                    .Select(x => ToOrderResult(x.Success, x.Error, x.Data))
-            ]);
+            [.. result.Data.Select(x => ToOrderResult(x?.Success ?? false, x?.Error, x?.Data))]);
     }
 
     private static OrderResult ToOrderResult(bool success, Error? error, HyperLiquidOrderResult? data) =>
