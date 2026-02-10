@@ -33,6 +33,7 @@ on:
 
 env:
   DOTNET_VERSION: "10.0.x"
+  FUNCTION_PROJECT: "src/YoloFunk/YoloFunk.csproj"
 
 jobs:
   determine-environment:
@@ -215,6 +216,8 @@ jobs:
     if: needs.determine-environment.outputs.deploy == 'true'
     runs-on: ubuntu-latest
     environment: ${{ needs.determine-environment.outputs.environment == 'prod' && 'production' || 'development' }}
+    env:
+      PUBLISH_DIR: ${{ github.workspace }}/publish
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -225,19 +228,36 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore dependencies
-        run: |
-          cd src/YoloFunk
-          dotnet restore
+        run: dotnet restore ${{ env.FUNCTION_PROJECT }}
 
       - name: Build
-        run: |
-          cd src/YoloFunk
-          dotnet build --configuration Release --no-restore
+        run: dotnet build ${{ env.FUNCTION_PROJECT }} --configuration Release --no-restore
 
       - name: Publish
+        run: dotnet publish ${{ env.FUNCTION_PROJECT }} --configuration Release --no-build --output ${{ env.PUBLISH_DIR }}
+
+      - name: Verify publish output
         run: |
-          cd src/YoloFunk
-          dotnet publish --configuration Release --no-build --output ./output
+          echo "Publish folder: ${{ env.PUBLISH_DIR }}"
+          ls -la ${{ env.PUBLISH_DIR }}
+          echo "----"
+          # Key files expected for Azure Functions (.NET isolated)
+          test -f ${{ env.PUBLISH_DIR }}/host.json || (echo "❌ host.json missing from publish output" && exit 1)
+          # At least one assembly/executable should exist
+          if ! ls ${{ env.PUBLISH_DIR }}/*.dll 1>/dev/null 2>&1 && ! ls ${{ env.PUBLISH_DIR }}/*.exe 1>/dev/null 2>&1 ; then
+            echo "❌ No binaries (*.dll/*.exe) found in publish output" && exit 1
+          fi
+          # Helpful for .NET isolated
+          if [ -f ${{ env.PUBLISH_DIR }}/functions.metadata ]; then
+            echo "✅ functions.metadata present"
+          else
+            echo "⚠️ functions.metadata not found (may indicate missing Worker.Sdk analyzer)"
+          fi
+          if [ -f ${{ env.PUBLISH_DIR }}/worker.config.json ]; then
+            echo "✅ worker.config.json present"
+          else
+            echo "⚠️ worker.config.json not found"
+          fi
 
       - name: Azure Login
         uses: azure/login@v2
@@ -248,7 +268,7 @@ jobs:
         uses: Azure/functions-action@v1
         with:
           app-name: ${{ needs.provision-infrastructure.outputs.function-app-name }}
-          package: "src/YoloFunk/output"
+          package: ${{ env.PUBLISH_DIR }}
 
       - name: Get Function App URL
         id: get-url
