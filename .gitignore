@@ -154,10 +154,16 @@ publish/
 #*.pubxml
 *.publishproj
 
+### Microsoft Azure Settings
+__azurite_db_*__.json
+__blobstorage__/
+__queuestorage__/
+
 # Microsoft Azure Web App publish settings. Comment the next line if you want to
 # checkin your Azure Web App publish settings, but sensitive information contained
 # in these scripts will be unencrypted
 PublishScripts/
+
 
 # NuGet Packages
 *.nupkg

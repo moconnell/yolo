@@ -13,13 +13,14 @@
       "command": "dotnet",
       "args": [
         "clean",
+        "${workspaceFolder}/src/YoloFunk/YoloFunk.csproj",
         "/property:GenerateFullPaths=true",
         "/consoleloggerparameters:NoSummary"
       ],
       "type": "process",
       "problemMatcher": "$msCompile",
       "options": {
-        "cwd": "${workspaceFolder}/src"
+        "cwd": "${workspaceFolder}"
       }
     },
     {
@@ -27,6 +28,7 @@
       "command": "dotnet",
       "args": [
         "build",
+        "${workspaceFolder}/src/YoloFunk/YoloFunk.csproj",
         "/property:GenerateFullPaths=true",
         "/consoleloggerparameters:NoSummary"
       ],
@@ -38,7 +40,7 @@
       },
       "problemMatcher": "$msCompile",
       "options": {
-        "cwd": "${workspaceFolder}/src"
+        "cwd": "${workspaceFolder}"
       }
     },
     {
@@ -48,13 +50,14 @@
         "clean",
         "--configuration",
         "Release",
+        "${workspaceFolder}/src/YoloFunk/YoloFunk.csproj",
         "/property:GenerateFullPaths=true",
         "/consoleloggerparameters:NoSummary"
       ],
       "type": "process",
       "problemMatcher": "$msCompile",
       "options": {
-        "cwd": "${workspaceFolder}/src"
+        "cwd": "${workspaceFolder}"
       }
     },
     {
@@ -64,6 +67,7 @@
         "publish",
         "--configuration",
         "Release",
+        "${workspaceFolder}/src/YoloFunk/YoloFunk.csproj",
         "/property:GenerateFullPaths=true",
         "/consoleloggerparameters:NoSummary"
       ],
@@ -71,11 +75,12 @@
       "dependsOn": "clean release (functions)",
       "problemMatcher": "$msCompile",
       "options": {
-        "cwd": "${workspaceFolder}/src"
+        "cwd": "${workspaceFolder}"
       }
     },
     {
       "type": "func",
+      "label": "func: host start",
       "dependsOn": "build (functions)",
       "options": {
         "cwd": "${workspaceFolder}/src/YoloFunk/bin/Debug/net10.0"

@@ -11,6 +11,9 @@ public record WebCallResultWrapper<T>(
     );
 
 public record OrderResult(
+    bool Success,
+    string? ErrorMessage,
+    int? ErrorCode,
     long? OrderId,
     YoloAbstractions.OrderStatus OrderStatus,
     decimal? AveragePrice,

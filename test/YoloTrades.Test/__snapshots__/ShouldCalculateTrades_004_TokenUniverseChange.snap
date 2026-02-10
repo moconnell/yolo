@@ -2,27 +2,27 @@
   {
     "Symbol": "BTC",
     "AssetType": "Future",
-    "Amount": -0.0154410964393754785475574933,
+    "Amount": -0.01545,
     "LimitPrice": 111014.0,
     "OrderType": "Limit",
     "PostPrice": true,
     "ReduceOnly": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "AbsoluteAmount": 0.0154410964393754785475574933,
+    "AbsoluteAmount": 0.01545,
     "OrderSide": "Sell"
   },
   {
     "Symbol": "DOGE",
     "AssetType": "Future",
-    "Amount": -6873.0,
+    "Amount": -6872.0,
     "LimitPrice": 0.21743,
     "OrderType": "Limit",
     "PostPrice": true,
     "ReduceOnly": false,
     "Expiry": null,
     "ClientOrderId": null,
-    "AbsoluteAmount": 6873.0,
+    "AbsoluteAmount": 6872.0,
     "OrderSide": "Sell"
   },
   {
@@ -41,14 +41,14 @@
   {
     "Symbol": "XRP",
     "AssetType": "Future",
-    "Amount": -349.0,
+    "Amount": -348.0,
     "LimitPrice": 2.8255,
     "OrderType": "Limit",
     "PostPrice": true,
     "ReduceOnly": false,
     "Expiry": null,
     "ClientOrderId": null,
-    "AbsoluteAmount": 349.0,
+    "AbsoluteAmount": 348.0,
     "OrderSide": "Sell"
   },
   {
@@ -80,27 +80,27 @@
   {
     "Symbol": "TRX",
     "AssetType": "Future",
-    "Amount": -5634.0,
+    "Amount": -5633.0,
     "LimitPrice": 0.32691,
     "OrderType": "Limit",
     "PostPrice": true,
     "ReduceOnly": false,
     "Expiry": null,
     "ClientOrderId": null,
-    "AbsoluteAmount": 5634.0,
+    "AbsoluteAmount": 5633.0,
     "OrderSide": "Sell"
   },
   {
     "Symbol": "ADA",
     "AssetType": "Future",
-    "Amount": -605.0,
+    "Amount": -604.0,
     "LimitPrice": 0.82744,
     "OrderType": "Limit",
     "PostPrice": true,
     "ReduceOnly": false,
     "Expiry": null,
     "ClientOrderId": null,
-    "AbsoluteAmount": 605.0,
+    "AbsoluteAmount": 604.0,
     "OrderSide": "Sell"
   },
   {
@@ -119,14 +119,14 @@
   {
     "Symbol": "UNI",
     "AssetType": "Future",
-    "Amount": 3.20056165000,
+    "Amount": 3.21,
     "LimitPrice": 9.40750,
     "OrderType": "Limit",
     "PostPrice": true,
     "ReduceOnly": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "AbsoluteAmount": 3.20056165000,
+    "AbsoluteAmount": 3.21,
     "OrderSide": "Buy"
   }
 ]
