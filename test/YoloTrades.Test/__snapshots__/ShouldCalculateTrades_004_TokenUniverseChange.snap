@@ -119,14 +119,14 @@
   {
     "Symbol": "UNI",
     "AssetType": "Future",
-    "Amount": 3.21,
+    "Amount": 3.20056165,
     "LimitPrice": 9.40750,
     "OrderType": "Limit",
     "PostPrice": true,
     "ReduceOnly": true,
     "Expiry": null,
     "ClientOrderId": null,
-    "AbsoluteAmount": 3.21,
+    "AbsoluteAmount": 3.20056165,
     "OrderSide": "Buy"
   }
 ]

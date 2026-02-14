@@ -224,6 +224,19 @@ public class TradeFactory : ITradeFactory
                     ? Math.Ceiling(Math.Abs(rawSize) / market.QuantityStep.Value) * market.QuantityStep.Value * Math.Sign(rawSize)
                     : Math.Floor(Math.Abs(rawSize) / market.QuantityStep.Value) * market.QuantityStep.Value * Math.Sign(rawSize);
 
+            if (reduceOnly)
+            {
+                var projectedAmount = projectedPosition.ProjectedAmount;
+                var maxReduceOnlySize = Math.Abs(projectedAmount);
+
+                size = projectedAmount switch
+                {
+                    > 0 => Math.Max(size, -maxReduceOnlySize),
+                    < 0 => Math.Min(size, maxReduceOnlySize),
+                    _ => 0
+                };
+            }
+
             var trade = market.MinProvideSize switch
             {
                 _ when Math.Abs(size) >= market.MinProvideSize.GetValueOrDefault() => new Trade(

@@ -329,6 +329,174 @@ public class TradeFactoryTests
         mntTrade.OrderSide.ShouldBe(OrderSide.Sell);
     }
 
+    [Theory]
+    [InlineData(1.001, -1.001)]
+    [InlineData(0.01, -0.01)]
+    public void GivenDroppedTokenLongSpot_WhenReduceOnlyAndQuantityStepMisaligned_ShouldNotOverClose(
+        decimal currentPosition,
+        decimal expectedTradeAmount)
+    {
+        // arrange
+        var logger = _loggerFactory.CreateLogger<TradeFactory>();
+        var config = new YoloConfig
+        {
+            AssetPermissions = AssetPermissions.All,
+            BaseAsset = "USDC",
+            NominalCash = 10000,
+            TradeBuffer = 0.04m
+        };
+
+        var tradeFactory = new TradeFactory(config, logger);
+
+        var weights = new Dictionary<string, decimal>();
+        var positions = new Dictionary<string, IReadOnlyList<Position>>
+        {
+            ["ABC"] =
+            [
+                new Position("ABC", "ABC", AssetType.Spot, currentPosition)
+            ]
+        };
+        var markets = new Dictionary<string, IReadOnlyList<MarketInfo>>
+        {
+            ["ABC"] =
+            [
+                new MarketInfo(
+                    "ABC/USDC",
+                    "ABC",
+                    "USDC",
+                    AssetType.Spot,
+                    DateTime.UtcNow,
+                    PriceStep: 0.01m,
+                    QuantityStep: 0.1m,
+                    MinProvideSize: 0,
+                    Ask: 100.1m,
+                    Bid: 100.0m,
+                    Last: 100.05m)
+            ]
+        };
+
+        // act
+        var trades = tradeFactory.CalculateTrades(weights, positions, markets).ToArray();
+
+        // assert
+        trades.Length.ShouldBe(1);
+        var trade = trades[0];
+        trade.Symbol.ShouldBe("ABC/USDC");
+        trade.ReduceOnly.ShouldBe(true);
+        trade.Amount.ShouldBe(expectedTradeAmount);
+        Math.Abs(trade.Amount).ShouldBeLessThanOrEqualTo(Math.Abs(currentPosition));
+    }
+
+    [Theory]
+    [InlineData(-1.001, 1.001)]
+    [InlineData(-0.01, 0.01)]
+    public void GivenDroppedTokenShortSpot_WhenReduceOnlyAndQuantityStepMisaligned_ShouldNotOverClose(
+        decimal currentPosition,
+        decimal expectedTradeAmount)
+    {
+        // arrange
+        var logger = _loggerFactory.CreateLogger<TradeFactory>();
+        var config = new YoloConfig
+        {
+            AssetPermissions = AssetPermissions.All,
+            BaseAsset = "USDC",
+            NominalCash = 10000,
+            TradeBuffer = 0.04m
+        };
+
+        var tradeFactory = new TradeFactory(config, logger);
+
+        var weights = new Dictionary<string, decimal>();
+        var positions = new Dictionary<string, IReadOnlyList<Position>>
+        {
+            ["ABC"] =
+            [
+                new Position("ABC", "ABC", AssetType.Spot, currentPosition)
+            ]
+        };
+        var markets = new Dictionary<string, IReadOnlyList<MarketInfo>>
+        {
+            ["ABC"] =
+            [
+                new MarketInfo(
+                    "ABC/USDC",
+                    "ABC",
+                    "USDC",
+                    AssetType.Spot,
+                    DateTime.UtcNow,
+                    PriceStep: 0.01m,
+                    QuantityStep: 0.1m,
+                    MinProvideSize: 0,
+                    Ask: 100.1m,
+                    Bid: 100.0m,
+                    Last: 100.05m)
+            ]
+        };
+
+        // act
+        var trades = tradeFactory.CalculateTrades(weights, positions, markets).ToArray();
+
+        // assert
+        trades.Length.ShouldBe(1);
+        var trade = trades[0];
+        trade.Symbol.ShouldBe("ABC/USDC");
+        trade.ReduceOnly.ShouldBe(true);
+        trade.Amount.ShouldBe(expectedTradeAmount);
+        Math.Abs(trade.Amount).ShouldBeLessThanOrEqualTo(Math.Abs(currentPosition));
+    }
+
+    [Fact]
+    public void GivenDroppedTokenLongSpot_WhenQuantityStepAligned_ShouldNotOverClose()
+    {
+        // arrange
+        var logger = _loggerFactory.CreateLogger<TradeFactory>();
+        var config = new YoloConfig
+        {
+            AssetPermissions = AssetPermissions.All,
+            BaseAsset = "USDC",
+            NominalCash = 10000,
+            TradeBuffer = 0.04m
+        };
+
+        var tradeFactory = new TradeFactory(config, logger);
+
+        var weights = new Dictionary<string, decimal>();
+        var positions = new Dictionary<string, IReadOnlyList<Position>>
+        {
+            ["ABC"] =
+            [
+                new Position("ABC", "ABC", AssetType.Spot, 1.1m)
+            ]
+        };
+        var markets = new Dictionary<string, IReadOnlyList<MarketInfo>>
+        {
+            ["ABC"] =
+            [
+                new MarketInfo(
+                    "ABC/USDC",
+                    "ABC",
+                    "USDC",
+                    AssetType.Spot,
+                    DateTime.UtcNow,
+                    PriceStep: 0.01m,
+                    QuantityStep: 0.1m,
+                    MinProvideSize: 0,
+                    Ask: 100.1m,
+                    Bid: 100.0m,
+                    Last: 100.05m)
+            ]
+        };
+
+        // act
+        var trades = tradeFactory.CalculateTrades(weights, positions, markets).ToArray();
+
+        // assert
+        trades.Length.ShouldBe(1);
+        var trade = trades[0];
+        trade.ReduceOnly.ShouldBe(true);
+        trade.Amount.ShouldBe(-1.1m);
+    }
+
     private static
         (Dictionary<string, decimal> weights,
         Dictionary<string, IReadOnlyList<Position>> positions,
