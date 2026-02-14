@@ -10,7 +10,7 @@ public record ProjectedPosition(MarketInfo Market, decimal Position, decimal Nom
 
     public bool HasPosition => ProjectedWeight != 0;
 
-    private decimal? CurrentWeight => CalcWeight(ProjectedAmount);
+    private decimal? CurrentWeight => CalcWeight(Position);
 
     public static ProjectedPosition operator +(ProjectedPosition position, Trade trade) =>
         new(
