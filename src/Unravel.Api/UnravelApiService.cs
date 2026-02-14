@@ -40,20 +40,69 @@ public class UnravelApiService : IUnravelApiService
         bool throwOnMissingValue = false,
         CancellationToken cancellationToken = default)
     {
+        var baseUrl = $"{_config.ApiBaseUrl}/{_config.UrlPathFactorsLive}";
+
+        return await GetFactorsCoreAsync(
+            tickers,
+            throwOnMissingValue,
+            async (factorTypeString, tickersCsv, token) =>
+            {
+                var url = string.Format(baseUrl, factorTypeString, tickersCsv, _config.Smoothing);
+                var response = await _httpClient.GetAsync<FactorsLiveResponse, double?>(url, _headers, token);
+                return (response.TimeStamp, response.Tickers, response.Data);
+            },
+            cancellationToken);
+    }
+
+    public async Task<FactorDataFrame> GetFactorsHistoricalAsync(
+        IEnumerable<string> tickers,
+        bool throwOnMissingValue = false,
+        CancellationToken cancellationToken = default)
+    {
+        var baseUrl = $"{_config.ApiBaseUrl}/{_config.UrlPathFactors}";
+        var date = DateTime.Today.AddDays(-1).ToString(_config.DateFormat);
+
+        return await GetFactorsCoreAsync(
+            tickers,
+            throwOnMissingValue,
+            async (factorTypeString, tickersCsv, token) =>
+            {
+                var url = string.Format(
+                    baseUrl,
+                    factorTypeString,
+                    tickersCsv,
+                    _config.Smoothing,
+                    date,
+                    date);
+                var response = await _httpClient.GetAsync<FactorsResponse, double?[]>(url, _headers, token);
+
+                if (response.Index.Count != 1 || response.Data.Count != 1)
+                    throw new ApiException(
+                        $"Expected a single row from historical endpoint for factor {factorTypeString}, got {response.Index.Count} index row(s) and {response.Data.Count} data row(s).");
+
+                var data = response.Data[0];
+                if (data.Length != response.Tickers.Count)
+                    throw new ApiException(
+                        $"Historical response malformed for factor {factorTypeString}: row length {data.Length} != tickers count {response.Tickers.Count}.");
+
+                return (response.Index[0], response.Tickers, data);
+            },
+            cancellationToken);
+    }
+
+    private async Task<FactorDataFrame> GetFactorsCoreAsync(
+        IEnumerable<string> tickers,
+        bool throwOnMissingValue,
+        Func<string, string, CancellationToken, Task<(DateTime Timestamp, IReadOnlyList<string> Tickers, IReadOnlyList<double?> Data)>> fetchFactorDataAsync,
+        CancellationToken cancellationToken)
+    {
         if (_config.Factors.Length == 0)
             return FactorDataFrame.Empty;
 
         ArgumentNullException.ThrowIfNull(tickers);
-        var tickerList = tickers
-            .Where(s => !string.IsNullOrWhiteSpace(s))
-            .Select(s => s.Trim().ToUpperInvariant())
-            .Distinct()
-            .OrderBy(s => s)
-            .ToList();
-        if (tickerList.Count == 0)
-            throw new ArgumentException("Tickers cannot be empty.", nameof(tickers));
+        ArgumentNullException.ThrowIfNull(fetchFactorDataAsync);
 
-        var baseUrl = $"{_config.ApiBaseUrl}/{_config.UrlPathFactorsLive}";
+        var tickerList = NormalizeTickers(tickers);
         var tickersCsv = Uri.EscapeDataString(tickerList.ToCsv());
         var results = new List<FactorDataFrame>();
 
@@ -63,12 +112,15 @@ public class UnravelApiService : IUnravelApiService
 
             if (!FactorTypeToStringMap.TryGetValue(fac, out var factorTypeString))
                 throw new InvalidOperationException($"Factor type {fac} is not supported.");
-            var url = string.Format(baseUrl, factorTypeString, tickersCsv);
-            var response = await _httpClient.GetAsync<FactorsLiveResponse, double?>(url, _headers, cancellationToken);
+
+            var response = await fetchFactorDataAsync(factorTypeString, tickersCsv, cancellationToken);
 
             if (response.Tickers.SequenceEqual(tickerList, StringComparer.OrdinalIgnoreCase))
             {
-                var dataFrame = FactorDataFrame.NewFrom(response.Tickers, response.TimeStamp, (fac, response.Data.Select(d => d ?? double.NaN).ToArray()));
+                var dataFrame = FactorDataFrame.NewFrom(
+                    response.Tickers,
+                    response.Timestamp,
+                    (fac, response.Data.Select(d => d ?? double.NaN).ToArray()));
                 results.Add(dataFrame);
                 continue;
             }
@@ -87,7 +139,7 @@ public class UnravelApiService : IUnravelApiService
                     values.Insert(insertIndex, double.NaN);
                 }
 
-                var dataFrame = FactorDataFrame.NewFrom(tickerList, response.TimeStamp, (fac, values));
+                var dataFrame = FactorDataFrame.NewFrom(tickerList, response.Timestamp, (fac, values));
                 results.Add(dataFrame);
             }
             else
@@ -105,18 +157,36 @@ public class UnravelApiService : IUnravelApiService
     {
         var baseUrl = $"{_config.ApiBaseUrl}/{_config.UrlPathUniverse}";
         var exchange = _config.Exchange.ToString().ToLowerInvariant();
-        var startDate = DateTime.Today.AddDays(-3).ToString(_config.DateFormat);
-        var url = string.Format(baseUrl, _config.UniverseSize, exchange, startDate);
+        var date = DateTime.Today.AddDays(-1).ToString(_config.DateFormat);
+        var url = string.Format(baseUrl, _config.UniverseSize, exchange, date, date);
         var response = await _httpClient.GetAsync<UniverseResponse, byte?[]>(url, _headers, cancellationToken);
-        if (response.Index.Count == 1 && response.Tickers.Count == _config.UniverseSize)
+        if (response.Index.Count == 0 || response.Tickers.Count == 0 || response.Data.Count == 0)
+            throw new ApiException("Universe response missing index, tickers, or data.");
+        if (response.Index.Count > 1)
+            throw new ApiException($"Expected a single row from universe endpoint, got {response.Index.Count} index rows.");
+        if (response.Tickers.Count == _config.UniverseSize)
             return response.Tickers;
 
-        var lastRow = response.Data[^1];
-        if (lastRow.Length != response.Tickers.Count)
-            throw new ApiException(
-                $"Universe response malformed: lastRow length {lastRow.Length} != tickers count {response.Tickers.Count}.");
+        var row = response.Data[0];
+        if (row.Length != response.Tickers.Count)
+            throw new ApiException($"Universe response malformed: row length {row.Length} != tickers count {response.Tickers.Count}.");
 
-        var tickers = response.Tickers.Where((_, i) => lastRow[i] == 1).ToArray();
+        var tickers = response.Tickers.Where((_, i) => row[i] == 1).ToArray();
         return tickers;
+    }
+
+    private static List<string> NormalizeTickers(IEnumerable<string> tickers)
+    {
+        var tickerList = tickers
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Select(s => s.Trim().ToUpperInvariant())
+            .Distinct()
+            .OrderBy(s => s)
+            .ToList();
+
+        if (tickerList.Count == 0)
+            throw new ArgumentException("Tickers cannot be empty.", nameof(tickers));
+
+        return tickerList;
     }
 }

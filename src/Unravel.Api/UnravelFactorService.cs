@@ -1,3 +1,4 @@
+using Unravel.Api.Config;
 using Unravel.Api.Interfaces;
 using YoloAbstractions;
 using YoloAbstractions.Exceptions;
@@ -8,8 +9,13 @@ namespace Unravel.Api;
 public class UnravelFactorService : IGetFactors
 {
     private readonly IUnravelApiService _unravelApiService;
+    private readonly UnravelConfig _unravelConfig;
 
-    public UnravelFactorService(IUnravelApiService unravelApiService) => _unravelApiService = unravelApiService;
+    public UnravelFactorService(IUnravelApiService unravelApiService, UnravelConfig unravelConfig)
+    {
+        _unravelApiService = unravelApiService;
+        _unravelConfig = unravelConfig;
+    }
 
     public bool IsFixedUniverse => false;
 
@@ -26,9 +32,13 @@ public class UnravelFactorService : IGetFactors
             throw new ApiException("No tickers provided or resolved");
         }
 
-        var factorsLive = await _unravelApiService.GetFactorsLiveAsync(
-            tickersArray,
-            cancellationToken: cancellationToken);
+        var factorsLive = _unravelConfig.UseLiveFactors
+            ? await _unravelApiService.GetFactorsLiveAsync(
+                tickersArray,
+                cancellationToken: cancellationToken)
+            : await _unravelApiService.GetFactorsHistoricalAsync(
+                tickersArray,
+                cancellationToken: cancellationToken);
 
         return factorsLive;
     }

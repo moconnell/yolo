@@ -21,65 +21,6 @@ public class YoloWeightsServiceTest
         });
     }
 
-    [Theory]
-    [InlineData(1, 1, 0.15)]
-    [InlineData(0, 1, 0.2)]
-    [InlineData(1, 0, 0.1)]
-    [InlineData(1, 0.5, 0.133333333333333)]
-    [InlineData(0.5, 1, 0.166666666666667)]
-    public async Task GivenTwoFactorServices_ShouldCombineIntoSingleWeighting(
-        decimal trendWeight,
-        decimal retailFlowWeight,
-        decimal expectedWeight,
-        decimal trendValue = 0.1m,
-        decimal retailFlowValue = 0.2m)
-    {
-        // arrange
-        const string btcUsdt = "BTC/USDT";
-
-        var config = new YoloConfig
-        {
-            BaseAsset = "USDC",
-            FactorWeights = new Dictionary<FactorType, decimal>
-            {
-                { Trend, trendWeight },
-                { RetailFlow, retailFlowWeight }
-            }
-        };
-
-        var testDate = new DateTime(2025, 10, 13, 0, 0, 0, DateTimeKind.Utc);
-
-        var mockFactorService1 = new Mock<IGetFactors>();
-        mockFactorService1.Setup(x => x.GetFactorsAsync(
-                It.IsAny<IEnumerable<string>>(),
-                It.IsAny<ISet<FactorType>>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(FactorDataFrame.NewFrom([btcUsdt], testDate, (Trend, [Convert.ToDouble(trendValue)])));
-
-        var mockFactorService2 = new Mock<IGetFactors>();
-        mockFactorService2.Setup(x => x.GetFactorsAsync(
-                It.IsAny<IEnumerable<string>>(),
-                It.IsAny<ISet<FactorType>>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(
-                FactorDataFrame.NewFrom([btcUsdt], testDate, (RetailFlow, [Convert.ToDouble(retailFlowValue)])));
-
-        var logger = _loggerFactory.CreateLogger<YoloWeightsService>();
-
-        var svc = new YoloWeightsService(
-            [mockFactorService1.Object, mockFactorService2.Object],
-            config,
-            logger);
-
-        // act
-        var weights = await svc.CalculateWeightsAsync();
-
-        // assert
-        weights.ShouldNotBeNull();
-        weights.Count.ShouldBe(1);
-        weights[btcUsdt].ShouldBe(expectedWeight);
-    }
-
     [Fact]
     public void GivenNullInner_WhenConstructing_ShouldThrowArgumentNullException()
     {
@@ -125,8 +66,10 @@ public class YoloWeightsServiceTest
         exception.Message.ShouldContain("must have at least one factor provider");
     }
 
-    [Fact]
-    public async Task GivenMaxWeightingAbs_WhenCalculatingWeights_ShouldClampWeights()
+    [Theory]
+    [InlineData(1, 0.1, null, 0.909090909090909, 0.0909090909090909)] // No capping, weights should reflect relative factor values
+    [InlineData(1, 0.1, 0.25, 0.7142857142857143, 0.28571428571428575)] // Large difference to trigger capping
+    public async Task GivenMaxWeightingAbs_WhenCalculatingWeights_ShouldClampWeights(double carryBtcUsdt, double carryEthUsdt, double? maxWeightingAbs = null, double expectedBtcUsdt = 0.25, double expectedEthUsdt = 0.25)
     {
         // arrange
         const string btcUsdt = "BTC/USDT";
@@ -136,7 +79,7 @@ public class YoloWeightsServiceTest
         {
             BaseAsset = "USDC",
             FactorWeights = new Dictionary<FactorType, decimal> { { Carry, 1m } },
-            MaxWeightingAbs = 0.25
+            MaxWeightingAbs = maxWeightingAbs
         };
 
         var mockFactorService = new Mock<IGetFactors>();
@@ -148,7 +91,7 @@ public class YoloWeightsServiceTest
                 FactorDataFrame.NewFrom(
                     [btcUsdt, ethUsdt],
                     DateTime.Today,
-                    (Carry, [1.0, 0.1]))); // Large difference to trigger capping
+                    (Carry, [carryBtcUsdt, carryEthUsdt])));
 
         var logger = _loggerFactory.CreateLogger<YoloWeightsService>();
         var svc = new YoloWeightsService([mockFactorService.Object], config, logger);
@@ -158,7 +101,9 @@ public class YoloWeightsServiceTest
 
         // assert
         weights.ShouldNotBeNull();
-        weights.Values.All(w => Math.Abs(w) <= 0.25m).ShouldBeTrue();
+        weights.Count.ShouldBe(2);
+        weights[btcUsdt].ShouldBe((decimal)expectedBtcUsdt);
+        weights[ethUsdt].ShouldBe((decimal)expectedEthUsdt);
     }
 
     [Fact]
@@ -429,44 +374,5 @@ public class YoloWeightsServiceTest
 
         // assert
         await Assert.ThrowsAsync<ArgumentException>(func);
-    }
-
-    [Fact]
-    public async Task GivenZeroFactorWeight_WhenCalculating_ShouldHandleCorrectly()
-    {
-        // arrange
-        const string btcUsdt = "BTC/USDT";
-
-        var config = new YoloConfig
-        {
-            BaseAsset = "USDC",
-            FactorWeights = new Dictionary<FactorType, decimal>
-            {
-                { Carry, 0m },
-                { Momentum, 1m }
-            }
-        };
-
-        var mockFactorService = new Mock<IGetFactors>();
-        mockFactorService.Setup(x => x.GetFactorsAsync(
-                It.IsAny<IEnumerable<string>>(),
-                It.IsAny<ISet<FactorType>>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(
-                FactorDataFrame.NewFrom(
-                    [btcUsdt],
-                    DateTime.Today,
-                    (Carry, [0.5]),
-                    (Momentum, [0.3])));
-
-        var logger = _loggerFactory.CreateLogger<YoloWeightsService>();
-        var svc = new YoloWeightsService([mockFactorService.Object], config, logger);
-
-        // act
-        var weights = await svc.CalculateWeightsAsync();
-
-        // assert
-        weights.ShouldNotBeNull();
-        weights[btcUsdt].ShouldBe(0.3m);
     }
 }

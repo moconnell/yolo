@@ -252,6 +252,8 @@ public class FactorDataFrameTest(ITestOutputHelper output)
             [Trend] = 1.0
         };
 
+        expectedValues = [.. expectedValues.Select(v => v / expectedValues.Sum(Math.Abs))];
+
         // act
         var result = factorDataFrame.ApplyWeights(weights, maxWeightAbs, volScaling);
 
@@ -608,12 +610,14 @@ public class FactorDataFrameTest(ITestOutputHelper output)
         result.ShouldNotBeNull();
         var resultWeights = ((DoubleDataFrameColumn)result["Weight"]).ToArray();
 
-        // MNT should only use Carry factor (normalized by weight=1.0)
-        resultWeights[2].ShouldBe(0.05);
+        var rawExpected = new[] { 0.49 / 2, 0.27 / 2, 0.05 };
+        var grossAbs = rawExpected.Sum(Math.Abs);
+        var expected = rawExpected.Select(x => x / grossAbs).ToArray();
 
-        // BTC and ETH should use both factors (normalized by weight=2.0)
-        resultWeights[0].ShouldBe((0.15 + 0.34) / 2.0);
-        resultWeights[1].ShouldBe((0.10 + 0.17) / 2.0);
+        const double tolerance = 1e-10;
+        resultWeights[0].GetValueOrDefault().ShouldBe(expected[0], tolerance);
+        resultWeights[1].GetValueOrDefault().ShouldBe(expected[1], tolerance);
+        resultWeights[2].GetValueOrDefault().ShouldBe(expected[2], tolerance);
     }
 
     [Fact]
@@ -668,9 +672,9 @@ public class FactorDataFrameTest(ITestOutputHelper output)
         // assert
         var resultWeights = ((DoubleDataFrameColumn)result["Weight"]).ToArray();
         // BTC: 0.15 / 1.0 (zero vol replaced with 1.0)
-        resultWeights[0].ShouldBe(0.15);
+        resultWeights[0].GetValueOrDefault().ShouldBe(0.15 / 0.35, 0.0000001);
         // ETH: 0.10 / 0.5
-        resultWeights[1].ShouldBe(0.20);
+        resultWeights[1].GetValueOrDefault().ShouldBe(0.20 / 0.35, 0.0000001);
     }
 
     [Fact]

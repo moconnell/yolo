@@ -212,6 +212,8 @@ public sealed record FactorDataFrame
             weightsCol = new DoubleDataFrameColumn(Weight, clampedWeights);
         }
 
+        weightsCol = weightsCol.NormalizeGrossAbs(1.0);
+
         var resultDf = new DataFrame();
         resultDf.Columns.Add(_dataFrame[Date]);
         resultDf.Columns.Add(_dataFrame[Ticker]);

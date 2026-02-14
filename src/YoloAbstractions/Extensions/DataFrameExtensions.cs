@@ -62,6 +62,19 @@ public static class DataFrameExtensions
         return new DoubleDataFrameColumn(col.Name, resultVec);
     }
 
+    public static DoubleDataFrameColumn NormalizeGrossAbs(this DoubleDataFrameColumn col, double targetGross = 1.0)
+    {
+        var values = col.Select(v => v ?? double.NaN).ToArray();
+        var gross = values.Sum(x => Math.Abs(x));
+        if (gross <= 0 || double.IsNaN(gross) || double.IsInfinity(gross))
+            return col;
+
+        var scale = targetGross / gross;
+        var normalizedValues = values.Select(v => v * scale).ToArray();
+
+        return new DoubleDataFrameColumn(col.Name, normalizedValues);
+    }
+
     // -------------------------------
     // Internal helpers (column-level)
     // -------------------------------
@@ -80,6 +93,13 @@ public static class DataFrameExtensions
 
         if (items.Count == 0)
             return [.. Enumerable.Repeat(double.NaN, (int)col.Length)];
+
+        var minValue = items.Min(x => x.Value);
+        var maxValue = items.Max(x => x.Value);
+        if (Math.Abs(maxValue - minValue) < 1e-10)
+        {
+            return EmptyArray(col, items, items.Count);
+        }
 
         // qcut behaviour
         items.Sort((a, b) => a.Value.CompareTo(b.Value));

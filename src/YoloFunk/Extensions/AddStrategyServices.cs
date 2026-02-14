@@ -1,6 +1,7 @@
 using CryptoExchange.Net.Authentication;
 using HyperLiquid.Net;
 using HyperLiquid.Net.Clients;
+using System.Net.Http.Headers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -92,9 +93,17 @@ public static class AddStrategyServices
         {
             var rwKey = $"{strategyKey}-robotwealth";
             services.AddKeyedSingleton(rwKey, robotWealthConfig);
+
+            // Strategy-specific named HttpClient so we can attach handlers (e.g., raw JSON persistence) per provider.
+            services.AddHttpClient(rwKey, client =>
+            {
+                client.DefaultRequestHeaders.Accept.Clear();
+                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            });
+
             services.AddKeyedSingleton<IGetFactors>(rwKey, (sp, key) =>
             {
-                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient();
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient(rwKey);
                 var apiService = new RobotWealthApiService(httpClient, robotWealthConfig);
                 return new RobotWealthFactorService(apiService);
             });
@@ -113,11 +122,19 @@ public static class AddStrategyServices
 
             var unKey = $"{strategyKey}-unravel";
             services.AddKeyedSingleton(unKey, unravelConfig);
+
+            // Strategy-specific named HttpClient so we can attach handlers (e.g., raw JSON persistence) per provider.
+            services.AddHttpClient(unKey, client =>
+            {
+                client.DefaultRequestHeaders.Accept.Clear();
+                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            });
+
             services.AddKeyedSingleton<IGetFactors>(unKey, (sp, key) =>
             {
-                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient();
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient(unKey);
                 var apiService = new UnravelApiService(httpClient, unravelConfig);
-                return new UnravelFactorService(apiService);
+                return new UnravelFactorService(apiService, unravelConfig);
             });
             factorProviders.Add(unKey);
         }
