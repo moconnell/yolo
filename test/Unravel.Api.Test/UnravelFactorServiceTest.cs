@@ -1,4 +1,5 @@
-﻿using Unravel.Api.Interfaces;
+﻿using Unravel.Api.Config;
+using Unravel.Api.Interfaces;
 using YoloAbstractions;
 using static YoloAbstractions.FactorType;
 
@@ -11,7 +12,7 @@ public class UnravelFactorServiceTest
     {
         // arrange
         var mockApiSvc = new Mock<IUnravelApiService>();
-        var svc = new UnravelFactorService(mockApiSvc.Object);
+        var svc = new UnravelFactorService(mockApiSvc.Object, new UnravelConfig());
 
         // act
         var isFixedUniverse = svc.IsFixedUniverse;
@@ -33,7 +34,7 @@ public class UnravelFactorServiceTest
             .ReturnsAsync(
                 FactorDataFrame.NewFrom(tickers, DateTime.Today, (RetailFlow, [retailFlowValueBtc])));
 
-        var svc = new UnravelFactorService(mockApiSvc.Object);
+        var svc = new UnravelFactorService(mockApiSvc.Object, new UnravelConfig { UseHistoricalFactors = false });
 
         // act
         var factors = await svc.GetFactorsAsync(tickers);
@@ -65,7 +66,7 @@ public class UnravelFactorServiceTest
             .ReturnsAsync(
                 FactorDataFrame.NewFrom(tickers, DateTime.Today, (RetailFlow, [retailFlowValueBtc])));
 
-        var svc = new UnravelFactorService(mockApiSvc.Object);
+        var svc = new UnravelFactorService(mockApiSvc.Object, new UnravelConfig { UseHistoricalFactors = false });
 
         // act
         var factors = await svc.GetFactorsAsync();
@@ -97,7 +98,7 @@ public class UnravelFactorServiceTest
             .ReturnsAsync(
                 FactorDataFrame.NewFrom(tickers, DateTime.Today, (RetailFlow, [retailFlowValueBtc])));
 
-        var svc = new UnravelFactorService(mockApiSvc.Object);
+        var svc = new UnravelFactorService(mockApiSvc.Object, new UnravelConfig { UseHistoricalFactors = false });
 
         // act
         var factors = await svc.GetFactorsAsync(dupeTickers);
@@ -109,5 +110,35 @@ public class UnravelFactorServiceTest
         var keyValuePair = factors[btc].First();
         keyValuePair.Key.ShouldBe(RetailFlow);
         keyValuePair.Value.ShouldBe(retailFlowValueBtc, 0.000000001);
+    }
+
+    [Fact]
+    public async Task GivenHistoricalConfig_WhenTickersSupplied_ShouldUseHistoricalEndpoint()
+    {
+        // arrange
+        const string btc = "BTC";
+        string[] tickers = [btc];
+        const double retailFlowValueBtc = 0.25;
+
+        var mockApiSvc = new Mock<IUnravelApiService>();
+        mockApiSvc.Setup(apiSvc => apiSvc.GetFactorsHistoricalAsync(tickers, false, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+                FactorDataFrame.NewFrom(tickers, DateTime.Today, (RetailFlow, [retailFlowValueBtc])));
+
+        var svc = new UnravelFactorService(mockApiSvc.Object, new UnravelConfig { UseHistoricalFactors = true });
+
+        // act
+        var factors = await svc.GetFactorsAsync(tickers);
+
+        // assert
+        factors.ShouldNotBeNull();
+        factors[btc].ShouldNotBeNull();
+        factors[btc].Count.ShouldBe(1);
+        var keyValuePair = factors[btc].First();
+        keyValuePair.Key.ShouldBe(RetailFlow);
+        keyValuePair.Value.ShouldBe(retailFlowValueBtc, 0.000000001);
+
+        mockApiSvc.Verify(apiSvc => apiSvc.GetFactorsHistoricalAsync(tickers, false, It.IsAny<CancellationToken>()), Times.Once);
+        mockApiSvc.Verify(apiSvc => apiSvc.GetFactorsLiveAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

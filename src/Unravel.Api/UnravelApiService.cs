@@ -63,7 +63,8 @@ public class UnravelApiService : IUnravelApiService
 
             if (!FactorTypeToStringMap.TryGetValue(fac, out var factorTypeString))
                 throw new InvalidOperationException($"Factor type {fac} is not supported.");
-            var url = string.Format(baseUrl, factorTypeString, tickersCsv);
+
+            var url = string.Format(baseUrl, factorTypeString, tickersCsv, _config.Smoothing);
             var response = await _httpClient.GetAsync<FactorsLiveResponse, double?>(url, _headers, cancellationToken);
 
             if (response.Tickers.SequenceEqual(tickerList, StringComparer.OrdinalIgnoreCase))
@@ -88,6 +89,91 @@ public class UnravelApiService : IUnravelApiService
                 }
 
                 var dataFrame = FactorDataFrame.NewFrom(tickerList, response.TimeStamp, (fac, values));
+                results.Add(dataFrame);
+            }
+            else
+            {
+                var unexpectedTickers = response.Tickers.Except(tickerList).ToArray();
+                throw new ApiException(
+                    $"Unravel API returned unexpected tickers for factor {fac}: {unexpectedTickers.ToCsv()}");
+            }
+        }
+
+        return results.Aggregate((one, two) => one + two);
+    }
+
+    public async Task<FactorDataFrame> GetFactorsHistoricalAsync(
+        IEnumerable<string> tickers,
+        bool throwOnMissingValue = false,
+        CancellationToken cancellationToken = default)
+    {
+        if (_config.Factors.Length == 0)
+            return FactorDataFrame.Empty;
+
+        ArgumentNullException.ThrowIfNull(tickers);
+        var tickerList = tickers
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Select(s => s.Trim().ToUpperInvariant())
+            .Distinct()
+            .OrderBy(s => s)
+            .ToList();
+        if (tickerList.Count == 0)
+            throw new ArgumentException("Tickers cannot be empty.", nameof(tickers));
+
+        var baseUrl = $"{_config.ApiBaseUrl}/{_config.UrlPathFactors}";
+        var tickersCsv = Uri.EscapeDataString(tickerList.ToCsv());
+        var startDate = DateTime.Today.AddDays(-1).ToString(_config.DateFormat);
+        var results = new List<FactorDataFrame>();
+
+        foreach (var fac in _config.Factors)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!FactorTypeToStringMap.TryGetValue(fac, out var factorTypeString))
+                throw new InvalidOperationException($"Factor type {fac} is not supported.");
+
+            var url = string.Format(
+                baseUrl,
+                factorTypeString,
+                tickersCsv,
+                _config.Smoothing,
+                startDate);
+            var response = await _httpClient.GetAsync<FactorsResponse, double?[]>(url, _headers, cancellationToken);
+
+            if (response.Index.Count != 1 || response.Data.Count != 1)
+                throw new ApiException(
+                    $"Expected a single row from historical endpoint for factor {fac}, got {response.Index.Count} index row(s) and {response.Data.Count} data row(s).");
+
+            var data = response.Data[0];
+            if (data.Length != response.Tickers.Count)
+                throw new ApiException(
+                    $"Historical response malformed for factor {fac}: row length {data.Length} != tickers count {response.Tickers.Count}.");
+
+            if (response.Tickers.SequenceEqual(tickerList, StringComparer.OrdinalIgnoreCase))
+            {
+                var dataFrame = FactorDataFrame.NewFrom(
+                    response.Tickers,
+                    response.Index[0],
+                    (fac, data.Select(d => d ?? double.NaN).ToArray()));
+                results.Add(dataFrame);
+                continue;
+            }
+
+            var missingTickers = tickerList.Except(response.Tickers).ToArray();
+            if (missingTickers.Length > 0)
+            {
+                if (throwOnMissingValue)
+                    throw new ApiException(
+                        $"Not all requested tickers were returned for {fac}: {string.Join(", ", missingTickers)}");
+
+                var values = data.Select(d => d ?? double.NaN).ToList();
+                foreach (var missingTicker in missingTickers)
+                {
+                    var insertIndex = tickerList.IndexOf(missingTicker);
+                    values.Insert(insertIndex, double.NaN);
+                }
+
+                var dataFrame = FactorDataFrame.NewFrom(tickerList, response.Index[0], (fac, values));
                 results.Add(dataFrame);
             }
             else

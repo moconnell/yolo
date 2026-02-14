@@ -134,7 +134,7 @@ public static class AddStrategyServices
             {
                 var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient(unKey);
                 var apiService = new UnravelApiService(httpClient, unravelConfig);
-                return new UnravelFactorService(apiService);
+                return new UnravelFactorService(apiService, unravelConfig);
             });
             factorProviders.Add(unKey);
         }

@@ -12,6 +12,7 @@ namespace Unravel.Api.Test;
 public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
 {
     private const string RetailFlow = "retail_flow";
+    private const string Momentum = "momentum_enhanced";
 
     [Fact]
     public async Task GivenGoodConfig_WhenMocked_ShouldReturnFactors()
@@ -58,6 +59,164 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         result.FactorTypes.ShouldBe([FactorType.RetailFlow]);
         result.Tickers.ShouldBe([btc]);
         result[FactorType.RetailFlow, btc].ShouldBe(0.25, 0.000000001);
+    }
+
+    [Fact]
+    public async Task GivenGoodConfig_WhenMockedHistorical_ShouldReturnFactors()
+    {
+        // arrange
+        const string btc = "BTC";
+        const string eth = "ETH";
+        var tickersCsv = Uri.EscapeDataString(string.Join(",", new[] { btc, eth }));
+        var startDate = DateTime.Today.AddDays(-1).ToString("yyyy-MM-dd");
+
+        var handler = new Mock<HttpMessageHandler>();
+        var httpClient = handler.CreateClient();
+        var config = new UnravelConfig
+        {
+            ApiBaseUrl = "http://foo.org/api",
+            Factors = [FactorType.Momentum],
+            UrlPathFactors = "portfolio/factors?id={0}&tickers={1}&smoothing={2}&start_date={3}",
+            Smoothing = 5,
+            DateFormat = "yyyy-MM-dd"
+        };
+
+        handler.SetupRequest(
+                HttpMethod.Get,
+                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactors, Momentum, tickersCsv, config.Smoothing, startDate)}")
+            .ReturnsAsync(
+                new HttpResponseMessage
+                {
+                    Content = new StringContent(
+                        $$"""
+                        {
+                            "data": [
+                                [null, 0.25]
+                            ],
+                            "index": ["{{startDate}}"],
+                            "columns": [
+                                "BTC", "ETH"
+                            ]
+                        }
+                        """),
+                    StatusCode = HttpStatusCode.OK
+                });
+
+        var svc = new UnravelApiService(httpClient, config);
+
+        // act
+        var result = await svc.GetFactorsHistoricalAsync([btc, eth]);
+
+        // assert
+        result.ShouldNotBeNull();
+        result.FactorTypes.ShouldBe([FactorType.Momentum]);
+        result.Tickers.ShouldBe([btc, eth]);
+        result[FactorType.Momentum, btc].ShouldBe(double.NaN);
+        result[FactorType.Momentum, eth].ShouldBe(0.25, 0.000000001);
+    }
+
+    [Fact]
+    public async Task GivenMultipleHistoricalRows_WhenMocked_ShouldThrow()
+    {
+        // arrange
+        const string btc = "BTC";
+        var tickersCsv = Uri.EscapeDataString(string.Join(",", new[] { btc }));
+        var startDate = DateTime.Today.AddDays(-1).ToString("yyyy-MM-dd");
+
+        var handler = new Mock<HttpMessageHandler>();
+        var httpClient = handler.CreateClient();
+        var config = new UnravelConfig
+        {
+            ApiBaseUrl = "http://foo.org/api",
+            Factors = [FactorType.Momentum],
+            UrlPathFactors = "portfolio/factors?id={0}&tickers={1}&smoothing={2}&start_date={3}",
+            Smoothing = 5,
+            DateFormat = "yyyy-MM-dd"
+        };
+
+        handler.SetupRequest(
+                HttpMethod.Get,
+                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactors, Momentum, tickersCsv, config.Smoothing, startDate)}")
+            .ReturnsAsync(
+                new HttpResponseMessage
+                {
+                    Content = new StringContent(
+                        $$"""
+                        {
+                            "data": [
+                                [0.1],
+                                [0.2]
+                            ],
+                            "index": ["{{startDate}}", "{{startDate}}"],
+                            "columns": [
+                                "BTC"
+                            ]
+                        }
+                        """),
+                    StatusCode = HttpStatusCode.OK
+                });
+
+        var svc = new UnravelApiService(httpClient, config);
+
+        // act & assert
+        var ex = await Should.ThrowAsync<ApiException>(async () =>
+            await svc.GetFactorsHistoricalAsync([btc]));
+
+        ex.Message.ShouldContain("Expected a single row from historical endpoint");
+    }
+
+    [Fact]
+    public async Task GivenMissingHistoricalTickers_WhenThrowOnMissingValueFalse_ShouldPopulateNaN()
+    {
+        // arrange
+        var startDate = DateTime.Today.AddDays(-1).ToString("yyyy-MM-dd");
+
+        var handler = new Mock<HttpMessageHandler>();
+        var httpClient = handler.CreateClient();
+        var config = new UnravelConfig
+        {
+            ApiBaseUrl = "http://foo.org/api",
+            Factors = [FactorType.Momentum],
+            UrlPathFactors = "portfolio/factors?id={0}&tickers={1}&smoothing={2}&start_date={3}",
+            Smoothing = 5,
+            DateFormat = "yyyy-MM-dd"
+        };
+
+        var requestedTickers = new[] { "ADA", "BTC", "ETH" };
+        var tickersCsv = Uri.EscapeDataString(string.Join(",", requestedTickers));
+
+        handler.SetupRequest(
+                HttpMethod.Get,
+                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactors, Momentum, tickersCsv, config.Smoothing, startDate)}")
+            .ReturnsAsync(
+                new HttpResponseMessage
+                {
+                    Content = new StringContent(
+                        $$"""
+                        {
+                            "data": [
+                                [0.5, 0.7]
+                            ],
+                            "index": ["{{startDate}}"],
+                            "columns": [
+                                "BTC", "ETH"
+                            ]
+                        }
+                        """),
+                    StatusCode = HttpStatusCode.OK
+                });
+
+        var svc = new UnravelApiService(httpClient, config);
+
+        // act
+        var result = await svc.GetFactorsHistoricalAsync(requestedTickers, throwOnMissingValue: false);
+
+        // assert
+        result.ShouldNotBeNull();
+        result.Tickers.ShouldBe(requestedTickers);
+        result[FactorType.Momentum, "ADA"].ShouldBe(double.NaN);
+        result[FactorType.Momentum, "BTC"].ShouldBe(0.5, 0.000000001);
+        result[FactorType.Momentum, "ETH"].ShouldBe(0.7, 0.000000001);
     }
 
     [Fact]
