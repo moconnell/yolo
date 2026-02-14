@@ -19,6 +19,9 @@ builder.Services.AddLogging()
                 .AddHttpClient()
                 .AddSingleton<IConfiguration>(config);
 
+// Raw API payload persistence (Blob/Table Storage)
+builder.Services.AddAzureStorage(config);
+
 // Register each strategy from configuration
 var strategiesSection = config.GetSection("Strategies");
 foreach (var strategySection in strategiesSection.GetChildren())

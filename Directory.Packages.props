@@ -1,7 +1,9 @@
 <Project>
   <ItemGroup>
+    <PackageVersion Include="Azure.Data.Tables" Version="12.10.0" />
     <PackageVersion Include="Azure.Identity" Version="1.17.1" />
     <PackageVersion Include="Azure.Security.KeyVault.Keys" Version="4.8.0" />
+    <PackageVersion Include="Azure.Storage.Blobs" Version="12.27.0" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="coverlet.msbuild" Version="6.0.4" />
     <PackageVersion Include="CsvHelper" Version="33.1.0" />
