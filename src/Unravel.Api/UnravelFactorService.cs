@@ -32,11 +32,11 @@ public class UnravelFactorService : IGetFactors
             throw new ApiException("No tickers provided or resolved");
         }
 
-        var factorsLive = _unravelConfig.UseHistoricalFactors
-            ? await _unravelApiService.GetFactorsHistoricalAsync(
+        var factorsLive = _unravelConfig.UseLiveFactors
+            ? await _unravelApiService.GetFactorsLiveAsync(
                 tickersArray,
                 cancellationToken: cancellationToken)
-            : await _unravelApiService.GetFactorsLiveAsync(
+            : await _unravelApiService.GetFactorsHistoricalAsync(
                 tickersArray,
                 cancellationToken: cancellationToken);
 

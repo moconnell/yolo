@@ -398,9 +398,9 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         };
 
         var exchange = config.Exchange.ToString().ToLowerInvariant();
-        var startDate = DateTime.Today.AddDays(-3).ToString(config.DateFormat);
+        var date = DateTime.Today.AddDays(-1).ToString(config.DateFormat);
         var requestUrl =
-            $"{config.ApiBaseUrl}/{string.Format(config.UrlPathUniverse, config.UniverseSize, exchange, startDate)}";
+            $"{config.ApiBaseUrl}/{string.Format(config.UrlPathUniverse, config.UniverseSize, exchange, date, date)}";
         handler.SetupRequest(HttpMethod.Get, requestUrl)
             .ReturnsAsync(
                 new HttpResponseMessage
@@ -411,7 +411,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
                               "data": [
                                   [1,1,1,1,1,1,1,1,1,1]
                               ],
-                              "index": ["{{startDate}}"],
+                              "index": ["{{date}}"],
                               "columns": [
                                   "BTC", "ADA", "ETH", "BNB", "TRX", "XRP", "SOL", "LINK", "AVAX", "DOGE"
                               ]

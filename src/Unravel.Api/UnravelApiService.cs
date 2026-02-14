@@ -60,7 +60,7 @@ public class UnravelApiService : IUnravelApiService
         CancellationToken cancellationToken = default)
     {
         var baseUrl = $"{_config.ApiBaseUrl}/{_config.UrlPathFactors}";
-        var startDate = DateTime.Today.AddDays(-1).ToString(_config.DateFormat);
+        var date = DateTime.Today.AddDays(-1).ToString(_config.DateFormat);
 
         return await GetFactorsCoreAsync(
             tickers,
@@ -72,7 +72,8 @@ public class UnravelApiService : IUnravelApiService
                     factorTypeString,
                     tickersCsv,
                     _config.Smoothing,
-                    startDate);
+                    date,
+                    date);
                 var response = await _httpClient.GetAsync<FactorsResponse, double?[]>(url, _headers, token);
 
                 if (response.Index.Count != 1 || response.Data.Count != 1)
@@ -156,18 +157,21 @@ public class UnravelApiService : IUnravelApiService
     {
         var baseUrl = $"{_config.ApiBaseUrl}/{_config.UrlPathUniverse}";
         var exchange = _config.Exchange.ToString().ToLowerInvariant();
-        var startDate = DateTime.Today.AddDays(-3).ToString(_config.DateFormat);
-        var url = string.Format(baseUrl, _config.UniverseSize, exchange, startDate);
+        var date = DateTime.Today.AddDays(-1).ToString(_config.DateFormat);
+        var url = string.Format(baseUrl, _config.UniverseSize, exchange, date, date);
         var response = await _httpClient.GetAsync<UniverseResponse, byte?[]>(url, _headers, cancellationToken);
-        if (response.Index.Count == 1 && response.Tickers.Count == _config.UniverseSize)
+        if (response.Index.Count == 0 || response.Tickers.Count == 0 || response.Data.Count == 0)
+            throw new ApiException("Universe response missing index, tickers, or data.");
+        if (response.Index.Count > 1)
+            throw new ApiException($"Expected a single row from universe endpoint, got {response.Index.Count} index rows.");
+        if (response.Tickers.Count == _config.UniverseSize)
             return response.Tickers;
 
-        var lastRow = response.Data[^1];
-        if (lastRow.Length != response.Tickers.Count)
-            throw new ApiException(
-                $"Universe response malformed: lastRow length {lastRow.Length} != tickers count {response.Tickers.Count}.");
+        var row = response.Data[0];
+        if (row.Length != response.Tickers.Count)
+            throw new ApiException($"Universe response malformed: row length {row.Length} != tickers count {response.Tickers.Count}.");
 
-        var tickers = response.Tickers.Where((_, i) => lastRow[i] == 1).ToArray();
+        var tickers = response.Tickers.Where((_, i) => row[i] == 1).ToArray();
         return tickers;
     }
 

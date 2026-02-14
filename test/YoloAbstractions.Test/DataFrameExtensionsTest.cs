@@ -39,6 +39,53 @@ public class DataFrameExtensionsTest
     }
 
     [Fact]
+    public void GivenAllZeroes_WhenCrossSectionalBinsNormalized_ShouldReturnAllZeroes()
+    {
+        var df = new DataFrame(new DoubleDataFrameColumn("Value", [0.0, 0.0, 0.0, 0.0]));
+
+        var result = df.Normalize(CrossSectionalBins, 10);
+        var values = ((DoubleDataFrameColumn)result["Value"]).ToArray();
+
+        values.Length.ShouldBe(4);
+        values[0].ShouldBe(0.0);
+        values[1].ShouldBe(0.0);
+        values[2].ShouldBe(0.0);
+        values[3].ShouldBe(0.0);
+    }
+
+    [Fact]
+    public void GivenAllEqualWithMissingValues_WhenCrossSectionalBinsNormalized_ShouldReturnZeroesAndPreserveNaN()
+    {
+        var df = new DataFrame(new DoubleDataFrameColumn("Value", [5.0, double.NaN, 5.0, 5.0]));
+
+        var result = df.Normalize(CrossSectionalBins, 10);
+        var values = ((DoubleDataFrameColumn)result["Value"]).ToArray();
+
+        values.Length.ShouldBe(4);
+        values[0].ShouldBe(0.0);
+        double.IsNaN(values[1].GetValueOrDefault()).ShouldBeTrue();
+        values[2].ShouldBe(0.0);
+        values[3].ShouldBe(0.0);
+    }
+
+    [Fact]
+    public void GivenAllEqualValues_WhenCrossSectionalBinsWithDifferentQuantiles_ShouldBeIdentical()
+    {
+        var df = new DataFrame(new DoubleDataFrameColumn("Value", [7.0, 7.0, 7.0, 7.0]));
+
+        var q2 = ((DoubleDataFrameColumn)df.Normalize(CrossSectionalBins, 2)["Value"]).ToArray();
+        var q10 = ((DoubleDataFrameColumn)df.Normalize(CrossSectionalBins, 10)["Value"]).ToArray();
+
+        q2.Length.ShouldBe(q10.Length);
+        for (var i = 0; i < q2.Length; i++)
+        {
+            q2[i].ShouldBe(0.0);
+            q10[i].ShouldBe(0.0);
+            q2[i].ShouldBe(q10[i]);
+        }
+    }
+
+    [Fact]
     public void GivenRankNormalizationWithMissingValues_WhenNormalized_ShouldPreserveNaN()
     {
         var df = new DataFrame(new DoubleDataFrameColumn("Value", [3.0, double.NaN, 1.0]));

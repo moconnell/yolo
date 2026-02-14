@@ -7,7 +7,7 @@ namespace YoloBroker;
 
 public class BrokerVolatilityFactorService(IYoloBroker broker, bool throwOnMissingData = true) : IGetFactors
 {
-    private const int Periods = 30;
+    private const int Periods = 120;
 
     public bool IsFixedUniverse => false;
 

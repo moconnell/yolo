@@ -34,7 +34,7 @@ public class UnravelFactorServiceTest
             .ReturnsAsync(
                 FactorDataFrame.NewFrom(tickers, DateTime.Today, (RetailFlow, [retailFlowValueBtc])));
 
-        var svc = new UnravelFactorService(mockApiSvc.Object, new UnravelConfig { UseHistoricalFactors = false });
+        var svc = new UnravelFactorService(mockApiSvc.Object, new UnravelConfig { UseLiveFactors = false });
 
         // act
         var factors = await svc.GetFactorsAsync(tickers);
@@ -66,7 +66,7 @@ public class UnravelFactorServiceTest
             .ReturnsAsync(
                 FactorDataFrame.NewFrom(tickers, DateTime.Today, (RetailFlow, [retailFlowValueBtc])));
 
-        var svc = new UnravelFactorService(mockApiSvc.Object, new UnravelConfig { UseHistoricalFactors = false });
+        var svc = new UnravelFactorService(mockApiSvc.Object, new UnravelConfig { UseLiveFactors = false });
 
         // act
         var factors = await svc.GetFactorsAsync();
@@ -98,7 +98,7 @@ public class UnravelFactorServiceTest
             .ReturnsAsync(
                 FactorDataFrame.NewFrom(tickers, DateTime.Today, (RetailFlow, [retailFlowValueBtc])));
 
-        var svc = new UnravelFactorService(mockApiSvc.Object, new UnravelConfig { UseHistoricalFactors = false });
+        var svc = new UnravelFactorService(mockApiSvc.Object, new UnravelConfig { UseLiveFactors = false });
 
         // act
         var factors = await svc.GetFactorsAsync(dupeTickers);
@@ -125,7 +125,7 @@ public class UnravelFactorServiceTest
             .ReturnsAsync(
                 FactorDataFrame.NewFrom(tickers, DateTime.Today, (RetailFlow, [retailFlowValueBtc])));
 
-        var svc = new UnravelFactorService(mockApiSvc.Object, new UnravelConfig { UseHistoricalFactors = true });
+        var svc = new UnravelFactorService(mockApiSvc.Object, new UnravelConfig { UseLiveFactors = true });
 
         // act
         var factors = await svc.GetFactorsAsync(tickers);
