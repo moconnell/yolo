@@ -101,15 +101,7 @@ public class UnravelApiService : IUnravelApiService
         ArgumentNullException.ThrowIfNull(tickers);
         ArgumentNullException.ThrowIfNull(fetchFactorDataAsync);
 
-        var tickerList = tickers
-            .Where(s => !string.IsNullOrWhiteSpace(s))
-            .Select(s => s.Trim().ToUpperInvariant())
-            .Distinct()
-            .OrderBy(s => s)
-            .ToList();
-        if (tickerList.Count == 0)
-            throw new ArgumentException("Tickers cannot be empty.", nameof(tickers));
-
+        var tickerList = NormalizeTickers(tickers);
         var tickersCsv = Uri.EscapeDataString(tickerList.ToCsv());
         var results = new List<FactorDataFrame>();
 
@@ -177,5 +169,20 @@ public class UnravelApiService : IUnravelApiService
 
         var tickers = response.Tickers.Where((_, i) => lastRow[i] == 1).ToArray();
         return tickers;
+    }
+
+    private static List<string> NormalizeTickers(IEnumerable<string> tickers)
+    {
+        var tickerList = tickers
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Select(s => s.Trim().ToUpperInvariant())
+            .Distinct()
+            .OrderBy(s => s)
+            .ToList();
+
+        if (tickerList.Count == 0)
+            throw new ArgumentException("Tickers cannot be empty.", nameof(tickers));
+
+        return tickerList;
     }
 }
