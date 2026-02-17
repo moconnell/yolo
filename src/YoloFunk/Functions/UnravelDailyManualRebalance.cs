@@ -3,6 +3,7 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.DurableTask.Client;
 using Microsoft.Extensions.Logging;
+using YoloFunk.Dto;
 
 namespace YoloFunk.Functions;
 
@@ -34,15 +35,21 @@ public class UnravelDailyManualRebalance
 
         try
         {
-            var startResult = await RebalanceDurableWorkflow.StartIfNotRunningAsync(
+            var (Started, InstanceId, Existing) = await RebalanceDurableWorkflow.StartIfNotRunningAsync(
                 durableClient,
                 request,
                 cancellationToken);
 
-            var response = req.CreateResponse(startResult.Started ? HttpStatusCode.Accepted : HttpStatusCode.OK);
-            await response.WriteStringAsync(startResult.Started
-                ? $"Rebalance started for strategy: {StrategyKey}. InstanceId: {startResult.InstanceId}"
-                : $"Rebalance already running for strategy: {StrategyKey}. InstanceId: {startResult.InstanceId}, Status: {startResult.Existing?.RuntimeStatus}");
+            var response = req.CreateResponse(Started ? HttpStatusCode.Accepted : HttpStatusCode.OK);
+            var payload = new RebalanceStartResponse(
+                StrategyKey,
+                InstanceId,
+                Started,
+                Started
+                    ? "Scheduled"
+                    : (Existing?.RuntimeStatus.ToString() ?? "Unknown"),
+                DateTime.UtcNow);
+            await response.WriteAsJsonAsync(payload, cancellationToken);
             return response;
         }
         catch (Exception ex)
@@ -50,7 +57,9 @@ public class UnravelDailyManualRebalance
             _logger.LogError(ex, "Error starting manual rebalance orchestration for {Strategy}", StrategyKey);
 
             var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
-            await errorResponse.WriteStringAsync($"Failed to start rebalance: {ex.Message}");
+            await errorResponse.WriteAsJsonAsync(
+                new RebalanceErrorResponse(StrategyKey, "Failed to start rebalance", ex.Message),
+                cancellationToken);
             return errorResponse;
         }
     }
@@ -68,13 +77,24 @@ public class UnravelDailyManualRebalance
         if (status is null)
         {
             var notFound = req.CreateResponse(HttpStatusCode.NotFound);
-            await notFound.WriteStringAsync($"No orchestration found for strategy: {StrategyKey}. InstanceId: {instanceId}");
+            await notFound.WriteAsJsonAsync(
+                new RebalanceErrorResponse(
+                    StrategyKey,
+                    "No orchestration found",
+                    $"InstanceId: {instanceId}"),
+                cancellationToken);
             return notFound;
         }
 
         var response = req.CreateResponse(HttpStatusCode.OK);
-        await response.WriteStringAsync(
-            $"Strategy: {StrategyKey}\nInstanceId: {instanceId}\nRuntimeStatus: {status.RuntimeStatus}\nCreatedAt: {status.CreatedAt:O}\nLastUpdatedAt: {status.LastUpdatedAt:O}");
+        await response.WriteAsJsonAsync(
+            new RebalanceStatusResponse(
+                StrategyKey,
+                instanceId,
+                status.RuntimeStatus.ToString(),
+                status.CreatedAt,
+                status.LastUpdatedAt),
+            cancellationToken);
         return response;
     }
 }
