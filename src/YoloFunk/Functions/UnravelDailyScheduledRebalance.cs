@@ -1,7 +1,6 @@
 using Microsoft.Azure.Functions.Worker;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.DurableTask.Client;
 using Microsoft.Extensions.Logging;
-using YoloAbstractions.Interfaces;
 
 namespace YoloFunk.Functions;
 
@@ -10,13 +9,9 @@ public class UnravelDailyScheduledRebalance
     private const string StrategyKey = "unraveldaily";
 
     private readonly ILogger<UnravelDailyScheduledRebalance> _logger;
-    private readonly ICommand _rebalanceCommand;
 
-    public UnravelDailyScheduledRebalance(
-        [FromKeyedServices(StrategyKey)] ICommand rebalanceCommand,
-        ILogger<UnravelDailyScheduledRebalance> logger)
+    public UnravelDailyScheduledRebalance(ILogger<UnravelDailyScheduledRebalance> logger)
     {
-        _rebalanceCommand = rebalanceCommand;
         _logger = logger;
     }
 
@@ -24,12 +19,37 @@ public class UnravelDailyScheduledRebalance
     [ExponentialBackoffRetry(3, "00:05:00", "00:30:00")]
     public async Task Run(
         [TimerTrigger("%Strategies:UnravelDaily:Schedule%")] TimerInfo myTimer,
+        [DurableClient] DurableTaskClient durableClient,
         CancellationToken cancellationToken)
     {
         _logger.LogInformation("{Strategy} scheduled rebalance executed at: {executionTime}",
             StrategyKey, DateTime.UtcNow);
 
-        await _rebalanceCommand.ExecuteAsync(cancellationToken);
+        var request = new RebalanceDurableWorkflow.RebalanceRequest(
+            StrategyKey,
+            "timer",
+            DateTime.UtcNow);
+
+        var startResult = await RebalanceDurableWorkflow.StartIfNotRunningAsync(
+            durableClient,
+            request,
+            cancellationToken);
+
+        if (startResult.Started)
+        {
+            _logger.LogInformation(
+                "Started durable rebalance orchestration {InstanceId} for strategy {Strategy}",
+                startResult.InstanceId,
+                StrategyKey);
+        }
+        else
+        {
+            _logger.LogInformation(
+                "Skipping orchestration start for strategy {Strategy}; existing instance {InstanceId} is {Status}",
+                StrategyKey,
+                startResult.InstanceId,
+                startResult.Existing?.RuntimeStatus);
+        }
 
         if (myTimer.ScheduleStatus is not null)
         {
