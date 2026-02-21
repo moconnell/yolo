@@ -249,6 +249,7 @@ public sealed class HyperliquidBroker : IYoloBroker
             });
 
         var orderTrackers = new ConcurrentDictionary<long, OrderTracker>();
+        var pendingOrderUpdates = new ConcurrentDictionary<long, HyperLiquidOrderStatus>();
 
         var spotOrderUpdatesSub = await CallAsync(
             () => _hyperliquidSocketClient.SpotApi.SubscribeToOrderUpdatesAsync(null, HandleOrderStatusUpdates, ct),
@@ -273,6 +274,13 @@ public sealed class HyperliquidBroker : IYoloBroker
 
             // Start timeout checking task
             var timeoutTask = StartTimeoutMonitoringTask(settings, updateChannel, orderTrackers, ct);
+
+            // If all orders already completed (e.g., filled immediately before trackers were registered),
+            // complete the channel now rather than waiting for the timeout monitor's next tick
+            if (orderTrackers.IsEmpty)
+            {
+                updateChannel.Writer.TryComplete();
+            }
 
             await foreach (var update in updateChannel.Reader.ReadAllAsync(ct))
             {
@@ -302,60 +310,78 @@ public sealed class HyperliquidBroker : IYoloBroker
 
             foreach (var update in e.Data)
             {
-                if (!orderTrackers.TryGetValue(update.Order.OrderId, out var tracker))
+                if (!orderTrackers.ContainsKey(update.Order.OrderId))
                 {
                     _logger.LogWarning(
                         "Received order update for unknown order {OrderId}: {Update}",
                         update.Order.OrderId,
                         update);
+                    // Buffer the update so it can be replayed when AddOrderTracker registers this order.
+                    // If multiple events arrive before registration, the latest one is kept; this is safe
+                    // because the most recent status (e.g., Filled after PartiallyFilled) is the one
+                    // that matters for correct order handling.
+                    pendingOrderUpdates[update.Order.OrderId] = update;
                     continue;
                 }
 
-                var orderStatus = update.Status.ToYoloOrderStatus();
-                var newOrder = tracker.Order with
-                {
-                    Filled = tracker.Order.Amount - update.Order.QuantityRemaining,
-                    OrderStatus = orderStatus
-                };
-
-                orderTrackers[tracker.Order.Id] = tracker with
-                {
-                    Order = newOrder
-                };
-
-                var message = update.Status.ToString();
-
-                switch (orderStatus)
-                {
-                    case OrderStatus.Filled:
-                        updateChannel.Writer.TryWrite(
-                            new OrderUpdate(newOrder.Symbol, OrderUpdateType.Filled, newOrder, Message: message));
-                        RemoveOrderTracker(tracker.MarkComplete().Order.Id);
-                        break;
-
-                    case OrderStatus.Canceled:
-                    case OrderStatus.MarginCanceled:
-                    case OrderStatus.Rejected:
-                        updateChannel.Writer.TryWrite(
-                            new OrderUpdate(newOrder.Symbol, OrderUpdateType.Cancelled, newOrder, Message: message));
-                        RemoveOrderTracker(tracker.MarkComplete().Order.Id);
-                        break;
-
-                    default:
-                        var orderUpdateType =
-                            (update.Order.QuantityRemaining > 0 &&
-                             update.Order.QuantityRemaining < tracker.Order.Amount)
-                                ? OrderUpdateType.PartiallyFilled
-                                : OrderUpdateType.Created;
-                        updateChannel.Writer.TryWrite(
-                            new OrderUpdate(tracker.Order.Symbol, orderUpdateType, newOrder, Message: message));
-                        break;
-                }
+                HandleSingleOrderUpdate(update);
             }
 
             if (orderTrackers.IsEmpty)
             {
                 updateChannel.Writer.TryComplete();
+            }
+        }
+
+        void HandleSingleOrderUpdate(HyperLiquidOrderStatus update)
+        {
+            if (!orderTrackers.TryGetValue(update.Order.OrderId, out var tracker))
+            {
+                _logger.LogDebug(
+                    "Order {OrderId} tracker not found during update processing; order may have already completed",
+                    update.Order.OrderId);
+                return;
+            }
+
+            var orderStatus = update.Status.ToYoloOrderStatus();
+            var newOrder = tracker.Order with
+            {
+                Filled = tracker.Order.Amount - update.Order.QuantityRemaining,
+                OrderStatus = orderStatus
+            };
+
+            orderTrackers[tracker.Order.Id] = tracker with
+            {
+                Order = newOrder
+            };
+
+            var message = update.Status.ToString();
+
+            switch (orderStatus)
+            {
+                case OrderStatus.Filled:
+                    updateChannel.Writer.TryWrite(
+                        new OrderUpdate(newOrder.Symbol, OrderUpdateType.Filled, newOrder, Message: message));
+                    RemoveOrderTracker(tracker.MarkComplete().Order.Id);
+                    break;
+
+                case OrderStatus.Canceled:
+                case OrderStatus.MarginCanceled:
+                case OrderStatus.Rejected:
+                    updateChannel.Writer.TryWrite(
+                        new OrderUpdate(newOrder.Symbol, OrderUpdateType.Cancelled, newOrder, Message: message));
+                    RemoveOrderTracker(tracker.MarkComplete().Order.Id);
+                    break;
+
+                default:
+                    var orderUpdateType =
+                        (update.Order.QuantityRemaining > 0 &&
+                         update.Order.QuantityRemaining < tracker.Order.Amount)
+                            ? OrderUpdateType.PartiallyFilled
+                            : OrderUpdateType.Created;
+                    updateChannel.Writer.TryWrite(
+                        new OrderUpdate(tracker.Order.Symbol, orderUpdateType, newOrder, Message: message));
+                    break;
             }
         }
 
@@ -407,6 +433,12 @@ public sealed class HyperliquidBroker : IYoloBroker
             if (orderTrackers.TryAdd(orderId, new OrderTracker(order, trade, DateTime.UtcNow)))
             {
                 _logger.LogDebug("Added order tracker for order {OrderId} for {Symbol}", orderId, order.Symbol);
+
+                if (pendingOrderUpdates.TryRemove(orderId, out var pendingUpdate))
+                {
+                    _logger.LogDebug("Replaying buffered order update for order {OrderId}", orderId);
+                    HandleSingleOrderUpdate(pendingUpdate);
+                }
             }
         }
 
