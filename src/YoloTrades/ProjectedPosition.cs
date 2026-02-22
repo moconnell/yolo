@@ -8,7 +8,7 @@ public record ProjectedPosition(MarketInfo Market, decimal Position, decimal Nom
 
     public decimal? ProjectedWeight => CurrentWeight + (Trades?.Sum(CalcWeight) ?? 0);
 
-    public bool HasPosition => ProjectedWeight != 0;
+    public bool HasPosition => ProjectedAmount != 0;
 
     private decimal? CurrentWeight => CalcWeight(Position);
 
@@ -21,5 +21,12 @@ public record ProjectedPosition(MarketInfo Market, decimal Position, decimal Nom
 
     private decimal? CalcWeight(Trade t) => CalcWeight(t.Amount);
 
-    private decimal? CalcWeight(decimal amount) => amount * (amount >= 0 ? Market.Bid : Market.Ask) / Nominal;
+    private decimal? CalcWeight(decimal amount)
+    {
+        if (amount == 0)
+            return 0;
+
+        var price = amount >= 0 ? Market.Bid : Market.Ask;
+        return price is null ? null : amount * price.Value / Nominal;
+    }
 }

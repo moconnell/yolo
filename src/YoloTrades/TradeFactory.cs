@@ -136,10 +136,14 @@ public class TradeFactory : ITradeFactory
             while (remainingDelta != 0)
             {
                 var trades = CalcTrades(
-                    token,
-                    [.. projectedPositions.Values],
-                    rebalanceTarget,
-                    remainingDelta);
+                        token,
+                        [.. projectedPositions.Values],
+                        rebalanceTarget,
+                        remainingDelta)
+                    .ToArray();
+
+                if (trades.Length == 0)
+                    yield break;
 
                 foreach (var (trade, remainingDeltaPostTrade) in trades)
                 {
@@ -192,11 +196,13 @@ public class TradeFactory : ITradeFactory
         foreach (var projectedPosition in orderedMarkets)
         {
             var market = projectedPosition.Market;
-            var weight = projectedPosition.ProjectedWeight!.Value;
             var nominal = projectedPosition.Nominal;
             var price = GetPrice(isBuy, market);
 
             if (price is null)
+                continue;
+
+            if (projectedPosition.ProjectedWeight is not { } weight)
                 continue;
 
             var (delta, restart) = market.AssetType switch

@@ -260,6 +260,87 @@ public class RebalanceCommandTest
     }
 
     [Fact]
+    public async Task GivenMissingBidAskAndNoGeneratedTrades_WhenExecuting_ShouldCompleteWithoutError()
+    {
+        // arrange
+        var weights = new Dictionary<string, decimal>
+        {
+            { "HYPE/USDC", 0.2m }
+        };
+
+        var positions = new Dictionary<string, IReadOnlyList<Position>>
+        {
+            {
+                "HYPE",
+                [
+                    new Position("HYPE-Future", "HYPE", AssetType.Future, 1.0m)
+                ]
+            }
+        };
+
+        var markets = new Dictionary<string, IReadOnlyList<MarketInfo>>
+        {
+            {
+                "HYPE",
+                [
+                    new MarketInfo(
+                        "HYPE-Future",
+                        "HYPE",
+                        "USDC",
+                        AssetType.Future,
+                        DateTime.UtcNow,
+                        PriceStep: 0.01m,
+                        QuantityStep: 0.01m,
+                        MinProvideSize: 0.07m,
+                        Ask: null,
+                        Bid: null,
+                        Last: 163.05m)
+                ]
+            }
+        };
+
+        var mockWeightsService = new Mock<ICalcWeights>();
+        mockWeightsService.Setup(x => x.CalculateWeightsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(weights);
+
+        var mockTradeFactory = new Mock<ITradeFactory>();
+        mockTradeFactory.Setup(x => x.CalculateTrades(weights, positions, markets))
+            .Returns(Array.Empty<Trade>());
+
+        var mockBroker = new Mock<IYoloBroker>();
+        mockBroker.Setup(x => x.GetOpenOrdersAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<long, Order>());
+        mockBroker.Setup(x => x.GetPositionsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(positions);
+        mockBroker.Setup(x => x.GetMarketsAsync(
+                It.IsAny<HashSet<string>>(),
+                It.IsAny<string>(),
+                It.IsAny<AssetPermissions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(markets);
+
+        var options = Options.Create(new YoloConfig { BaseAsset = "USDC" });
+        var logger = _loggerFactory.CreateLogger<RebalanceCommand>();
+
+        var command = new RebalanceCommand(
+            mockWeightsService.Object,
+            mockTradeFactory.Object,
+            mockBroker.Object,
+            options,
+            logger);
+
+        // act
+        await command.ExecuteAsync();
+
+        // assert
+        mockTradeFactory.Verify(x => x.CalculateTrades(weights, positions, markets), Times.Once);
+        mockBroker.Verify(x => x.ManageOrdersAsync(
+            It.IsAny<Trade[]>(),
+            It.IsAny<OrderManagementSettings>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task GivenTrades_WhenExecuting_ShouldManageOrders()
     {
         // arrange
