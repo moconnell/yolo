@@ -8,7 +8,7 @@ using YoloFunk.Dto;
 
 namespace YoloFunk.Functions;
 
-public partial class RebalanceDurableWorkflow
+public class RebalanceDurableWorkflow
 {
     public const string OrchestratorName = nameof(RunRebalanceOrchestrator);
     public const string ActivityName = nameof(RunRebalanceActivity);
@@ -25,10 +25,8 @@ public partial class RebalanceDurableWorkflow
     [Function(OrchestratorName)]
     public static async Task RunRebalanceOrchestrator([OrchestrationTrigger] TaskOrchestrationContext context)
     {
-        var input = context.GetInput<RebalanceRequest>()
-                ?? throw new InvalidOperationException("Missing orchestration input.");
-
-        await context.CallActivityAsync(ActivityName, input);
+        var input = context.GetInput<RebalanceRequest>() ?? throw new InvalidOperationException("Missing orchestration input.");
+        _ = await context.CallActivityAsync<RebalanceResult>(ActivityName, input);
     }
 
     [Function(ActivityName)]
@@ -70,8 +68,14 @@ public partial class RebalanceDurableWorkflow
         var instanceId = GetInstanceId(request.StrategyKey);
         var existing = await durableClient.GetInstanceAsync(instanceId, getInputsAndOutputs: false, cancellationToken);
 
-        if (existing?.IsRunning == true)
+        if (existing is not null &&
+            (existing.IsRunning ||
+             (existing.RuntimeStatus != OrchestrationRuntimeStatus.Completed &&
+              existing.RuntimeStatus != OrchestrationRuntimeStatus.Failed &&
+              existing.RuntimeStatus != OrchestrationRuntimeStatus.Terminated)))
+        {
             return (false, instanceId, existing);
+        }
 
         var options = new StartOrchestrationOptions { InstanceId = instanceId };
         var startedInstanceId = await durableClient.ScheduleNewOrchestrationInstanceAsync(
