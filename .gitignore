@@ -155,9 +155,12 @@ publish/
 *.publishproj
 
 ### Microsoft Azure Settings
+
+# Azurite Emulator related files
 __azurite_db_*__.json
 __blobstorage__/
 __queuestorage__/
+AzuriteConfig
 
 # Microsoft Azure Web App publish settings. Comment the next line if you want to
 # checkin your Azure Web App publish settings, but sensitive information contained
@@ -180,6 +183,7 @@ PublishScripts/
 # Microsoft Azure Build Output
 csx/
 *.build.csdef
+
 
 # Microsoft Azure Emulator
 ecf/

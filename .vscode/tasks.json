@@ -79,6 +79,37 @@
       }
     },
     {
+      "label": "Azurite: Start",
+      "type": "process",
+      "command": "npx",
+      "args": [
+        "--yes",
+        "azurite",
+        "--location",
+        "${workspaceFolder}",
+        "--silent"
+      ],
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "azurite",
+        "pattern": {
+          "regexp": "^(.*)$",
+          "message": 1
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*Azurite Blob service is starting.*",
+          "endsPattern": ".*Azurite Blob service is successfully listening at.*"
+        }
+      }
+    },
+    {
+      "label": "func: host start (with azurite)",
+      "dependsOn": ["Azurite: Start", "func: host start"],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
       "type": "func",
       "label": "func: host start",
       "dependsOn": "build (functions)",
