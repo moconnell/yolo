@@ -11,7 +11,18 @@
       "default": "Information",
       "Host.Results": "Information",
       "Function": "Information",
-      "Host.Aggregator": "Warning"
+      "Host.Aggregator": "Warning",
+      "Azure": "Warning",
+      "Azure.Core": "Warning",
+      "Azure.Storage": "Warning",
+      "DurableTask": "Warning",
+      "DurableTask.AzureStorage": "Warning",
+      "Host.Triggers.DurableTask": "Warning"
+    }
+  },
+  "extensions": {
+    "durableTask": {
+      "hubName": "YoloFunkLocalHub"
     }
   },
   "functionTimeout": "00:10:00"
