@@ -293,8 +293,8 @@ public sealed class HyperliquidBroker : IYoloBroker
         finally
         {
             updateChannel.Writer.TryComplete();
-            await spotOrderUpdatesSub.CloseAsync();
-            await futuresOrderUpdatesSub.CloseAsync();
+            if (spotOrderUpdatesSub != null) await spotOrderUpdatesSub.CloseAsync();
+            if (futuresOrderUpdatesSub != null) await futuresOrderUpdatesSub.CloseAsync();
             _logger.LogDebug("Unsubscribed from spot and futures order updates");
         }
 
@@ -327,7 +327,7 @@ public sealed class HyperliquidBroker : IYoloBroker
                 HandleSingleOrderUpdate(update);
             }
 
-            if (orderTrackers.IsEmpty)
+            if (orderTrackers.IsEmpty && pendingOrderUpdates.IsEmpty)
             {
                 updateChannel.Writer.TryComplete();
             }
@@ -462,7 +462,10 @@ public sealed class HyperliquidBroker : IYoloBroker
             {
                 try
                 {
-                    using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+                    var timerInterval = settings.StatusCheckInterval > TimeSpan.Zero
+                        ? settings.StatusCheckInterval
+                        : TimeSpan.FromSeconds(5);
+                    using var timer = new PeriodicTimer(timerInterval);
 
                     while (!ct.IsCancellationRequested && await timer.WaitForNextTickAsync(ct))
                     {
