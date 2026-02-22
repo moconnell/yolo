@@ -1,5 +1,8 @@
 using Microsoft.DurableTask;
 using Microsoft.DurableTask.Client;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using YoloAbstractions.Interfaces;
 using YoloFunk.Dto;
 using YoloFunk.Functions;
 
@@ -7,6 +10,54 @@ namespace YoloFunk.Test.Functions;
 
 public class RebalanceDurableWorkflowTest
 {
+    [Fact]
+    public async Task GivenRegisteredCommand_WhenRunRebalanceActivity_ShouldReturnSuccess()
+    {
+        var command = new Mock<ICommand>();
+        command
+            .Setup(x => x.ExecuteAsync(It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton("test-strategy", command.Object);
+
+        var sut = new RebalanceDurableWorkflow(
+            services.BuildServiceProvider(),
+            Mock.Of<ILogger<RebalanceDurableWorkflow>>());
+
+        var request = new RebalanceRequest("test-strategy", "manual", DateTime.UtcNow);
+
+        var result = await sut.RunRebalanceActivity(request, CancellationToken.None);
+
+        result.Success.ShouldBeTrue();
+        result.ErrorMessage.ShouldBeNull();
+        command.Verify(x => x.ExecuteAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GivenCommandThrows_WhenRunRebalanceActivity_ShouldReturnFailureWithMessage()
+    {
+        var command = new Mock<ICommand>();
+        command
+            .Setup(x => x.ExecuteAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("activity failed"));
+
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton("test-strategy", command.Object);
+
+        var sut = new RebalanceDurableWorkflow(
+            services.BuildServiceProvider(),
+            Mock.Of<ILogger<RebalanceDurableWorkflow>>());
+
+        var request = new RebalanceRequest("test-strategy", "manual", DateTime.UtcNow);
+
+        var result = await sut.RunRebalanceActivity(request, CancellationToken.None);
+
+        result.Success.ShouldBeFalse();
+        result.ErrorMessage.ShouldBe("activity failed");
+        command.Verify(x => x.ExecuteAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     [Fact]
     public async Task GivenNoExistingInstance_WhenStartIfNotRunningAsync_ShouldStartNewOrchestration()
     {
@@ -136,6 +187,84 @@ public class RebalanceDurableWorkflowTest
                 It.IsAny<StartOrchestrationOptions>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task GivenFailedInstance_WhenStartIfNotRunningAsync_ShouldStartNewOrchestration()
+    {
+        var request = new RebalanceRequest(
+            "test-strategy",
+            "manual",
+            DateTime.UtcNow);
+
+        var failedMetadata = new OrchestrationMetadata("rebalance-test-strategy", RebalanceDurableWorkflow.OrchestratorName)
+        {
+            RuntimeStatus = OrchestrationRuntimeStatus.Failed,
+        };
+
+        var mockDurableClient = new Mock<DurableTaskClient>("test-client");
+        mockDurableClient
+            .Setup(x => x.GetInstanceAsync(
+                It.IsAny<string>(),
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(failedMetadata);
+        mockDurableClient
+            .Setup(x => x.ScheduleNewOrchestrationInstanceAsync(
+                It.IsAny<TaskName>(),
+                It.IsAny<RebalanceRequest>(),
+                It.IsAny<StartOrchestrationOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync("rebalance-test-strategy");
+
+        var (started, instanceId, existing) = await RebalanceDurableWorkflow.StartIfNotRunningAsync(
+            mockDurableClient.Object,
+            request,
+            CancellationToken.None);
+
+        started.ShouldBeTrue();
+        instanceId.ShouldBe("rebalance-test-strategy");
+        existing.ShouldNotBeNull();
+        existing!.RuntimeStatus.ShouldBe(OrchestrationRuntimeStatus.Failed);
+    }
+
+    [Fact]
+    public async Task GivenTerminatedInstance_WhenStartIfNotRunningAsync_ShouldStartNewOrchestration()
+    {
+        var request = new RebalanceRequest(
+            "test-strategy",
+            "manual",
+            DateTime.UtcNow);
+
+        var terminatedMetadata = new OrchestrationMetadata("rebalance-test-strategy", RebalanceDurableWorkflow.OrchestratorName)
+        {
+            RuntimeStatus = OrchestrationRuntimeStatus.Terminated,
+        };
+
+        var mockDurableClient = new Mock<DurableTaskClient>("test-client");
+        mockDurableClient
+            .Setup(x => x.GetInstanceAsync(
+                It.IsAny<string>(),
+                It.IsAny<bool>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(terminatedMetadata);
+        mockDurableClient
+            .Setup(x => x.ScheduleNewOrchestrationInstanceAsync(
+                It.IsAny<TaskName>(),
+                It.IsAny<RebalanceRequest>(),
+                It.IsAny<StartOrchestrationOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync("rebalance-test-strategy");
+
+        var (started, instanceId, existing) = await RebalanceDurableWorkflow.StartIfNotRunningAsync(
+            mockDurableClient.Object,
+            request,
+            CancellationToken.None);
+
+        started.ShouldBeTrue();
+        instanceId.ShouldBe("rebalance-test-strategy");
+        existing.ShouldNotBeNull();
+        existing!.RuntimeStatus.ShouldBe(OrchestrationRuntimeStatus.Terminated);
     }
 
     [Fact]
