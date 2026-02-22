@@ -4,10 +4,11 @@ using Microsoft.Extensions.Logging;
 using Microsoft.DurableTask;
 using Microsoft.DurableTask.Client;
 using YoloAbstractions.Interfaces;
+using YoloFunk.Dto;
 
 namespace YoloFunk.Functions;
 
-public class RebalanceDurableWorkflow
+public partial class RebalanceDurableWorkflow
 {
     public const string OrchestratorName = nameof(RunRebalanceOrchestrator);
     public const string ActivityName = nameof(RunRebalanceActivity);
@@ -58,10 +59,6 @@ public class RebalanceDurableWorkflow
             return new RebalanceResult(false, ex.Message);
         }
     }
-
-    public sealed record RebalanceResult(bool Success, string? ErrorMessage);
-
-    public sealed record RebalanceRequest(string StrategyKey, string Trigger, DateTime RequestedAtUtc);
 
     public static string GetInstanceId(string strategyKey) => $"rebalance-{strategyKey}";
 

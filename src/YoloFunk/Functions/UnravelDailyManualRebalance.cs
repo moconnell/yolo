@@ -28,7 +28,7 @@ public class UnravelDailyManualRebalance
         _logger.LogInformation("{Strategy} manual rebalance triggered at: {executionTime}",
             StrategyKey, DateTime.UtcNow);
 
-        var request = new RebalanceDurableWorkflow.RebalanceRequest(
+        var request = new RebalanceRequest(
             StrategyKey,
             "manual",
             DateTime.UtcNow);
@@ -40,14 +40,43 @@ public class UnravelDailyManualRebalance
                 request,
                 cancellationToken);
 
-            var response = req.CreateResponse(Started ? HttpStatusCode.Accepted : HttpStatusCode.OK);
+            var orchestrationStatus = Started
+                ? "Scheduled"
+                : (Existing?.RuntimeStatus.ToString() ?? "Unknown");
+
+            HttpStatusCode statusCode;
+            if (Started)
+            {
+                statusCode = HttpStatusCode.Accepted;
+            }
+            else
+            {
+                var runtimeStatus = Existing?.RuntimeStatus;
+
+                if (runtimeStatus is null)
+                {
+                    statusCode = HttpStatusCode.NotFound;
+                }
+                else
+                {
+                    statusCode = runtimeStatus switch
+                    {
+                        OrchestrationRuntimeStatus.Running => HttpStatusCode.OK,
+                        OrchestrationRuntimeStatus.Pending => HttpStatusCode.OK,
+                        OrchestrationRuntimeStatus.Completed => HttpStatusCode.OK,
+                        OrchestrationRuntimeStatus.Failed => HttpStatusCode.InternalServerError,
+                        OrchestrationRuntimeStatus.Terminated => HttpStatusCode.Conflict,
+                        _ => HttpStatusCode.OK
+                    };
+                }
+            }
+
+            var response = req.CreateResponse(statusCode);
             var payload = new RebalanceStartResponse(
                 StrategyKey,
                 InstanceId,
                 Started,
-                Started
-                    ? "Scheduled"
-                    : (Existing?.RuntimeStatus.ToString() ?? "Unknown"),
+                orchestrationStatus,
                 DateTime.UtcNow);
             await response.WriteAsJsonAsync(payload, cancellationToken);
             return response;
@@ -58,7 +87,7 @@ public class UnravelDailyManualRebalance
 
             var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
             await errorResponse.WriteAsJsonAsync(
-                new RebalanceErrorResponse(StrategyKey, "Failed to start rebalance", ex.Message),
+                new RebalanceErrorResponse(StrategyKey, "Failed to start rebalance", "An internal error occurred. Check logs for details."),
                 cancellationToken);
             return errorResponse;
         }

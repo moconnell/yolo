@@ -28,7 +28,7 @@ public class YoloDailyManualRebalance
         _logger.LogInformation("{Strategy} manual rebalance triggered at: {executionTime}",
             StrategyKey, DateTime.UtcNow);
 
-        var request = new RebalanceDurableWorkflow.RebalanceRequest(
+        var request = new RebalanceRequest(
             StrategyKey,
             "manual",
             DateTime.UtcNow);
@@ -40,14 +40,39 @@ public class YoloDailyManualRebalance
                 request,
                 cancellationToken);
 
-            var response = req.CreateResponse(Started ? HttpStatusCode.Accepted : HttpStatusCode.OK);
+            HttpStatusCode statusCode;
+            string statusMessage;
+
+            if (Started)
+            {
+                statusCode = HttpStatusCode.Accepted;
+                statusMessage = "Scheduled";
+            }
+            else if (Existing != null)
+            {
+                statusMessage = Existing.RuntimeStatus.ToString();
+                statusCode = Existing.RuntimeStatus switch
+                {
+                    OrchestrationRuntimeStatus.Pending or
+                    OrchestrationRuntimeStatus.Running or
+                    OrchestrationRuntimeStatus.Completed => HttpStatusCode.OK,
+                    OrchestrationRuntimeStatus.Failed or
+                    OrchestrationRuntimeStatus.Terminated => HttpStatusCode.Conflict,
+                    _ => HttpStatusCode.OK
+                };
+            }
+            else
+            {
+                statusCode = HttpStatusCode.OK;
+                statusMessage = "Unknown";
+            }
+
+            var response = req.CreateResponse(statusCode);
             var payload = new RebalanceStartResponse(
                 StrategyKey,
                 InstanceId,
                 Started,
-                Started
-                    ? "Scheduled"
-                    : (Existing?.RuntimeStatus.ToString() ?? "Unknown"),
+                statusMessage,
                 DateTime.UtcNow);
             await response.WriteAsJsonAsync(payload, cancellationToken);
             return response;
@@ -58,7 +83,7 @@ public class YoloDailyManualRebalance
 
             var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
             await errorResponse.WriteAsJsonAsync(
-                new RebalanceErrorResponse(StrategyKey, "Failed to start rebalance", ex.Message),
+                new RebalanceErrorResponse(StrategyKey, "Failed to start rebalance", "An internal error occurred. Check logs for details."),
                 cancellationToken);
             return errorResponse;
         }

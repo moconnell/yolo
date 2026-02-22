@@ -1,6 +1,7 @@
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.DurableTask.Client;
 using Microsoft.Extensions.Logging;
+using YoloFunk.Dto;
 
 namespace YoloFunk.Functions;
 
@@ -26,7 +27,7 @@ public class YoloDailyScheduledRebalance
         _logger.LogInformation("{Strategy} scheduled rebalance executed at: {executionTime}",
             StrategyKey, DateTime.UtcNow);
 
-        var request = new RebalanceDurableWorkflow.RebalanceRequest(
+        var request = new RebalanceRequest(
             StrategyKey,
             "timer",
             DateTime.UtcNow);
