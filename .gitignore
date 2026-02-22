@@ -160,6 +160,7 @@ publish/
 __azurite_db_*__.json
 __blobstorage__/
 __queuestorage__/
+__tablestorage__/
 AzuriteConfig
 
 # Microsoft Azure Web App publish settings. Comment the next line if you want to
