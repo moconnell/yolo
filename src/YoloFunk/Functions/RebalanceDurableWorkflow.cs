@@ -25,24 +25,41 @@ public class RebalanceDurableWorkflow
     public static async Task RunRebalanceOrchestrator([OrchestrationTrigger] TaskOrchestrationContext context)
     {
         var input = context.GetInput<RebalanceRequest>()
-                    ?? throw new InvalidOperationException("Missing orchestration input.");
+                ?? throw new InvalidOperationException("Missing orchestration input.");
 
         await context.CallActivityAsync(ActivityName, input);
     }
 
     [Function(ActivityName)]
-    public async Task RunRebalanceActivity([ActivityTrigger] RebalanceRequest request, CancellationToken cancellationToken)
+    public async Task<RebalanceResult> RunRebalanceActivity([ActivityTrigger] RebalanceRequest request, CancellationToken cancellationToken)
     {
-        var rebalanceCommand = _serviceProvider.GetRequiredKeyedService<ICommand>(request.StrategyKey);
+        try
+        {
+            var rebalanceCommand = _serviceProvider.GetRequiredKeyedService<ICommand>(request.StrategyKey);
 
-        _logger.LogInformation(
-            "Executing durable rebalance activity for strategy {Strategy} (trigger: {Trigger}, requestedAtUtc: {RequestedAtUtc})",
-            request.StrategyKey,
-            request.Trigger,
-            request.RequestedAtUtc);
+            if (_logger.IsEnabled(LogLevel.Information))
+            {
+                _logger.LogInformation(
+                    "Executing durable rebalance activity for strategy {Strategy} (trigger: {Trigger}, requestedAtUtc: {RequestedAtUtc})",
+                    request.StrategyKey,
+                    request.Trigger,
+                    request.RequestedAtUtc);
+            }
 
-        await rebalanceCommand.ExecuteAsync(cancellationToken);
+            await rebalanceCommand.ExecuteAsync(cancellationToken);
+            return new RebalanceResult(true, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Durable rebalance activity failed for strategy {Strategy} (trigger: {Trigger})",
+                request.StrategyKey,
+                request.Trigger);
+            return new RebalanceResult(false, ex.Message);
+        }
     }
+
+    public sealed record RebalanceResult(bool Success, string? ErrorMessage);
 
     public sealed record RebalanceRequest(string StrategyKey, string Trigger, DateTime RequestedAtUtc);
 
