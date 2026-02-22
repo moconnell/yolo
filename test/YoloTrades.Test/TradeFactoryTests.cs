@@ -497,6 +497,101 @@ public class TradeFactoryTests
         trade.Amount.ShouldBe(-1.1m);
     }
 
+    [Fact]
+    public void GivenMissingAsk_WhenBuying_ShouldNotThrowAndShouldSkipTrade()
+    {
+        var logger = _loggerFactory.CreateLogger<TradeFactory>();
+        var config = new YoloConfig
+        {
+            AssetPermissions = AssetPermissions.All,
+            BaseAsset = "USDC",
+            NominalCash = 10000,
+            TradeBuffer = 0.04m
+        };
+
+        var tradeFactory = new TradeFactory(config, logger);
+
+        var weights = new Dictionary<string, decimal>
+        {
+            ["HYPE/USDC"] = 0.10m
+        };
+        var positions = new Dictionary<string, IReadOnlyList<Position>>();
+        var markets = new Dictionary<string, IReadOnlyList<MarketInfo>>
+        {
+            ["HYPE"] =
+            [
+                new MarketInfo(
+                    "HYPE-Future",
+                    "HYPE",
+                    "USDC",
+                    AssetType.Future,
+                    DateTime.UtcNow,
+                    PriceStep: 0.01m,
+                    QuantityStep: 0.01m,
+                    MinProvideSize: 0.07m,
+                    Ask: null,
+                    Bid: 163.00m,
+                    Last: 163.05m)
+            ]
+        };
+
+        Trade[]? trades = null;
+        var exception = Record.Exception(() => trades = tradeFactory.CalculateTrades(weights, positions, markets).ToArray());
+
+        exception.ShouldBeNull();
+        trades.ShouldNotBeNull();
+        trades.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void GivenMissingBid_WhenSelling_ShouldNotThrowAndShouldSkipTrade()
+    {
+        var logger = _loggerFactory.CreateLogger<TradeFactory>();
+        var config = new YoloConfig
+        {
+            AssetPermissions = AssetPermissions.All,
+            BaseAsset = "USDC",
+            NominalCash = 10000,
+            TradeBuffer = 0.04m
+        };
+
+        var tradeFactory = new TradeFactory(config, logger);
+
+        var weights = new Dictionary<string, decimal>();
+        var positions = new Dictionary<string, IReadOnlyList<Position>>
+        {
+            ["HYPE"] =
+            [
+                new Position("HYPE-Future", "HYPE", AssetType.Future, 1.0m)
+            ]
+        };
+        var markets = new Dictionary<string, IReadOnlyList<MarketInfo>>
+        {
+            ["HYPE"] =
+            [
+                new MarketInfo(
+                    "HYPE-Future",
+                    "HYPE",
+                    "USDC",
+                    AssetType.Future,
+                    DateTime.UtcNow,
+                    PriceStep: 0.01m,
+                    QuantityStep: 0.01m,
+                    MinProvideSize: 0.07m,
+                    Ask: 163.08m,
+                    Bid: null,
+                    Last: 163.05m)
+            ]
+        };
+
+        Trade[]? trades = null;
+        var exception = Record.Exception(() => trades = tradeFactory.CalculateTrades(weights, positions, markets).ToArray());
+
+        exception.ShouldBeNull();
+        trades.ShouldNotBeNull();
+        trades.ShouldBeEmpty();
+    }
+
     private static
         (Dictionary<string, decimal> weights,
         Dictionary<string, IReadOnlyList<Position>> positions,
