@@ -4,6 +4,8 @@ namespace YoloBroker.Interface;
 
 public interface IYoloBroker : IDisposable
 {
+    BrokerAccountContext GetAccountContext();
+
     Task CancelOrderAsync(Order order, CancellationToken ct = default);
 
     Task<IReadOnlyDictionary<string, IReadOnlyList<MarketInfo>>> GetMarketsAsync(

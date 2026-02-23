@@ -36,6 +36,7 @@ public sealed class HyperliquidBroker : IYoloBroker
     private readonly IHyperLiquidRestClient _hyperliquidClient;
     private readonly IHyperLiquidSocketClient _hyperliquidSocketClient;
     private readonly ITickerAliasService _tickerAliasService;
+    private readonly string? _address;
     private readonly string? _vaultAddress;
     private readonly ILogger<HyperliquidBroker> _logger;
 
@@ -62,6 +63,7 @@ public sealed class HyperliquidBroker : IYoloBroker
             hyperliquidClient,
             hyperliquidSocketClient,
             tickerAliasService,
+            config.Address,
             config.VaultAddress,
             logger)
     {
@@ -72,16 +74,37 @@ public sealed class HyperliquidBroker : IYoloBroker
         IHyperLiquidSocketClient hyperliquidSocketClient,
         ITickerAliasService tickerAliasService,
         string? vaultAddress,
+        ILogger<HyperliquidBroker> logger) : this(
+            hyperliquidClient,
+            hyperliquidSocketClient,
+            tickerAliasService,
+            null,
+            vaultAddress,
+            logger)
+    {
+    }
+
+    public HyperliquidBroker(
+        IHyperLiquidRestClient hyperliquidClient,
+        IHyperLiquidSocketClient hyperliquidSocketClient,
+        ITickerAliasService tickerAliasService,
+        string? address,
+        string? vaultAddress,
         ILogger<HyperliquidBroker> logger)
     {
         _hyperliquidClient = hyperliquidClient;
         _hyperliquidSocketClient = hyperliquidSocketClient;
         _tickerAliasService = tickerAliasService;
+        _address = address.IsValidEthereumAddressHexFormat() && !address.IsAnEmptyAddress()
+            ? address
+            : null;
         _vaultAddress = vaultAddress.IsValidEthereumAddressHexFormat() && !vaultAddress.IsAnEmptyAddress()
             ? vaultAddress
             : null;
         _logger = logger;
     }
+
+    public BrokerAccountContext GetAccountContext() => new(_address, _vaultAddress);
 
 
     public void Dispose()
@@ -474,21 +497,81 @@ public sealed class HyperliquidBroker : IYoloBroker
                             .Where(t => now - t.CreatedAt > settings.UnfilledOrderTimeout && !t.IsComplete)
                             .ToList();
 
+                        if (timedOutTrackers.Count == 0)
+                        {
+                            if (orderTrackers.IsEmpty)
+                            {
+                                _logger.LogInformation("All orders completed after timeout processing, completing channel");
+                                updateChannel.Writer.TryComplete();
+                                break;
+                            }
+
+                            continue;
+                        }
+
+                        IReadOnlyDictionary<long, Order> openOrdersSnapshot;
+                        try
+                        {
+                            openOrdersSnapshot = await GetOpenOrdersAsync(ct);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to retrieve open orders snapshot during timeout processing; skipping this cycle");
+                            continue;
+                        }
+
                         foreach (var tracker in timedOutTrackers)
                         {
+                            if (!openOrdersSnapshot.TryGetValue(tracker.Order.Id, out var timedOutOrder))
+                            {
+                                _logger.LogInformation(
+                                    "Order {OrderId} for {AssetName} is no longer open at timeout check; skipping cancellation and market fallback",
+                                    tracker.Order.Id,
+                                    tracker.Order.Symbol);
+
+                                tracker.MarkComplete();
+                                orderTrackers.TryRemove(tracker.Order.Id, out _);
+                                continue;
+                            }
+
+                            var remainingQuantity = Math.Max(0m, timedOutOrder.Filled.GetValueOrDefault());
+                            var trackerWithSnapshotFill = tracker with
+                            {
+                                Order = tracker.Order with
+                                {
+                                    Filled = Math.Max(0m, tracker.Order.Amount - remainingQuantity)
+                                }
+                            };
+                            orderTrackers[tracker.Order.Id] = trackerWithSnapshotFill;
+
+                            if (remainingQuantity == 0)
+                            {
+                                _logger.LogInformation(
+                                    "Order {OrderId} for {AssetName} has no remaining quantity at timeout check; skipping cancellation and market fallback",
+                                    tracker.Order.Id,
+                                    tracker.Order.Symbol);
+
+                                trackerWithSnapshotFill.MarkComplete();
+                                orderTrackers.TryRemove(tracker.Order.Id, out _);
+                                continue;
+                            }
+
                             _logger.LogInformation(
                                 "Order {OrderId} for {AssetName} timed out and will be cancelled",
                                 tracker.Order.Id,
                                 tracker.Order.Symbol);
 
+                            var cancelled = false;
+
                             try
                             {
-                                await CancelOrderAsync(tracker.Order, ct);
+                                await CancelOrderAsync(trackerWithSnapshotFill.Order, ct);
+                                cancelled = true;
                                 updateChannel.Writer.TryWrite(
                                     new OrderUpdate(
-                                        tracker.Order.Symbol,
+                                        trackerWithSnapshotFill.Order.Symbol,
                                         OrderUpdateType.TimedOut,
-                                        tracker.Order with { OrderStatus = OrderStatus.Canceled },
+                                        trackerWithSnapshotFill.Order with { OrderStatus = OrderStatus.Canceled },
                                         Message: "Order timed out"));
                             }
                             catch (Exception ex)
@@ -501,13 +584,24 @@ public sealed class HyperliquidBroker : IYoloBroker
                                     ex.Message);
                             }
 
-                            if (settings.SwitchToMarketOnTimeout)
+                            var signedRemainingAmount = Math.Sign(tracker.OriginalTrade.Amount) * remainingQuantity;
+
+                            if (settings.SwitchToMarketOnTimeout && cancelled && signedRemainingAmount != 0)
                             {
-                                _logger.LogInformation("Creating market order for {AssetName}", tracker.Order.Symbol);
+                                _logger.LogInformation(
+                                    "Creating market order for {AssetName} with remaining amount {RemainingAmount}",
+                                    trackerWithSnapshotFill.Order.Symbol,
+                                    signedRemainingAmount);
 
                                 try
                                 {
-                                    var marketTrade = tracker.OriginalTrade with { OrderType = OrderType.Market };
+                                    var marketTrade = tracker.OriginalTrade with
+                                    {
+                                        Amount = signedRemainingAmount,
+                                        OrderType = OrderType.Market,
+                                        LimitPrice = null
+                                    };
+
                                     var marketTradeResult = await PlaceTradeAsync(marketTrade, ct);
                                     if (marketTradeResult.Success)
                                     {
@@ -530,14 +624,26 @@ public sealed class HyperliquidBroker : IYoloBroker
                                 {
                                     updateChannel.Writer.TryWrite(
                                         new OrderUpdate(
-                                            tracker.Order.Symbol,
+                                            trackerWithSnapshotFill.Order.Symbol,
                                             OrderUpdateType.Error,
                                             Message: $"Failed to create market order: {ex.Message}",
                                             Error: ex));
                                 }
                             }
+                            else if (settings.SwitchToMarketOnTimeout && !cancelled)
+                            {
+                                _logger.LogWarning(
+                                    "Skipping market fallback for {AssetName} because cancellation did not complete successfully",
+                                    trackerWithSnapshotFill.Order.Symbol);
+                            }
+                            else if (settings.SwitchToMarketOnTimeout && signedRemainingAmount == 0)
+                            {
+                                _logger.LogInformation(
+                                    "Skipping market fallback for {AssetName} because no remaining quantity is detected",
+                                    trackerWithSnapshotFill.Order.Symbol);
+                            }
 
-                            tracker.MarkComplete();
+                            trackerWithSnapshotFill.MarkComplete();
                             orderTrackers.TryRemove(tracker.Order.Id, out _);
                         }
 

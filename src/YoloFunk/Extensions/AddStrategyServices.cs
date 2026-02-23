@@ -48,6 +48,8 @@ public static class AddStrategyServices
             throw new ConfigException($"Strategy '{strategyKey}' missing Hyperliquid broker configuration");
         }
 
+        services.AddKeyedSingleton(strategyKey, hyperliquidConfig);
+
         var throwOnMissingData = !hyperliquidConfig.UseTestnet;
 
         services.AddKeyedSingleton<IYoloBroker>(strategyKey, (sp, key) =>

@@ -1115,6 +1115,519 @@ public class HyperliquidBrokerTest
         updates.ShouldContain(u => u.Type == OrderUpdateType.Filled);
     }
 
+    [Fact]
+    public async Task GivenTimedOutPartiallyFilledOrder_WhenSwitchingToMarket_ShouldPlaceMarketForRemainingAmountOnly()
+    {
+        const long orderId = 12345L;
+        var trade = CreateTrade("SOL", Future, 10.0, 100m);
+
+        Action<DataEvent<HyperLiquidOrderStatus[]>>? capturedFuturesHandler = null;
+
+        var mockRestClient = new Mock<IHyperLiquidRestClient>();
+        var mockFuturesRestApi = new Mock<IHyperLiquidRestClientFuturesApi>();
+        var mockFuturesTrading = new Mock<IHyperLiquidRestClientFuturesApiTrading>();
+        var mockSocketClient = new Mock<IHyperLiquidSocketClient>();
+        var mockSpotSocketApi = new Mock<IHyperLiquidSocketClientSpotApi>();
+        var mockFuturesSocketApi = new Mock<IHyperLiquidSocketClientFuturesApi>();
+
+        mockRestClient.Setup(x => x.FuturesApi).Returns(mockFuturesRestApi.Object);
+        mockFuturesRestApi.Setup(x => x.Trading).Returns(mockFuturesTrading.Object);
+        mockSocketClient.Setup(x => x.SpotApi).Returns(mockSpotSocketApi.Object);
+        mockSocketClient.Setup(x => x.FuturesApi).Returns(mockFuturesSocketApi.Object);
+
+        mockSpotSocketApi
+            .Setup(x => x.SubscribeToOrderUpdatesAsync(
+                It.IsAny<string?>(),
+                It.IsAny<Action<DataEvent<HyperLiquidOrderStatus[]>>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CallResult<UpdateSubscription>((UpdateSubscription)null!));
+
+        mockFuturesSocketApi
+            .Setup(x => x.SubscribeToOrderUpdatesAsync(
+                It.IsAny<string?>(),
+                It.IsAny<Action<DataEvent<HyperLiquidOrderStatus[]>>>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string?, Action<DataEvent<HyperLiquidOrderStatus[]>>, CancellationToken>((_, handler, _) => capturedFuturesHandler = handler)
+            .ReturnsAsync(new CallResult<UpdateSubscription>((UpdateSubscription)null!));
+
+        var openOrderResult = new[]
+        {
+            new CallResult<HyperLiquidOrderResult>(new HyperLiquidOrderResult
+            {
+                OrderId = orderId,
+                Status = HlOrderStatus.Open,
+                FilledQuantity = 0m
+            })
+        };
+
+        mockFuturesTrading
+            .Setup(x => x.PlaceMultipleOrdersAsync(
+                It.IsAny<IEnumerable<HyperLiquidOrderRequest>>(),
+                null, null, null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(openOrderResult));
+
+        mockFuturesTrading
+            .Setup(x => x.GetOpenOrdersExtendedAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(new[]
+            {
+                new HyperLiquidOrder
+                {
+                    OrderId = orderId,
+                    Symbol = "SOL",
+                    SymbolType = SymbolType.Futures,
+                    Quantity = 10m,
+                    QuantityRemaining = 6m,
+                    OrderSide = HlOrderSide.Buy,
+                    Price = 100m,
+                    Timestamp = DateTime.UtcNow
+                }
+            }));
+
+        mockFuturesTrading
+            .Setup(x => x.CancelOrderAsync(
+                "SOL",
+                orderId,
+                It.IsAny<string?>(),
+                It.IsAny<DateTime?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult());
+
+        mockFuturesTrading
+            .Setup(x => x.PlaceOrderAsync(
+                "SOL",
+                It.IsAny<HlOrderSide>(),
+                HyperLiquid.Net.Enums.OrderType.Market,
+                It.IsAny<decimal>(),
+                It.IsAny<decimal>(),
+                It.IsAny<TimeInForce?>(),
+                It.IsAny<bool?>(),
+                It.IsAny<string?>(),
+                It.IsAny<decimal?>(),
+                It.IsAny<TpSlType?>(),
+                It.IsAny<TpSlGrouping?>(),
+                It.IsAny<string?>(),
+                It.IsAny<DateTime?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(new HyperLiquidOrderResult
+            {
+                OrderId = 99999,
+                Status = HlOrderStatus.Open,
+                FilledQuantity = 0m
+            }));
+
+        var broker = GetBrokerWithMockedClient(mockRestClient.Object, socketClient: mockSocketClient.Object);
+
+        var settings = new OrderManagementSettings(
+            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(10),
+            SwitchToMarketOnTimeout: true,
+            StatusCheckInterval: TimeSpan.FromMilliseconds(10));
+
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(20);
+            capturedFuturesHandler?.Invoke(new DataEvent<HyperLiquidOrderStatus[]>(
+                "stream",
+                [new HyperLiquidOrderStatus
+                {
+                    Status = HlOrderStatus.WaitingFill,
+                    Order = new HyperLiquidOrder { OrderId = orderId, QuantityRemaining = 6m }
+                }],
+                DateTime.UtcNow,
+                "raw"));
+        });
+
+        var updates = new List<OrderUpdate>();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        await foreach (var update in broker.ManageOrdersAsync([trade], settings, cts.Token))
+        {
+            updates.Add(update);
+        }
+
+        mockFuturesTrading.Verify(x => x.PlaceOrderAsync(
+                "SOL",
+                It.IsAny<HlOrderSide>(),
+                HyperLiquid.Net.Enums.OrderType.Market,
+                6m,
+                It.IsAny<decimal>(),
+                It.IsAny<TimeInForce?>(),
+                It.IsAny<bool?>(),
+            It.IsAny<string?>(),
+                It.IsAny<decimal?>(),
+            It.IsAny<TpSlType?>(),
+            It.IsAny<TpSlGrouping?>(),
+                It.IsAny<string?>(),
+                It.IsAny<DateTime?>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        updates.ShouldContain(u => u.Type == OrderUpdateType.MarketOrderPlaced);
+    }
+
+    [Fact]
+    public async Task GivenTimedOutOrderNoLongerOpen_WhenSwitchingToMarket_ShouldNotPlaceMarketFallback()
+    {
+        const long orderId = 54321L;
+        var trade = CreateTrade("ADA", Future, 5.0, 0.5m);
+
+        var mockRestClient = new Mock<IHyperLiquidRestClient>();
+        var mockFuturesRestApi = new Mock<IHyperLiquidRestClientFuturesApi>();
+        var mockFuturesTrading = new Mock<IHyperLiquidRestClientFuturesApiTrading>();
+        var mockSocketClient = new Mock<IHyperLiquidSocketClient>();
+        var mockSpotSocketApi = new Mock<IHyperLiquidSocketClientSpotApi>();
+        var mockFuturesSocketApi = new Mock<IHyperLiquidSocketClientFuturesApi>();
+
+        mockRestClient.Setup(x => x.FuturesApi).Returns(mockFuturesRestApi.Object);
+        mockFuturesRestApi.Setup(x => x.Trading).Returns(mockFuturesTrading.Object);
+        mockSocketClient.Setup(x => x.SpotApi).Returns(mockSpotSocketApi.Object);
+        mockSocketClient.Setup(x => x.FuturesApi).Returns(mockFuturesSocketApi.Object);
+
+        mockSpotSocketApi
+            .Setup(x => x.SubscribeToOrderUpdatesAsync(
+                It.IsAny<string?>(),
+                It.IsAny<Action<DataEvent<HyperLiquidOrderStatus[]>>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CallResult<UpdateSubscription>((UpdateSubscription)null!));
+
+        mockFuturesSocketApi
+            .Setup(x => x.SubscribeToOrderUpdatesAsync(
+                It.IsAny<string?>(),
+                It.IsAny<Action<DataEvent<HyperLiquidOrderStatus[]>>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CallResult<UpdateSubscription>((UpdateSubscription)null!));
+
+        var openOrderResult = new[]
+        {
+            new CallResult<HyperLiquidOrderResult>(new HyperLiquidOrderResult
+            {
+                OrderId = orderId,
+                Status = HlOrderStatus.Open,
+                FilledQuantity = 0m
+            })
+        };
+
+        mockFuturesTrading
+            .Setup(x => x.PlaceMultipleOrdersAsync(
+                It.IsAny<IEnumerable<HyperLiquidOrderRequest>>(),
+                null, null, null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(openOrderResult));
+
+        mockFuturesTrading
+            .Setup(x => x.GetOpenOrdersExtendedAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(Array.Empty<HyperLiquidOrder>()));
+
+        var broker = GetBrokerWithMockedClient(mockRestClient.Object, socketClient: mockSocketClient.Object);
+
+        var settings = new OrderManagementSettings(
+            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(10),
+            SwitchToMarketOnTimeout: true,
+            StatusCheckInterval: TimeSpan.FromMilliseconds(10));
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        await foreach (var _ in broker.ManageOrdersAsync([trade], settings, cts.Token))
+        {
+        }
+
+        mockFuturesTrading.Verify(x => x.CancelOrderAsync(
+                It.IsAny<string>(),
+                It.IsAny<long>(),
+                It.IsAny<string?>(),
+                It.IsAny<DateTime?>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        mockFuturesTrading.Verify(x => x.PlaceOrderAsync(
+                It.IsAny<string>(),
+                It.IsAny<HlOrderSide>(),
+                HyperLiquid.Net.Enums.OrderType.Market,
+                It.IsAny<decimal>(),
+                It.IsAny<decimal>(),
+                It.IsAny<TimeInForce?>(),
+                It.IsAny<bool?>(),
+            It.IsAny<string?>(),
+                It.IsAny<decimal?>(),
+            It.IsAny<TpSlType?>(),
+            It.IsAny<TpSlGrouping?>(),
+                It.IsAny<string?>(),
+                It.IsAny<DateTime?>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task GivenTimedOutOrderSnapshotWithZeroRemaining_WhenSwitchingToMarket_ShouldNotPlaceMarketFallback()
+    {
+        const long orderId = 65432L;
+        var trade = CreateTrade("XRP", Future, 8.0, 0.6m);
+
+        Action<DataEvent<HyperLiquidOrderStatus[]>>? capturedFuturesHandler = null;
+
+        var mockRestClient = new Mock<IHyperLiquidRestClient>();
+        var mockFuturesRestApi = new Mock<IHyperLiquidRestClientFuturesApi>();
+        var mockFuturesTrading = new Mock<IHyperLiquidRestClientFuturesApiTrading>();
+        var mockSocketClient = new Mock<IHyperLiquidSocketClient>();
+        var mockSpotSocketApi = new Mock<IHyperLiquidSocketClientSpotApi>();
+        var mockFuturesSocketApi = new Mock<IHyperLiquidSocketClientFuturesApi>();
+
+        mockRestClient.Setup(x => x.FuturesApi).Returns(mockFuturesRestApi.Object);
+        mockFuturesRestApi.Setup(x => x.Trading).Returns(mockFuturesTrading.Object);
+        mockSocketClient.Setup(x => x.SpotApi).Returns(mockSpotSocketApi.Object);
+        mockSocketClient.Setup(x => x.FuturesApi).Returns(mockFuturesSocketApi.Object);
+
+        mockSpotSocketApi
+            .Setup(x => x.SubscribeToOrderUpdatesAsync(
+                It.IsAny<string?>(),
+                It.IsAny<Action<DataEvent<HyperLiquidOrderStatus[]>>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CallResult<UpdateSubscription>((UpdateSubscription)null!));
+
+        mockFuturesSocketApi
+            .Setup(x => x.SubscribeToOrderUpdatesAsync(
+                It.IsAny<string?>(),
+                It.IsAny<Action<DataEvent<HyperLiquidOrderStatus[]>>>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string?, Action<DataEvent<HyperLiquidOrderStatus[]>>, CancellationToken>((_, handler, _) => capturedFuturesHandler = handler)
+            .ReturnsAsync(new CallResult<UpdateSubscription>((UpdateSubscription)null!));
+
+        var openOrderResult = new[]
+        {
+            new CallResult<HyperLiquidOrderResult>(new HyperLiquidOrderResult
+            {
+                OrderId = orderId,
+                Status = HlOrderStatus.Open,
+                FilledQuantity = 0m
+            })
+        };
+
+        mockFuturesTrading
+            .Setup(x => x.PlaceMultipleOrdersAsync(
+                It.IsAny<IEnumerable<HyperLiquidOrderRequest>>(),
+                null, null, null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(openOrderResult));
+
+        // Timeout snapshot still includes the order but with no quantity remaining.
+        mockFuturesTrading
+            .Setup(x => x.GetOpenOrdersExtendedAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(new[]
+            {
+                new HyperLiquidOrder
+                {
+                    OrderId = orderId,
+                    Symbol = "XRP",
+                    SymbolType = SymbolType.Futures,
+                    Quantity = 8m,
+                    QuantityRemaining = 0m,
+                    OrderSide = HlOrderSide.Buy,
+                    Price = 0.6m,
+                    Timestamp = DateTime.UtcNow
+                }
+            }));
+
+        var broker = GetBrokerWithMockedClient(mockRestClient.Object, socketClient: mockSocketClient.Object);
+
+        var settings = new OrderManagementSettings(
+            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(10),
+            SwitchToMarketOnTimeout: true,
+            StatusCheckInterval: TimeSpan.FromMilliseconds(10));
+
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(20);
+            capturedFuturesHandler?.Invoke(new DataEvent<HyperLiquidOrderStatus[]>(
+                "stream",
+                [new HyperLiquidOrderStatus
+                {
+                    Status = HlOrderStatus.WaitingFill,
+                    Order = new HyperLiquidOrder { OrderId = orderId, QuantityRemaining = 8m }
+                }],
+                DateTime.UtcNow,
+                "raw"));
+        });
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        await foreach (var _ in broker.ManageOrdersAsync([trade], settings, cts.Token))
+        {
+        }
+
+        mockFuturesTrading.Verify(x => x.CancelOrderAsync(
+                It.IsAny<string>(),
+                It.IsAny<long>(),
+                It.IsAny<string?>(),
+                It.IsAny<DateTime?>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        mockFuturesTrading.Verify(x => x.PlaceOrderAsync(
+                It.IsAny<string>(),
+                It.IsAny<HlOrderSide>(),
+                HyperLiquid.Net.Enums.OrderType.Market,
+                It.IsAny<decimal>(),
+                It.IsAny<decimal>(),
+                It.IsAny<TimeInForce?>(),
+                It.IsAny<bool?>(),
+                It.IsAny<string?>(),
+                It.IsAny<decimal?>(),
+                It.IsAny<TpSlType?>(),
+                It.IsAny<TpSlGrouping?>(),
+                It.IsAny<string?>(),
+                It.IsAny<DateTime?>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task GivenTimedOutOrderWithStaleFilledWebsocket_WhenSnapshotHasRemaining_ShouldPlaceMarketForSnapshotRemaining()
+    {
+        const long orderId = 76543L;
+        var trade = CreateTrade("DOT", Future, 10.0, 5m);
+
+        Action<DataEvent<HyperLiquidOrderStatus[]>>? capturedFuturesHandler = null;
+
+        var mockRestClient = new Mock<IHyperLiquidRestClient>();
+        var mockFuturesRestApi = new Mock<IHyperLiquidRestClientFuturesApi>();
+        var mockFuturesTrading = new Mock<IHyperLiquidRestClientFuturesApiTrading>();
+        var mockSocketClient = new Mock<IHyperLiquidSocketClient>();
+        var mockSpotSocketApi = new Mock<IHyperLiquidSocketClientSpotApi>();
+        var mockFuturesSocketApi = new Mock<IHyperLiquidSocketClientFuturesApi>();
+
+        mockRestClient.Setup(x => x.FuturesApi).Returns(mockFuturesRestApi.Object);
+        mockFuturesRestApi.Setup(x => x.Trading).Returns(mockFuturesTrading.Object);
+        mockSocketClient.Setup(x => x.SpotApi).Returns(mockSpotSocketApi.Object);
+        mockSocketClient.Setup(x => x.FuturesApi).Returns(mockFuturesSocketApi.Object);
+
+        mockSpotSocketApi
+            .Setup(x => x.SubscribeToOrderUpdatesAsync(
+                It.IsAny<string?>(),
+                It.IsAny<Action<DataEvent<HyperLiquidOrderStatus[]>>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CallResult<UpdateSubscription>((UpdateSubscription)null!));
+
+        mockFuturesSocketApi
+            .Setup(x => x.SubscribeToOrderUpdatesAsync(
+                It.IsAny<string?>(),
+                It.IsAny<Action<DataEvent<HyperLiquidOrderStatus[]>>>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string?, Action<DataEvent<HyperLiquidOrderStatus[]>>, CancellationToken>((_, handler, _) => capturedFuturesHandler = handler)
+            .ReturnsAsync(new CallResult<UpdateSubscription>((UpdateSubscription)null!));
+
+        var openOrderResult = new[]
+        {
+            new CallResult<HyperLiquidOrderResult>(new HyperLiquidOrderResult
+            {
+                OrderId = orderId,
+                Status = HlOrderStatus.Open,
+                FilledQuantity = 0m
+            })
+        };
+
+        mockFuturesTrading
+            .Setup(x => x.PlaceMultipleOrdersAsync(
+                It.IsAny<IEnumerable<HyperLiquidOrderRequest>>(),
+                null, null, null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(openOrderResult));
+
+        // Snapshot says there are still 4 units remaining to fill.
+        mockFuturesTrading
+            .Setup(x => x.GetOpenOrdersExtendedAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(new[]
+            {
+                new HyperLiquidOrder
+                {
+                    OrderId = orderId,
+                    Symbol = "DOT",
+                    SymbolType = SymbolType.Futures,
+                    Quantity = 10m,
+                    QuantityRemaining = 4m,
+                    OrderSide = HlOrderSide.Buy,
+                    Price = 5m,
+                    Timestamp = DateTime.UtcNow
+                }
+            }));
+
+        mockFuturesTrading
+            .Setup(x => x.CancelOrderAsync(
+                "DOT",
+                orderId,
+                It.IsAny<string?>(),
+                It.IsAny<DateTime?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult());
+
+        mockFuturesTrading
+            .Setup(x => x.PlaceOrderAsync(
+                "DOT",
+                It.IsAny<HlOrderSide>(),
+                HyperLiquid.Net.Enums.OrderType.Market,
+                It.IsAny<decimal>(),
+                It.IsAny<decimal>(),
+                It.IsAny<TimeInForce?>(),
+                It.IsAny<bool?>(),
+                It.IsAny<string?>(),
+                It.IsAny<decimal?>(),
+                It.IsAny<TpSlType?>(),
+                It.IsAny<TpSlGrouping?>(),
+                It.IsAny<string?>(),
+                It.IsAny<DateTime?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(new HyperLiquidOrderResult
+            {
+                OrderId = 88888,
+                Status = HlOrderStatus.Open,
+                FilledQuantity = 0m
+            }));
+
+        var broker = GetBrokerWithMockedClient(mockRestClient.Object, socketClient: mockSocketClient.Object);
+
+        var settings = new OrderManagementSettings(
+            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(10),
+            SwitchToMarketOnTimeout: true,
+            StatusCheckInterval: TimeSpan.FromMilliseconds(10));
+
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(20);
+            // Stale websocket event says filled (remaining 0), but timeout snapshot should win.
+            capturedFuturesHandler?.Invoke(new DataEvent<HyperLiquidOrderStatus[]>(
+                "stream",
+                [new HyperLiquidOrderStatus
+                {
+                    Status = HlOrderStatus.Filled,
+                    Order = new HyperLiquidOrder { OrderId = orderId, QuantityRemaining = 0m }
+                }],
+                DateTime.UtcNow,
+                "raw"));
+        });
+
+        var updates = new List<OrderUpdate>();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        await foreach (var update in broker.ManageOrdersAsync([trade], settings, cts.Token))
+        {
+            updates.Add(update);
+        }
+
+        mockFuturesTrading.Verify(x => x.PlaceOrderAsync(
+                "DOT",
+                It.IsAny<HlOrderSide>(),
+                HyperLiquid.Net.Enums.OrderType.Market,
+                4m,
+                It.IsAny<decimal>(),
+                It.IsAny<TimeInForce?>(),
+                It.IsAny<bool?>(),
+                It.IsAny<string?>(),
+                It.IsAny<decimal?>(),
+                It.IsAny<TpSlType?>(),
+                It.IsAny<TpSlGrouping?>(),
+                It.IsAny<string?>(),
+                It.IsAny<DateTime?>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        updates.ShouldContain(u => u.Type == OrderUpdateType.MarketOrderPlaced);
+    }
+
     #endregion
 
     #region EditOrderAsync Tests
