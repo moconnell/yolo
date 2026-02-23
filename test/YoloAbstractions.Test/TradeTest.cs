@@ -53,6 +53,23 @@ public class TradeTest
         Assert.Equal(expectedResult, result);
     }
 
+    [Fact]
+    public void GivenReduceOnlyTradeBelowMinOrderValue_WhenCheckingIsTradable_ShouldReturnFalse()
+    {
+        var trade = new Trade(
+            "BTC",
+            AssetType.Future,
+            -0.0001m,
+            50000m,
+            OrderType.Market,
+            false,
+            true);
+
+        var result = trade.IsTradable(10m);
+
+        result.ShouldBeFalse();
+    }
+
     private static (OrderType, decimal?) ToOrderTypeAndDecimal(double? limitPrice)
     {
         return limitPrice.HasValue ? (OrderType.Limit, Convert.ToDecimal(limitPrice)) : (OrderType.Market, null);
