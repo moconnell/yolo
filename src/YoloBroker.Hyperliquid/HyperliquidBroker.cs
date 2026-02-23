@@ -181,7 +181,9 @@ public sealed class HyperliquidBroker : IYoloBroker
             var or = spotResult.OrderResult[i];
             var t = spotTrades[i];
 
-            yield return spotResult.Success
+            var orderSuccess = spotResult.Success && or.Success;
+
+            yield return orderSuccess
                 ? new TradeResult(
                     t,
                     true,
@@ -200,8 +202,8 @@ public sealed class HyperliquidBroker : IYoloBroker
                     t,
                     false,
                     null,
-                    spotResult.Error?.Message,
-                    spotResult.Error?.Code);
+                    or.ErrorMessage ?? spotResult.Error?.Message,
+                    or.ErrorCode ?? spotResult.Error?.Code);
         }
 
         if (futuresTrades.Count == 0)
@@ -215,7 +217,9 @@ public sealed class HyperliquidBroker : IYoloBroker
             var or = futuresResult.OrderResult[i];
             var t = futuresTrades[i];
 
-            yield return futuresResult.Success
+            var orderSuccess = futuresResult.Success && or.Success;
+
+            yield return orderSuccess
                 ? new TradeResult(
                     t,
                     true,
@@ -234,8 +238,8 @@ public sealed class HyperliquidBroker : IYoloBroker
                     t,
                     false,
                     null,
-                    futuresResult.Error?.Message,
-                    futuresResult.Error?.Code);
+                    or.ErrorMessage ?? futuresResult.Error?.Message,
+                    or.ErrorCode ?? futuresResult.Error?.Code);
         }
     }
 
@@ -1060,12 +1064,14 @@ public sealed class HyperliquidBroker : IYoloBroker
 
     private async Task<WebCallResultWrapper<OrderResult>> PlaceFuturesOrderAsync(Trade trade, CancellationToken ct)
     {
+        var orderPrice = await ResolveOrderPriceAsync(trade, ct);
+
         var result = await _hyperliquidClient.FuturesApi.Trading.PlaceOrderAsync(
             trade.Symbol,
             trade.OrderSide.ToHyperLiquid(),
             trade.OrderType.ToHyperLiquid(),
             trade.AbsoluteAmount,
-            trade.LimitPrice.GetValueOrDefault(),
+            orderPrice,
             clientOrderId: trade.ClientOrderId,
             reduceOnly: trade.ReduceOnly,
             vaultAddress: _vaultAddress,
@@ -1076,18 +1082,57 @@ public sealed class HyperliquidBroker : IYoloBroker
 
     private async Task<WebCallResultWrapper<OrderResult>> PlaceSpotOrderAsync(Trade trade, CancellationToken ct)
     {
+        var orderPrice = await ResolveOrderPriceAsync(trade, ct);
+
         var result = await _hyperliquidClient.SpotApi.Trading.PlaceOrderAsync(
             trade.Symbol,
             trade.OrderSide.ToHyperLiquid(),
             trade.OrderType.ToHyperLiquid(),
             trade.AbsoluteAmount,
-            trade.LimitPrice.GetValueOrDefault(),
+            orderPrice,
             clientOrderId: trade.ClientOrderId,
             reduceOnly: trade.ReduceOnly,
             vaultAddress: _vaultAddress,
             ct: ct);
 
         return Wrap(result);
+    }
+
+    private async Task<decimal> ResolveOrderPriceAsync(Trade trade, CancellationToken ct)
+    {
+        if (trade.LimitPrice.HasValue)
+        {
+            return trade.LimitPrice.Value;
+        }
+
+        if (trade.OrderType != OrderType.Market)
+        {
+            return trade.LimitPrice.GetValueOrDefault();
+        }
+
+        var orderBook = trade.AssetType switch
+        {
+            AssetType.Spot => await GetSpotOrderBookAsync(trade.Symbol, ct),
+            AssetType.Future => await GetFuturesOrderBookAsync(trade.Symbol, ct),
+            _ => throw new ArgumentOutOfRangeException(nameof(trade.AssetType), trade.AssetType, "AssetType not supported")
+        };
+
+        var bestAsk = orderBook.Levels.Asks.ElementAtOrDefault(0)?.Price;
+        var bestBid = orderBook.Levels.Bids.ElementAtOrDefault(0)?.Price;
+
+        var price = trade.OrderSide switch
+        {
+            YoloAbstractions.OrderSide.Buy => bestAsk ?? bestBid,
+            YoloAbstractions.OrderSide.Sell => bestBid ?? bestAsk,
+            _ => bestAsk ?? bestBid
+        };
+
+        if (!price.HasValue)
+        {
+            throw new InvalidOperationException($"Could not determine market order price for {trade.Symbol}: order book has no bid/ask");
+        }
+
+        return price.Value;
     }
 
     private async Task<WebCallResultWrapper<IReadOnlyList<OrderResult>>> PlaceSpotOrdersAsync(

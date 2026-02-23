@@ -402,9 +402,11 @@ public class HyperliquidBrokerTest
         var mockRestClient = new Mock<IHyperLiquidRestClient>();
         var mockFuturesApi = new Mock<IHyperLiquidRestClientFuturesApi>();
         var mockFuturesTrading = new Mock<IHyperLiquidRestClientFuturesApiTrading>();
+        var mockFuturesExchangeData = new Mock<IHyperLiquidRestClientFuturesApiExchangeData>();
 
         mockRestClient.Setup(x => x.FuturesApi).Returns(mockFuturesApi.Object);
         mockFuturesApi.Setup(x => x.Trading).Returns(mockFuturesTrading.Object);
+        mockFuturesApi.Setup(x => x.ExchangeData).Returns(mockFuturesExchangeData.Object);
 
         var trade = CreateTrade("BTC", Future, 1.0, 50000m);
         var orderResult = new HyperLiquidOrderResult
@@ -709,6 +711,68 @@ public class HyperliquidBrokerTest
         results[1].Trade.AssetType.ShouldBe(Future);
     }
 
+    [Fact]
+    public async Task GivenBatchedFuturesPerOrderFailure_WhenPlaceTradesAsync_ShouldReturnFailedTradeResultForRejectedOrder()
+    {
+        var mockRestClient = new Mock<IHyperLiquidRestClient>();
+        var mockFuturesApi = new Mock<IHyperLiquidRestClientFuturesApi>();
+        var mockFuturesTrading = new Mock<IHyperLiquidRestClientFuturesApiTrading>();
+
+        mockRestClient.Setup(x => x.FuturesApi).Returns(mockFuturesApi.Object);
+        mockFuturesApi.Setup(x => x.Trading).Returns(mockFuturesTrading.Object);
+
+        var trades = new[]
+        {
+            CreateTrade("ETH", Future, 1.0, 2000m),
+            CreateTrade("BTC", Future, 0.0001, 60000m)
+        };
+
+        var orderResults = new[]
+        {
+            new CallResult<HyperLiquidOrderResult>(
+                new HyperLiquidOrderResult
+                {
+                    OrderId = 777,
+                    Status = HlOrderStatus.Open,
+                    FilledQuantity = 0m
+                }),
+            new CallResult<HyperLiquidOrderResult>(
+                new TestError(
+                    "ServerError.InvalidQuantity",
+                    new ErrorInfo(ErrorType.SystemError, "Order must have minimum value of $10.")
+                    {
+                        Message = "Order must have minimum value of $10."
+                    },
+                    null))
+        };
+
+        mockFuturesTrading
+            .Setup(x => x.PlaceMultipleOrdersAsync(
+                It.IsAny<IEnumerable<HyperLiquidOrderRequest>>(),
+                null,
+                null,
+                null,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(orderResults));
+
+        var broker = GetBrokerWithMockedClient(mockRestClient.Object);
+
+        var results = new List<TradeResult>();
+        await foreach (var result in broker.PlaceTradesAsync(trades))
+        {
+            results.Add(result);
+        }
+
+        results.Count.ShouldBe(2);
+        results[0].Success.ShouldBeTrue();
+        results[0].Order!.Id.ShouldBe(777);
+
+        results[1].Success.ShouldBeFalse();
+        results[1].Order.ShouldBeNull();
+        results[1].Error.ShouldNotBeNull();
+        results[1].Error!.ShouldContain("minimum value", Case.Insensitive);
+    }
+
     #endregion
 
     #region GetOpenOrdersAsync Tests
@@ -932,14 +996,33 @@ public class HyperliquidBrokerTest
         var mockRestClient = new Mock<IHyperLiquidRestClient>();
         var mockFuturesRestApi = new Mock<IHyperLiquidRestClientFuturesApi>();
         var mockFuturesTrading = new Mock<IHyperLiquidRestClientFuturesApiTrading>();
+        var mockFuturesExchangeData = new Mock<IHyperLiquidRestClientFuturesApiExchangeData>();
         var mockSocketClient = new Mock<IHyperLiquidSocketClient>();
         var mockSpotSocketApi = new Mock<IHyperLiquidSocketClientSpotApi>();
         var mockFuturesSocketApi = new Mock<IHyperLiquidSocketClientFuturesApi>();
 
         mockRestClient.Setup(x => x.FuturesApi).Returns(mockFuturesRestApi.Object);
         mockFuturesRestApi.Setup(x => x.Trading).Returns(mockFuturesTrading.Object);
+        mockFuturesRestApi.Setup(x => x.ExchangeData).Returns(mockFuturesExchangeData.Object);
         mockSocketClient.Setup(x => x.SpotApi).Returns(mockSpotSocketApi.Object);
         mockSocketClient.Setup(x => x.FuturesApi).Returns(mockFuturesSocketApi.Object);
+
+        mockFuturesExchangeData
+            .Setup(x => x.GetOrderBookAsync(
+                It.IsAny<string>(),
+                It.IsAny<int?>(),
+                It.IsAny<int?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(new HyperLiquidOrderBook
+            {
+                Symbol = "SOL",
+                Timestamp = DateTime.UtcNow,
+                Levels = new HyperLiquidOrderBookLevels
+                {
+                    Asks = [new HyperLiquidOrderBookEntry { Price = 100m, Quantity = 10m, Orders = 1 }],
+                    Bids = [new HyperLiquidOrderBookEntry { Price = 99.5m, Quantity = 10m, Orders = 1 }]
+                }
+            }));
 
         // Spot subscription - not used for futures orders but required by ManageOrdersAsync
         mockSpotSocketApi
@@ -1035,14 +1118,33 @@ public class HyperliquidBrokerTest
         var mockRestClient = new Mock<IHyperLiquidRestClient>();
         var mockFuturesRestApi = new Mock<IHyperLiquidRestClientFuturesApi>();
         var mockFuturesTrading = new Mock<IHyperLiquidRestClientFuturesApiTrading>();
+        var mockFuturesExchangeData = new Mock<IHyperLiquidRestClientFuturesApiExchangeData>();
         var mockSocketClient = new Mock<IHyperLiquidSocketClient>();
         var mockSpotSocketApi = new Mock<IHyperLiquidSocketClientSpotApi>();
         var mockFuturesSocketApi = new Mock<IHyperLiquidSocketClientFuturesApi>();
 
         mockRestClient.Setup(x => x.FuturesApi).Returns(mockFuturesRestApi.Object);
         mockFuturesRestApi.Setup(x => x.Trading).Returns(mockFuturesTrading.Object);
+        mockFuturesRestApi.Setup(x => x.ExchangeData).Returns(mockFuturesExchangeData.Object);
         mockSocketClient.Setup(x => x.SpotApi).Returns(mockSpotSocketApi.Object);
         mockSocketClient.Setup(x => x.FuturesApi).Returns(mockFuturesSocketApi.Object);
+
+        mockFuturesExchangeData
+            .Setup(x => x.GetOrderBookAsync(
+                It.IsAny<string>(),
+                It.IsAny<int?>(),
+                It.IsAny<int?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(new HyperLiquidOrderBook
+            {
+                Symbol = "DOT",
+                Timestamp = DateTime.UtcNow,
+                Levels = new HyperLiquidOrderBookLevels
+                {
+                    Asks = [new HyperLiquidOrderBookEntry { Price = 5m, Quantity = 20m, Orders = 1 }],
+                    Bids = [new HyperLiquidOrderBookEntry { Price = 4.9m, Quantity = 20m, Orders = 1 }]
+                }
+            }));
 
         mockSpotSocketApi
             .Setup(x => x.SubscribeToOrderUpdatesAsync(
@@ -1126,14 +1228,33 @@ public class HyperliquidBrokerTest
         var mockRestClient = new Mock<IHyperLiquidRestClient>();
         var mockFuturesRestApi = new Mock<IHyperLiquidRestClientFuturesApi>();
         var mockFuturesTrading = new Mock<IHyperLiquidRestClientFuturesApiTrading>();
+        var mockFuturesExchangeData = new Mock<IHyperLiquidRestClientFuturesApiExchangeData>();
         var mockSocketClient = new Mock<IHyperLiquidSocketClient>();
         var mockSpotSocketApi = new Mock<IHyperLiquidSocketClientSpotApi>();
         var mockFuturesSocketApi = new Mock<IHyperLiquidSocketClientFuturesApi>();
 
         mockRestClient.Setup(x => x.FuturesApi).Returns(mockFuturesRestApi.Object);
         mockFuturesRestApi.Setup(x => x.Trading).Returns(mockFuturesTrading.Object);
+        mockFuturesRestApi.Setup(x => x.ExchangeData).Returns(mockFuturesExchangeData.Object);
         mockSocketClient.Setup(x => x.SpotApi).Returns(mockSpotSocketApi.Object);
         mockSocketClient.Setup(x => x.FuturesApi).Returns(mockFuturesSocketApi.Object);
+
+        mockFuturesExchangeData
+            .Setup(x => x.GetOrderBookAsync(
+                It.IsAny<string>(),
+                It.IsAny<int?>(),
+                It.IsAny<int?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(new HyperLiquidOrderBook
+            {
+                Symbol = "SOL",
+                Timestamp = DateTime.UtcNow,
+                Levels = new HyperLiquidOrderBookLevels
+                {
+                    Asks = [new HyperLiquidOrderBookEntry { Price = 100m, Quantity = 10m, Orders = 1 }],
+                    Bids = [new HyperLiquidOrderBookEntry { Price = 99.5m, Quantity = 10m, Orders = 1 }]
+                }
+            }));
 
         mockSpotSocketApi
             .Setup(x => x.SubscribeToOrderUpdatesAsync(
@@ -1273,14 +1394,33 @@ public class HyperliquidBrokerTest
         var mockRestClient = new Mock<IHyperLiquidRestClient>();
         var mockFuturesRestApi = new Mock<IHyperLiquidRestClientFuturesApi>();
         var mockFuturesTrading = new Mock<IHyperLiquidRestClientFuturesApiTrading>();
+        var mockFuturesExchangeData = new Mock<IHyperLiquidRestClientFuturesApiExchangeData>();
         var mockSocketClient = new Mock<IHyperLiquidSocketClient>();
         var mockSpotSocketApi = new Mock<IHyperLiquidSocketClientSpotApi>();
         var mockFuturesSocketApi = new Mock<IHyperLiquidSocketClientFuturesApi>();
 
         mockRestClient.Setup(x => x.FuturesApi).Returns(mockFuturesRestApi.Object);
         mockFuturesRestApi.Setup(x => x.Trading).Returns(mockFuturesTrading.Object);
+        mockFuturesRestApi.Setup(x => x.ExchangeData).Returns(mockFuturesExchangeData.Object);
         mockSocketClient.Setup(x => x.SpotApi).Returns(mockSpotSocketApi.Object);
         mockSocketClient.Setup(x => x.FuturesApi).Returns(mockFuturesSocketApi.Object);
+
+        mockFuturesExchangeData
+            .Setup(x => x.GetOrderBookAsync(
+                It.IsAny<string>(),
+                It.IsAny<int?>(),
+                It.IsAny<int?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(new HyperLiquidOrderBook
+            {
+                Symbol = "DOT",
+                Timestamp = DateTime.UtcNow,
+                Levels = new HyperLiquidOrderBookLevels
+                {
+                    Asks = [new HyperLiquidOrderBookEntry { Price = 5m, Quantity = 20m, Orders = 1 }],
+                    Bids = [new HyperLiquidOrderBookEntry { Price = 4.9m, Quantity = 20m, Orders = 1 }]
+                }
+            }));
 
         mockSpotSocketApi
             .Setup(x => x.SubscribeToOrderUpdatesAsync(
@@ -1366,14 +1506,33 @@ public class HyperliquidBrokerTest
         var mockRestClient = new Mock<IHyperLiquidRestClient>();
         var mockFuturesRestApi = new Mock<IHyperLiquidRestClientFuturesApi>();
         var mockFuturesTrading = new Mock<IHyperLiquidRestClientFuturesApiTrading>();
+        var mockFuturesExchangeData = new Mock<IHyperLiquidRestClientFuturesApiExchangeData>();
         var mockSocketClient = new Mock<IHyperLiquidSocketClient>();
         var mockSpotSocketApi = new Mock<IHyperLiquidSocketClientSpotApi>();
         var mockFuturesSocketApi = new Mock<IHyperLiquidSocketClientFuturesApi>();
 
         mockRestClient.Setup(x => x.FuturesApi).Returns(mockFuturesRestApi.Object);
         mockFuturesRestApi.Setup(x => x.Trading).Returns(mockFuturesTrading.Object);
+        mockFuturesRestApi.Setup(x => x.ExchangeData).Returns(mockFuturesExchangeData.Object);
         mockSocketClient.Setup(x => x.SpotApi).Returns(mockSpotSocketApi.Object);
         mockSocketClient.Setup(x => x.FuturesApi).Returns(mockFuturesSocketApi.Object);
+
+        mockFuturesExchangeData
+            .Setup(x => x.GetOrderBookAsync(
+                It.IsAny<string>(),
+                It.IsAny<int?>(),
+                It.IsAny<int?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(new HyperLiquidOrderBook
+            {
+                Symbol = "DOT",
+                Timestamp = DateTime.UtcNow,
+                Levels = new HyperLiquidOrderBookLevels
+                {
+                    Asks = [new HyperLiquidOrderBookEntry { Price = 5m, Quantity = 20m, Orders = 1 }],
+                    Bids = [new HyperLiquidOrderBookEntry { Price = 4.9m, Quantity = 20m, Orders = 1 }]
+                }
+            }));
 
         mockSpotSocketApi
             .Setup(x => x.SubscribeToOrderUpdatesAsync(
@@ -1488,14 +1647,33 @@ public class HyperliquidBrokerTest
         var mockRestClient = new Mock<IHyperLiquidRestClient>();
         var mockFuturesRestApi = new Mock<IHyperLiquidRestClientFuturesApi>();
         var mockFuturesTrading = new Mock<IHyperLiquidRestClientFuturesApiTrading>();
+        var mockFuturesExchangeData = new Mock<IHyperLiquidRestClientFuturesApiExchangeData>();
         var mockSocketClient = new Mock<IHyperLiquidSocketClient>();
         var mockSpotSocketApi = new Mock<IHyperLiquidSocketClientSpotApi>();
         var mockFuturesSocketApi = new Mock<IHyperLiquidSocketClientFuturesApi>();
 
         mockRestClient.Setup(x => x.FuturesApi).Returns(mockFuturesRestApi.Object);
         mockFuturesRestApi.Setup(x => x.Trading).Returns(mockFuturesTrading.Object);
+        mockFuturesRestApi.Setup(x => x.ExchangeData).Returns(mockFuturesExchangeData.Object);
         mockSocketClient.Setup(x => x.SpotApi).Returns(mockSpotSocketApi.Object);
         mockSocketClient.Setup(x => x.FuturesApi).Returns(mockFuturesSocketApi.Object);
+
+        mockFuturesExchangeData
+            .Setup(x => x.GetOrderBookAsync(
+                It.IsAny<string>(),
+                It.IsAny<int?>(),
+                It.IsAny<int?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WebCallResult(new HyperLiquidOrderBook
+            {
+                Symbol = "DOT",
+                Timestamp = DateTime.UtcNow,
+                Levels = new HyperLiquidOrderBookLevels
+                {
+                    Asks = [new HyperLiquidOrderBookEntry { Price = 5m, Quantity = 20m, Orders = 1 }],
+                    Bids = [new HyperLiquidOrderBookEntry { Price = 4.9m, Quantity = 20m, Orders = 1 }]
+                }
+            }));
 
         mockSpotSocketApi
             .Setup(x => x.SubscribeToOrderUpdatesAsync(
@@ -1589,12 +1767,13 @@ public class HyperliquidBrokerTest
         _ = Task.Run(async () =>
         {
             await Task.Delay(20);
-            // Stale websocket event says filled (remaining 0), but timeout snapshot should win.
+            // Stale websocket event reports zero remaining but non-terminal status;
+            // timeout snapshot should still drive fallback sizing.
             capturedFuturesHandler?.Invoke(new DataEvent<HyperLiquidOrderStatus[]>(
                 "stream",
                 [new HyperLiquidOrderStatus
                 {
-                    Status = HlOrderStatus.Filled,
+                    Status = HlOrderStatus.WaitingFill,
                     Order = new HyperLiquidOrder { OrderId = orderId, QuantityRemaining = 0m }
                 }],
                 DateTime.UtcNow,
