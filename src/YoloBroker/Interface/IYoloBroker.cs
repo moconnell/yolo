@@ -14,18 +14,15 @@ public interface IYoloBroker : IDisposable
         AssetPermissions assetPermissions = AssetPermissions.All,
         CancellationToken ct = default);
 
-    Task<IReadOnlyDictionary<long, Order>> GetOpenOrdersAsync(CancellationToken ct);
+    Task<IReadOnlyDictionary<long, Order>> GetOpenOrdersAsync(CancellationToken ct = default);
 
-    Task<IReadOnlyDictionary<string, IReadOnlyList<Position>>> GetPositionsAsync(CancellationToken ct);
+    Task<IReadOnlyDictionary<string, IReadOnlyList<Position>>> GetPositionsAsync(CancellationToken ct = default);
 
-    IAsyncEnumerable<OrderUpdate> ManageOrdersAsync(
-        IEnumerable<Trade> trades,
-        OrderManagementSettings settings,
-        CancellationToken ct = default);
+    Task<TradeResult> PlaceTradeAsync(Trade trade, CancellationToken ct = default);
 
-    Task<TradeResult> PlaceTradeAsync(Trade trade, CancellationToken ct);
+    IAsyncEnumerable<TradeResult> PlaceTradesAsync(IEnumerable<Trade> trades, CancellationToken ct = default);
 
-    IAsyncEnumerable<TradeResult> PlaceTradesAsync(IEnumerable<Trade> trades, CancellationToken ct);
+    IAsyncEnumerable<BrokerOrderEvent> SubscribeOrderUpdatesAsync(CancellationToken ct = default);
 
     Task<IReadOnlyList<decimal>> GetDailyClosePricesAsync(
         string ticker,

@@ -87,6 +87,12 @@ public static class AddStrategyServices
                 sp.GetRequiredService<ILogger<HyperliquidBroker>>());
         });
 
+        services.AddKeyedSingleton<IOrderManager>(strategyKey, (sp, key) =>
+        {
+            var broker = sp.GetRequiredKeyedService<IYoloBroker>(strategyKey);
+            return new OrderManager(broker, sp.GetRequiredService<ILogger<OrderManager>>());
+        });
+
         // Register factor providers for this strategy
         var factorProviders = new List<string>();
 
@@ -168,6 +174,7 @@ public static class AddStrategyServices
             return new RebalanceCommand(
                 sp.GetRequiredKeyedService<ICalcWeights>(strategyKey),
                 sp.GetRequiredKeyedService<ITradeFactory>(strategyKey),
+                sp.GetRequiredKeyedService<IOrderManager>(strategyKey),
                 sp.GetRequiredKeyedService<IYoloBroker>(strategyKey),
                 sp.GetRequiredKeyedService<YoloConfig>(strategyKey),
                 sp.GetRequiredService<ILogger<RebalanceCommand>>());

@@ -83,6 +83,8 @@ __  ______  __    ____  __
             var yoloConfig = config.GetYoloConfig() ??
                              throw new ConfigException("YOLO configuration is missing or invalid");
 
+            var orderManager = serviceProvider.GetService<IOrderManager>()!;
+
             using var broker = serviceProvider.GetService<IYoloBroker>()!;
             var orders = await broker.GetOpenOrdersAsync(cancellationToken);
 
@@ -195,7 +197,7 @@ __  ______  __    ____  __
 
                     try
                     {
-                        await foreach (var update in broker.ManageOrdersAsync(trades, settings, cancellationToken))
+                        await foreach (var update in orderManager.ManageOrdersAsync(trades, settings, cancellationToken))
                         {
                             UpdateOrderTable(table, index, update);
 
