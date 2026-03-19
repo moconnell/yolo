@@ -7,5 +7,7 @@
   "azureFunctions.projectRuntime": "~4",
   "debug.internalConsoleOptions": "neverOpen",
   "azureFunctions.preDeployTask": "publish (functions)",
-  "azureFunctions.projectSubpath": "src/YoloFunk"
+  "azureFunctions.projectSubpath": "src/YoloFunk",
+  "xml.format.maxLineWidth": 0,
+  "xml.format.splitAttributes": "preserve"
 }
