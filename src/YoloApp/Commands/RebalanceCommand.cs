@@ -1,6 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
-
-using System.Threading.Channels;
+﻿using System.Threading.Channels;
 
 using YoloAbstractions;
 using YoloAbstractions.Config;
@@ -8,7 +6,9 @@ using YoloAbstractions.Extensions;
 using YoloAbstractions.Interfaces;
 using YoloApp.Extensions;
 using YoloBroker.Interface;
+
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 
 namespace YoloApp.Commands;
 
@@ -20,6 +20,7 @@ public class RebalanceCommand : ICommand
     private readonly IYoloBroker _broker;
     private readonly YoloConfig _yoloConfig;
     private readonly ILogger<RebalanceCommand> _logger;
+
     public RebalanceCommand(ICalcWeights weightsService, ITradeFactory tradeFactory, IOrderManager orderManager, IYoloBroker broker, IOptions<YoloConfig> options, ILogger<RebalanceCommand> logger)
         : this(weightsService, tradeFactory, orderManager, broker, options.Value, logger)
     {
