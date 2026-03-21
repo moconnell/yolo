@@ -270,6 +270,7 @@ public class RebalanceCommandTest
         mockOrderManager.Verify(x => x.ManageOrdersAsync(
             It.IsAny<Trade[]>(),
             It.IsAny<OrderManagementSettings>(),
+            It.IsAny<ITradeAdvisor>(),
             It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -354,6 +355,7 @@ public class RebalanceCommandTest
         mockOrderManager.Verify(x => x.ManageOrdersAsync(
             It.IsAny<Trade[]>(),
             It.IsAny<OrderManagementSettings>(),
+            It.IsAny<ITradeAdvisor>(),
             It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -399,7 +401,8 @@ public class RebalanceCommandTest
         mockOrderManager.Setup(x => x.ManageOrdersAsync(
                 It.IsAny<Trade[]>(),
                 It.IsAny<OrderManagementSettings>(),
-                It.IsAny<CancellationToken>()))
+            It.IsAny<ITradeAdvisor>(),
+            It.IsAny<CancellationToken>()))
             .Returns(channel.Reader.ReadAllAsync());
 
         var options = Options.Create(new YoloConfig { BaseAsset = "USDC" });
@@ -420,6 +423,7 @@ public class RebalanceCommandTest
         mockOrderManager.Verify(x => x.ManageOrdersAsync(
             It.Is<Trade[]>(t => t.Length == 3),
             It.IsAny<OrderManagementSettings>(),
+            It.IsAny<ITradeAdvisor>(),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -480,7 +484,8 @@ public class RebalanceCommandTest
         mockOrderManager.Setup(x => x.ManageOrdersAsync(
                 It.IsAny<Trade[]>(),
                 It.IsAny<OrderManagementSettings>(),
-                It.IsAny<CancellationToken>()))
+            It.IsAny<ITradeAdvisor>(),
+            It.IsAny<CancellationToken>()))
             .Throws<SocketException>();
 
         var mockBroker = new Mock<IYoloBroker>();
@@ -546,7 +551,8 @@ public class RebalanceCommandTest
         mockOrderManager.Setup(x => x.ManageOrdersAsync(
                 It.IsAny<Trade[]>(),
                 It.IsAny<OrderManagementSettings>(),
-                It.IsAny<CancellationToken>()))
+            It.IsAny<ITradeAdvisor>(),
+            It.IsAny<CancellationToken>()))
             .Returns(channel.Reader.ReadAllAsync());
 
         var mockBroker = new Mock<IYoloBroker>();
@@ -579,6 +585,7 @@ public class RebalanceCommandTest
         mockOrderManager.Verify(x => x.ManageOrdersAsync(
             It.Is<Trade[]>(t => t.Length == 1),
             It.IsAny<OrderManagementSettings>(),
+            It.IsAny<ITradeAdvisor>(),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 }

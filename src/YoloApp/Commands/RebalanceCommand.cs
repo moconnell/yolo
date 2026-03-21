@@ -6,6 +6,7 @@ using YoloAbstractions.Extensions;
 using YoloAbstractions.Interfaces;
 using YoloApp.Extensions;
 using YoloBroker.Interface;
+using YoloTrades;
 
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
@@ -94,22 +95,14 @@ public class RebalanceCommand : ICommand
             return;
         }
 
-        var settings = OrderManagementSettings.Default with
-        {
-            UnfilledOrderTimeout = TimeSpan.TryParse(_yoloConfig.UnfilledOrderTimeout, out var timeout)
-                ? timeout
-                : OrderManagementSettings.Default.UnfilledOrderTimeout,
-            SwitchToMarketOnTimeout = _yoloConfig.SwitchToMarketOnTimeout
-        };
+        var settings = new OrderManagementSettings(TimeSpan.Parse(_yoloConfig.UnfilledOrderTimeout), _yoloConfig.MaxRepriceRetries);
+        var advisor = new TradeAdvisor(weights, _tradeFactory, _broker, _yoloConfig.BaseAsset, _yoloConfig.AssetPermissions);
 
-        _logger.LogInformation(
-            "Order management settings: UnfilledOrderTimeout={UnfilledOrderTimeout}, SwitchToMarketOnTimeout={SwitchToMarketOnTimeout}",
-            settings.UnfilledOrderTimeout,
-            settings.SwitchToMarketOnTimeout);
+        _logger.LogInformation("Order management settings: {Settings}, Advisor={AdvisorType}", settings, advisor.GetType().Name);
 
         try
         {
-            await foreach (var update in _orderManager.ManageOrdersAsync(trades, settings, cancellationToken))
+            await foreach (var update in _orderManager.ManageOrdersAsync(trades, settings, advisor, cancellationToken))
             {
                 if (update.Type == OrderUpdateType.Error)
                 {

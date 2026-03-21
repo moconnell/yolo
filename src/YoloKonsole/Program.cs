@@ -191,14 +191,16 @@ __  ______  __    ____  __
                         UnfilledOrderTimeout = TimeSpan.TryParse(yoloConfig.UnfilledOrderTimeout, out var timeout)
                             ? timeout
                             : OrderManagementSettings.Default.UnfilledOrderTimeout,
-                        SwitchToMarketOnTimeout = yoloConfig.SwitchToMarketOnTimeout
+                        MaxRepriceRetries = yoloConfig.MaxRepriceRetries
                     };
+
+                    var advisor = new TradeAdvisor(weights, tradeFactory, broker, yoloConfig.BaseAsset, yoloConfig.AssetPermissions);
 
                     _logger.LogInformation("Managing orders for {TradeCount} trades", trades.Length);
 
                     try
                     {
-                        await foreach (var update in orderManager.ManageOrdersAsync(trades, settings, cancellationToken))
+                        await foreach (var update in orderManager.ManageOrdersAsync(trades, settings, advisor, cancellationToken))
                         {
                             UpdateOrderTable(table, index, update);
 

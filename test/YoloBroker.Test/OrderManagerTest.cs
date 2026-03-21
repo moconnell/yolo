@@ -5,6 +5,7 @@ using Moq;
 using Shouldly;
 using Xunit;
 using YoloAbstractions;
+using YoloAbstractions.Interfaces;
 using YoloBroker.Interface;
 
 namespace YoloBroker.Test;
@@ -27,11 +28,9 @@ public class OrderManagerTest
 
         var sut = CreateSut(broker.Object);
         var settings = new OrderManagementSettings(
-            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20),
-            SwitchToMarketOnTimeout: true,
-            StatusCheckInterval: TimeSpan.FromMilliseconds(10));
+            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20));
 
-        var updates = await CollectUpdatesAsync(sut.ManageOrdersAsync([trade], settings));
+        var updates = await CollectUpdatesAsync(sut.ManageOrdersAsync([trade], settings, CreateAdvisor(null)));
 
         updates.Count.ShouldBe(1);
         updates[0].Type.ShouldBe(OrderUpdateType.Created);
@@ -40,10 +39,11 @@ public class OrderManagerTest
     }
 
     [Fact]
-    public async Task ManageOrdersAsync_WhenTimedOutPartiallyFilledOrder_ShouldPlaceMarketForRemainingAmount()
+    public async Task ManageOrdersAsync_WhenAdvisorReturnsReplacementTrade_ShouldPlaceIt()
     {
         var trade = CreateLimitTrade(clientOrderId: "c2", amount: 10m, limitPrice: 100m);
         var partiallyFilledOrder = CreateOrder(id: 1002, clientId: "c2", status: OrderStatus.WaitingFill, amount: 10m, filled: 4m);
+        var replacementTrade = trade with { Amount = 6m, OrderType = OrderType.Market, LimitPrice = null };
 
         var broker = new Mock<IYoloBroker>();
         broker.Setup(x => x.SubscribeOrderUpdatesAsync(It.IsAny<CancellationToken>()))
@@ -58,16 +58,14 @@ public class OrderManagerTest
                 new TradeResult(
                     marketTrade,
                     Success: true,
-                    Order: CreateOrder(id: 2002, clientId: marketTrade.ClientOrderId, status: OrderStatus.Open, amount: marketTrade.Amount, filled: 0m)));
+                    Order: CreateOrder(id: 2002, clientId: marketTrade.ClientOrderId, status: OrderStatus.Open, amount: marketTrade.AbsoluteAmount, filled: 0m)));
 
         var sut = CreateSut(broker.Object);
         var settings = new OrderManagementSettings(
-            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20),
-            SwitchToMarketOnTimeout: true,
-            StatusCheckInterval: TimeSpan.FromMilliseconds(10));
+            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20));
 
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
-        var updates = await CollectUpdatesUntilCanceledAsync(sut.ManageOrdersAsync([trade], settings, cts.Token));
+        var updates = await CollectUpdatesUntilCanceledAsync(sut.ManageOrdersAsync([trade], settings, CreateAdvisor(replacementTrade), cts.Token));
 
         updates.ShouldContain(x => x.Type == OrderUpdateType.MarketOrderPlaced);
         broker.Verify(x => x.CancelOrderAsync(partiallyFilledOrder, It.IsAny<CancellationToken>()), Times.Once);
@@ -82,10 +80,10 @@ public class OrderManagerTest
     }
 
     [Fact]
-    public async Task ManageOrdersAsync_WhenTimedOutAndMarketFallbackDisabled_ShouldEmitTimedOutAndComplete()
+    public async Task ManageOrdersAsync_WhenAdvisorReturnsNull_ShouldCancelAndEmitTimedOut()
     {
         var trade = CreateLimitTrade(clientOrderId: "c2b", amount: 10m, limitPrice: 100m);
-        var openOrder = CreateOrder(id: 10021, clientId: "c2b", status: OrderStatus.Open, amount: 10m, filled: 0m);
+        var openOrder = CreateOrder(id: 10022, clientId: "c2b", status: OrderStatus.Open, amount: 10m, filled: 0m);
 
         var broker = new Mock<IYoloBroker>();
         broker.Setup(x => x.SubscribeOrderUpdatesAsync(It.IsAny<CancellationToken>()))
@@ -93,23 +91,23 @@ public class OrderManagerTest
         broker.Setup(x => x.PlaceTradesAsync(It.IsAny<IEnumerable<Trade>>(), It.IsAny<CancellationToken>()))
             .Returns((IEnumerable<Trade> _, CancellationToken _) =>
                 ToAsyncEnumerable(new TradeResult(trade, Success: true, Order: openOrder)));
+        broker.Setup(x => x.CancelOrderAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
 
         var sut = CreateSut(broker.Object);
         var settings = new OrderManagementSettings(
-            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20),
-            SwitchToMarketOnTimeout: false,
-            StatusCheckInterval: TimeSpan.FromMilliseconds(10));
+            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20));
 
-        var updates = await CollectUpdatesAsync(sut.ManageOrdersAsync([trade], settings));
+        var updates = await CollectUpdatesAsync(sut.ManageOrdersAsync([trade], settings, CreateAdvisor(null)));
 
         updates.ShouldContain(x => x.Type == OrderUpdateType.Created);
         updates.ShouldContain(x => x.Type == OrderUpdateType.TimedOut);
-        broker.Verify(x => x.CancelOrderAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()), Times.Never);
+        broker.Verify(x => x.CancelOrderAsync(openOrder, It.IsAny<CancellationToken>()), Times.Once);
         broker.Verify(x => x.PlaceTradeAsync(It.IsAny<Trade>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
-    public async Task ManageOrdersAsync_WhenMarketFallbackFails_ShouldEmitErrorUpdate()
+    public async Task ManageOrdersAsync_WhenReplacementTradeFails_ShouldEmitErrorUpdate()
     {
         var trade = CreateLimitTrade(clientOrderId: "c3", amount: 5m, limitPrice: 50m);
         var openOrder = CreateOrder(id: 1003, clientId: "c3", status: OrderStatus.Open, amount: 5m, filled: 0m);
@@ -128,12 +126,10 @@ public class OrderManagerTest
 
         var sut = CreateSut(broker.Object);
         var settings = new OrderManagementSettings(
-            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20),
-            SwitchToMarketOnTimeout: true,
-            StatusCheckInterval: TimeSpan.FromMilliseconds(10));
+            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20));
 
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
-        var updates = await CollectUpdatesUntilCanceledAsync(sut.ManageOrdersAsync([trade], settings, cts.Token));
+        var updates = await CollectUpdatesUntilCanceledAsync(sut.ManageOrdersAsync([trade], settings, CreateAdvisor(trade with { Amount = 5m, OrderType = OrderType.Market, LimitPrice = null }), cts.Token));
 
         var errorUpdate = updates.Single(x => x.Type == OrderUpdateType.Error);
         errorUpdate.Error.ShouldNotBeNull();
@@ -141,10 +137,11 @@ public class OrderManagerTest
     }
 
     [Fact]
-    public async Task ManageOrdersAsync_WhenTimedOutSellOrder_ShouldPlaceSellMarketForRemainingAmount()
+    public async Task ManageOrdersAsync_WhenAdvisorReturnsSellTrade_ShouldPreserveSign()
     {
         var trade = CreateLimitTrade(clientOrderId: "c3sell", amount: -10m, limitPrice: 50m);
         var openOrder = CreateOrder(id: 10031, clientId: "c3sell", status: OrderStatus.Open, amount: 10m, filled: 0m);
+        var replacementTrade = trade with { Amount = -10m, OrderType = OrderType.Market, LimitPrice = null };
 
         var broker = new Mock<IYoloBroker>();
         broker.Setup(x => x.SubscribeOrderUpdatesAsync(It.IsAny<CancellationToken>()))
@@ -168,12 +165,10 @@ public class OrderManagerTest
 
         var sut = CreateSut(broker.Object);
         var settings = new OrderManagementSettings(
-            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20),
-            SwitchToMarketOnTimeout: true,
-            StatusCheckInterval: TimeSpan.FromMilliseconds(10));
+            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20));
 
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
-        var updates = await CollectUpdatesUntilCanceledAsync(sut.ManageOrdersAsync([trade], settings, cts.Token));
+        var updates = await CollectUpdatesUntilCanceledAsync(sut.ManageOrdersAsync([trade], settings, CreateAdvisor(replacementTrade), cts.Token));
 
         updates.ShouldContain(x => x.Type == OrderUpdateType.MarketOrderPlaced);
         broker.Verify(x => x.PlaceTradeAsync(
@@ -184,6 +179,58 @@ public class OrderManagerTest
                     t.Amount == -10m),
                 It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task ManageOrdersAsync_WhenRepriceRetriesExceeded_ShouldEscalateToMarket()
+    {
+        var trade = CreateLimitTrade(clientOrderId: "c3retry", amount: 8m, limitPrice: 50m);
+        var firstOpenOrder = CreateOrder(id: 10041, clientId: "c3retry", status: OrderStatus.Open, amount: 8m, filled: 0m);
+        var repriceTrade = trade with { LimitPrice = 49m, OrderType = OrderType.Limit };
+        var replacementOpenOrder = CreateOrder(id: 10042, clientId: "c3retry", status: OrderStatus.Open, amount: 8m, filled: 0m);
+
+        var broker = new Mock<IYoloBroker>();
+        broker.Setup(x => x.SubscribeOrderUpdatesAsync(It.IsAny<CancellationToken>()))
+            .Returns(EmptyEventsAsync);
+        broker.Setup(x => x.PlaceTradesAsync(It.IsAny<IEnumerable<Trade>>(), It.IsAny<CancellationToken>()))
+            .Returns((IEnumerable<Trade> _, CancellationToken _) =>
+                ToAsyncEnumerable(new TradeResult(trade, Success: true, Order: firstOpenOrder)));
+        broker.Setup(x => x.CancelOrderAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var placedReplacements = new List<Trade>();
+        broker.Setup(x => x.PlaceTradeAsync(It.IsAny<Trade>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Trade replacement, CancellationToken _) =>
+            {
+                placedReplacements.Add(replacement);
+
+                return replacement.OrderType == OrderType.Market
+                    ? new TradeResult(
+                        replacement,
+                        Success: true,
+                        Order: CreateOrder(id: 20041, clientId: replacement.ClientOrderId, status: OrderStatus.Filled, amount: replacement.AbsoluteAmount, filled: replacement.AbsoluteAmount))
+                    : new TradeResult(
+                        replacement,
+                        Success: true,
+                        Order: replacementOpenOrder);
+            });
+
+        var sut = CreateSut(broker.Object);
+        var settings = new OrderManagementSettings(
+            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20),
+            MaxRepriceRetries: 1);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+        var updates = await CollectUpdatesUntilCanceledAsync(sut.ManageOrdersAsync([trade], settings, CreateAdvisor(repriceTrade), cts.Token));
+
+        updates.ShouldContain(x => x.Type == OrderUpdateType.Created);
+        updates.ShouldContain(x => x.Type == OrderUpdateType.MarketOrderPlaced);
+
+        placedReplacements.Count.ShouldBe(2);
+        placedReplacements[0].OrderType.ShouldBe(OrderType.Limit);
+        placedReplacements[1].OrderType.ShouldBe(OrderType.Market);
+        placedReplacements[1].LimitPrice.ShouldBeNull();
+        placedReplacements[1].ClientOrderId.ShouldBe("c3retry");
     }
 
     [Fact]
@@ -208,7 +255,7 @@ public class OrderManagerTest
                     Order: CreateOrder(id: 1004, clientId: "c4", status: OrderStatus.Filled, amount: 2m, filled: 2m))));
 
         var sut = CreateSut(broker.Object);
-        var updates = await CollectUpdatesAsync(sut.ManageOrdersAsync([trade], OrderManagementSettings.Default));
+        var updates = await CollectUpdatesAsync(sut.ManageOrdersAsync([trade], OrderManagementSettings.Default, CreateAdvisor(null)));
 
         updates.Count.ShouldBe(1);
         updates[0].Type.ShouldBe(OrderUpdateType.MarketOrderPlaced);
@@ -238,11 +285,9 @@ public class OrderManagerTest
 
         var sut = CreateSut(broker.Object);
         var settings = new OrderManagementSettings(
-            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20),
-            SwitchToMarketOnTimeout: false,
-            StatusCheckInterval: TimeSpan.FromMilliseconds(10));
+            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20));
 
-        var updates = await CollectUpdatesAsync(sut.ManageOrdersAsync([trade], settings));
+        var updates = await CollectUpdatesAsync(sut.ManageOrdersAsync([trade], settings, CreateAdvisor(null)));
 
         updates.ShouldContain(x => x.Type == OrderUpdateType.Created);
     }
@@ -250,6 +295,14 @@ public class OrderManagerTest
     private static OrderManager CreateSut(IYoloBroker broker)
     {
         return new OrderManager(broker, Mock.Of<ILogger<OrderManager>>());
+    }
+
+    private static ITradeAdvisor CreateAdvisor(Trade? replacementTrade)
+    {
+        var mock = new Mock<ITradeAdvisor>();
+        mock.Setup(x => x.GetReplacementTradeAsync(It.IsAny<Trade>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(replacementTrade);
+        return mock.Object;
     }
 
     private static Trade CreateLimitTrade(string clientOrderId, decimal amount, decimal limitPrice)

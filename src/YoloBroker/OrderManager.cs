@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using YoloAbstractions;
+using YoloAbstractions.Interfaces;
 using YoloBroker.Exceptions;
 using YoloBroker.Interface;
 
@@ -22,10 +23,12 @@ public sealed class OrderManager : IOrderManager
     public async IAsyncEnumerable<OrderUpdate> ManageOrdersAsync(
         IEnumerable<Trade> trades,
         OrderManagementSettings settings,
+        ITradeAdvisor advisor,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(trades);
         ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(advisor);
 
         var pending = new ConcurrentDictionary<string, OrderTracker>();
         var eventChannel = Channel.CreateUnbounded<ManagerEvent>();
@@ -64,9 +67,10 @@ public sealed class OrderManager : IOrderManager
 
         _logger.LogInformation("Managing orders for {TradeCount} trades", pending.Count);
         _logger.LogInformation(
-            "Order manager configured with UnfilledOrderTimeout={UnfilledOrderTimeout}, SwitchToMarketOnTimeout={SwitchToMarketOnTimeout}",
+            "Order manager configured with UnfilledOrderTimeout={UnfilledOrderTimeout}, MaxRepriceRetries={MaxRepriceRetries}, Advisor={AdvisorType}",
             settings.UnfilledOrderTimeout,
-            settings.SwitchToMarketOnTimeout);
+            settings.MaxRepriceRetries,
+            advisor.GetType().Name);
 
         await foreach (var placed in _broker.PlaceTradesAsync(pending.Values.Select(x => x.Trade), ct))
         {
@@ -147,32 +151,19 @@ public sealed class OrderManager : IOrderManager
                 return null;
             }
 
-            if (!settings.SwitchToMarketOnTimeout)
-            {
-                _logger.LogWarning(
-                    "Order timeout for {ClientOrderId} on {Symbol}: market fallback disabled; emitting TimedOut",
-                    clientOrderId,
-                    tracker.Trade.Symbol);
-                pending.TryRemove(clientOrderId, out _);
-                return new OrderUpdate(
-                    tracker.Trade.Symbol,
-                    OrderUpdateType.TimedOut,
-                    tracker.CurrentOrder with { OrderStatus = OrderStatus.Canceled },
-                    Message: "Order timed out");
-            }
-
             try
             {
+                tracker.IncrementTimeoutCount();
                 await _broker.CancelOrderAsync(tracker.CurrentOrder, ct);
 
-                var remainingAmount = tracker.AmountRemaining;
-                if (remainingAmount <= 0)
+                var replacement = await advisor.GetReplacementTradeAsync(tracker.Trade, ct);
+
+                if (replacement == null)
                 {
                     _logger.LogInformation(
-                        "Order timeout for {ClientOrderId} on {Symbol}: remaining amount is {RemainingAmount}; emitting TimedOut",
+                        "Order timeout for {ClientOrderId} on {Symbol}: advisor returned no replacement; emitting TimedOut",
                         clientOrderId,
-                        tracker.Trade.Symbol,
-                        remainingAmount);
+                        tracker.Trade.Symbol);
                     pending.TryRemove(clientOrderId, out _);
                     return new OrderUpdate(
                         tracker.Trade.Symbol,
@@ -181,26 +172,44 @@ public sealed class OrderManager : IOrderManager
                         Message: "Order timed out");
                 }
 
-                var fallbackAmount = tracker.Trade.OrderSide == OrderSide.Sell ? -remainingAmount : remainingAmount;
-
                 _logger.LogInformation(
-                    "Order timeout for {ClientOrderId} on {Symbol}: placing market fallback for remaining amount {RemainingAmount} (fallback trade amount {FallbackAmount})",
+                    "Order timeout for {ClientOrderId} on {Symbol}: placing advisor replacement {Replacement}",
                     clientOrderId,
                     tracker.Trade.Symbol,
-                    remainingAmount,
-                    fallbackAmount);
+                    replacement);
 
-                var tradeResult = await _broker.PlaceTradeAsync(
-                    tracker.Trade with { Amount = fallbackAmount, LimitPrice = null, OrderType = OrderType.Market },
-                    ct);
+                replacement = replacement with { ClientOrderId = tracker.Trade.ClientOrderId };
+
+                if (tracker.TimeoutCount > settings.MaxRepriceRetries && replacement.OrderType != OrderType.Market)
+                {
+                    _logger.LogInformation(
+                        "Order timeout for {ClientOrderId} on {Symbol}: MaxRepriceRetries exceeded; escalating to market",
+                        clientOrderId,
+                        tracker.Trade.Symbol);
+
+                    replacement = replacement with
+                    {
+                        OrderType = OrderType.Market,
+                        LimitPrice = null,
+                        PostPrice = false
+                    };
+                }
+
+                var tradeResult = await _broker.PlaceTradeAsync(replacement, ct);
 
                 if (tradeResult.Success && tradeResult.Order is not null)
                 {
                     tracker.AddOrder(tradeResult.Order);
+
+                    if (replacement.OrderType != OrderType.Market && !tradeResult.Order.IsCompleted())
+                    {
+                        _ = StartTimeout(clientOrderId, settings.UnfilledOrderTimeout, eventChannel, ct);
+                        return ToOrderUpdate(tradeResult);
+                    }
                 }
                 else
                 {
-                    _logger.LogError("Failed to place market order for trade {trade} after timeout: {Error} ({ErrorCode})", tracker.Trade, tradeResult.Error, tradeResult.ErrorCode);
+                    _logger.LogError("Failed to place replacement order after timeout: {Error} ({ErrorCode})", tradeResult.Error, tradeResult.ErrorCode);
                 }
 
                 pending.TryRemove(clientOrderId, out _);
@@ -209,7 +218,7 @@ public sealed class OrderManager : IOrderManager
             catch (Exception ex)
             {
                 pending.TryRemove(clientOrderId, out _);
-                _logger.LogError(ex, "Failed to cancel order {clientOrderId} after timeout: {Message}", clientOrderId, ex.Message);
+                _logger.LogError(ex, "Failed to handle timeout for {clientOrderId}: {Message}", clientOrderId, ex.Message);
                 return new OrderUpdate(
                     tracker.Trade.Symbol,
                     OrderUpdateType.Error,
@@ -277,6 +286,7 @@ public sealed class OrderManager : IOrderManager
         private readonly Trade _trade;
         private readonly DateTime _createdAt;
         private readonly ConcurrentStack<Order> _orderHistory = new();
+        private int _timeoutCount;
 
         private OrderTracker(Trade trade, DateTime createdAt)
         {
@@ -289,8 +299,7 @@ public sealed class OrderManager : IOrderManager
         internal Order? CurrentOrder => _orderHistory.TryPeek(out var order) ? order : null;
 
         internal Trade Trade => _trade;
-
-        internal decimal AmountRemaining => Math.Max(0m, _trade.AbsoluteAmount - (CurrentOrder?.Filled ?? 0m));
+        internal int TimeoutCount => _timeoutCount;
 
         internal void AddOrder(Order order)
         {
@@ -303,6 +312,11 @@ public sealed class OrderManager : IOrderManager
         internal bool IsCompleted()
         {
             return CurrentOrder?.IsCompleted() ?? false;
+        }
+
+        internal void IncrementTimeoutCount()
+        {
+            _timeoutCount++;
         }
     }
 
