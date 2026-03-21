@@ -1,4 +1,5 @@
 {
+  "dotnetAcquisitionExtension.sharedExistingDotnetPath": "/usr/local/share/dotnet/dotnet",
   "dotnet.server.useOmnisharp": false,
   "dotnet.completion.showCompletionItemsFromUnimportedNamespaces": true,
   "dotnet.codeLens.enableReferencesCodeLens": true,
