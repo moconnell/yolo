@@ -98,8 +98,14 @@ public class RebalanceCommand : ICommand
         {
             UnfilledOrderTimeout = TimeSpan.TryParse(_yoloConfig.UnfilledOrderTimeout, out var timeout)
                 ? timeout
-                : OrderManagementSettings.Default.UnfilledOrderTimeout
+                : OrderManagementSettings.Default.UnfilledOrderTimeout,
+            SwitchToMarketOnTimeout = _yoloConfig.SwitchToMarketOnTimeout
         };
+
+        _logger.LogInformation(
+            "Order management settings: UnfilledOrderTimeout={UnfilledOrderTimeout}, SwitchToMarketOnTimeout={SwitchToMarketOnTimeout}",
+            settings.UnfilledOrderTimeout,
+            settings.SwitchToMarketOnTimeout);
 
         try
         {

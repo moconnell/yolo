@@ -190,7 +190,8 @@ __  ______  __    ____  __
                     {
                         UnfilledOrderTimeout = TimeSpan.TryParse(yoloConfig.UnfilledOrderTimeout, out var timeout)
                             ? timeout
-                            : OrderManagementSettings.Default.UnfilledOrderTimeout
+                            : OrderManagementSettings.Default.UnfilledOrderTimeout,
+                        SwitchToMarketOnTimeout = yoloConfig.SwitchToMarketOnTimeout
                     };
 
                     _logger.LogInformation("Managing orders for {TradeCount} trades", trades.Length);

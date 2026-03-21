@@ -12,6 +12,7 @@ public record YoloConfig
     public decimal? MinOrderValue { get; init; } = 10;
     public bool KillOpenOrders { get; init; } = false;
     public string UnfilledOrderTimeout { get; init; } = "00:05:00"; // Default 5 minutes
+    public bool SwitchToMarketOnTimeout { get; init; } = true;
     public double? MaxWeightingAbs { get; init; }
     public IReadOnlyDictionary<FactorType, decimal> FactorWeights { get; init; } = new Dictionary<FactorType, decimal>();
     public NormalizationMethod NormalizationMethod { get; init; } = NormalizationMethod.None;

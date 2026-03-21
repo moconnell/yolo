@@ -35,6 +35,61 @@ public class HyperliquidBrokerTest
         });
     }
 
+    #region SubscribeOrderUpdatesAsync Tests
+
+    [Fact]
+    public async Task GivenVaultAddress_WhenSubscribeOrderUpdatesAsync_ShouldSubscribeUsingVaultAddress()
+    {
+        // arrange
+        const string address = "0x1111111111111111111111111111111111111111";
+        const string vaultAddress = "0x2222222222222222222222222222222222222222";
+
+        var mockRestClient = new Mock<IHyperLiquidRestClient>();
+        var mockSocketClient = new Mock<IHyperLiquidSocketClient>();
+        var mockFuturesApi = new Mock<IHyperLiquidSocketClientFuturesApi>();
+        var updateSubscription = (UpdateSubscription)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(UpdateSubscription));
+        string? subscribedAddress = null;
+
+        mockSocketClient.Setup(x => x.FuturesApi).Returns(mockFuturesApi.Object);
+        mockFuturesApi
+            .Setup(x => x.SubscribeToOrderUpdatesAsync(
+                It.IsAny<string?>(),
+                It.IsAny<Action<DataEvent<HyperLiquidOrderStatus[]>>>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string?, Action<DataEvent<HyperLiquidOrderStatus[]>>, CancellationToken>((addr, _, _) =>
+                subscribedAddress = addr)
+            .ReturnsAsync(new CallResult<UpdateSubscription>(updateSubscription));
+
+        var broker = new HyperliquidBroker(
+            mockRestClient.Object,
+            mockSocketClient.Object,
+            GetTickerAliasService(null),
+            address,
+            vaultAddress,
+            _loggerFactory.CreateLogger<HyperliquidBroker>());
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+
+        // act
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+        {
+            await foreach (var _ in broker.SubscribeOrderUpdatesAsync(cts.Token))
+            {
+            }
+        });
+
+        // assert
+        subscribedAddress.ShouldBe(vaultAddress);
+        mockFuturesApi.Verify(
+            x => x.SubscribeToOrderUpdatesAsync(
+                vaultAddress,
+                It.IsAny<Action<DataEvent<HyperLiquidOrderStatus[]>>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    #endregion
+
     [Fact]
     public async Task GivenNullTrades_WhenPlaceTradesAsync_ShouldThrowArgumentNullException()
     {

@@ -29,25 +29,44 @@ public sealed class OrderManager : IOrderManager
 
         var pending = new ConcurrentDictionary<string, OrderTracker>();
         var eventChannel = Channel.CreateUnbounded<ManagerEvent>();
+        using var subscriptionCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var orderUpdates = _broker.SubscribeOrderUpdatesAsync(subscriptionCts.Token);
 
         var subscriptionPump = Task.Run(async () =>
         {
-            await foreach (var evt in _broker.SubscribeOrderUpdatesAsync(ct))
+            try
             {
-                if (pending.ContainsKey(evt.ClientOrderId))
+                await foreach (var evt in orderUpdates.WithCancellation(subscriptionCts.Token))
                 {
-                    await eventChannel.Writer.WriteAsync(new ManagerEvent.Broker(evt), ct);
+                    if (pending.ContainsKey(evt.ClientOrderId))
+                    {
+                        await eventChannel.Writer.WriteAsync(new ManagerEvent.Broker(evt), ct);
+                    }
+                    else
+                    {
+                        _logger.LogWarning(
+                            "Subscription pump: dropping WS event for unknown ClientOrderId={ClientOrderId}",
+                            evt.ClientOrderId);
+                    }
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected when subscription is cancelled after order management completes
             }
         }, ct);
 
         foreach (var t in trades)
         {
-            var trade = string.IsNullOrWhiteSpace(t.ClientOrderId) ? t with { ClientOrderId = Guid.NewGuid().ToString() } : t;
+            var trade = string.IsNullOrWhiteSpace(t.ClientOrderId) ? t with { ClientOrderId = "0x" + Guid.NewGuid().ToString("N") } : t;
             pending[trade.ClientOrderId!] = OrderTracker.Create(trade);
         }
 
         _logger.LogInformation("Managing orders for {TradeCount} trades", pending.Count);
+        _logger.LogInformation(
+            "Order manager configured with UnfilledOrderTimeout={UnfilledOrderTimeout}, SwitchToMarketOnTimeout={SwitchToMarketOnTimeout}",
+            settings.UnfilledOrderTimeout,
+            settings.SwitchToMarketOnTimeout);
 
         await foreach (var placed in _broker.PlaceTradesAsync(pending.Values.Select(x => x.Trade), ct))
         {
@@ -64,6 +83,10 @@ public sealed class OrderManager : IOrderManager
                 pending.TryRemove(doneKey, out _);
             }
         }
+
+        _logger.LogInformation(
+            "After placement: {Count} order(s) awaiting WS fill notifications",
+            pending.Count);
 
         while (!ct.IsCancellationRequested && !pending.IsEmpty)
         {
@@ -83,6 +106,7 @@ public sealed class OrderManager : IOrderManager
         }
 
         eventChannel.Writer.TryComplete();
+        await subscriptionCts.CancelAsync();
         await subscriptionPump;
 
         _logger.LogInformation("Finished managing orders.");
@@ -125,6 +149,10 @@ public sealed class OrderManager : IOrderManager
 
             if (!settings.SwitchToMarketOnTimeout)
             {
+                _logger.LogWarning(
+                    "Order timeout for {ClientOrderId} on {Symbol}: market fallback disabled; emitting TimedOut",
+                    clientOrderId,
+                    tracker.Trade.Symbol);
                 pending.TryRemove(clientOrderId, out _);
                 return new OrderUpdate(
                     tracker.Trade.Symbol,
@@ -140,6 +168,11 @@ public sealed class OrderManager : IOrderManager
                 var remainingAmount = tracker.AmountRemaining;
                 if (remainingAmount <= 0)
                 {
+                    _logger.LogInformation(
+                        "Order timeout for {ClientOrderId} on {Symbol}: remaining amount is {RemainingAmount}; emitting TimedOut",
+                        clientOrderId,
+                        tracker.Trade.Symbol,
+                        remainingAmount);
                     pending.TryRemove(clientOrderId, out _);
                     return new OrderUpdate(
                         tracker.Trade.Symbol,
@@ -148,8 +181,17 @@ public sealed class OrderManager : IOrderManager
                         Message: "Order timed out");
                 }
 
+                var fallbackAmount = tracker.Trade.OrderSide == OrderSide.Sell ? -remainingAmount : remainingAmount;
+
+                _logger.LogInformation(
+                    "Order timeout for {ClientOrderId} on {Symbol}: placing market fallback for remaining amount {RemainingAmount} (fallback trade amount {FallbackAmount})",
+                    clientOrderId,
+                    tracker.Trade.Symbol,
+                    remainingAmount,
+                    fallbackAmount);
+
                 var tradeResult = await _broker.PlaceTradeAsync(
-                    tracker.Trade with { Amount = remainingAmount, LimitPrice = null, OrderType = OrderType.Market },
+                    tracker.Trade with { Amount = fallbackAmount, LimitPrice = null, OrderType = OrderType.Market },
                     ct);
 
                 if (tradeResult.Success && tradeResult.Order is not null)
@@ -248,7 +290,7 @@ public sealed class OrderManager : IOrderManager
 
         internal Trade Trade => _trade;
 
-        internal decimal AmountRemaining => _trade.Amount - _orderHistory.Sum(x => x.Filled.GetValueOrDefault());
+        internal decimal AmountRemaining => Math.Max(0m, _trade.AbsoluteAmount - (CurrentOrder?.Filled ?? 0m));
 
         internal void AddOrder(Order order)
         {
@@ -260,7 +302,7 @@ public sealed class OrderManager : IOrderManager
 
         internal bool IsCompleted()
         {
-            return AmountRemaining <= 0;
+            return CurrentOrder?.IsCompleted() ?? false;
         }
     }
 

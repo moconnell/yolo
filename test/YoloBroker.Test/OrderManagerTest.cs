@@ -141,6 +141,52 @@ public class OrderManagerTest
     }
 
     [Fact]
+    public async Task ManageOrdersAsync_WhenTimedOutSellOrder_ShouldPlaceSellMarketForRemainingAmount()
+    {
+        var trade = CreateLimitTrade(clientOrderId: "c3sell", amount: -10m, limitPrice: 50m);
+        var openOrder = CreateOrder(id: 10031, clientId: "c3sell", status: OrderStatus.Open, amount: 10m, filled: 0m);
+
+        var broker = new Mock<IYoloBroker>();
+        broker.Setup(x => x.SubscribeOrderUpdatesAsync(It.IsAny<CancellationToken>()))
+            .Returns(EmptyEventsAsync);
+        broker.Setup(x => x.PlaceTradesAsync(It.IsAny<IEnumerable<Trade>>(), It.IsAny<CancellationToken>()))
+            .Returns((IEnumerable<Trade> _, CancellationToken _) =>
+                ToAsyncEnumerable(new TradeResult(trade, Success: true, Order: openOrder)));
+        broker.Setup(x => x.CancelOrderAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        broker.Setup(x => x.PlaceTradeAsync(It.IsAny<Trade>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Trade marketTrade, CancellationToken _) =>
+                new TradeResult(
+                    marketTrade,
+                    Success: true,
+                    Order: CreateOrder(
+                        id: 20031,
+                        clientId: marketTrade.ClientOrderId,
+                        status: OrderStatus.Open,
+                        amount: marketTrade.AbsoluteAmount,
+                        filled: 0m)));
+
+        var sut = CreateSut(broker.Object);
+        var settings = new OrderManagementSettings(
+            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20),
+            SwitchToMarketOnTimeout: true,
+            StatusCheckInterval: TimeSpan.FromMilliseconds(10));
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
+        var updates = await CollectUpdatesUntilCanceledAsync(sut.ManageOrdersAsync([trade], settings, cts.Token));
+
+        updates.ShouldContain(x => x.Type == OrderUpdateType.MarketOrderPlaced);
+        broker.Verify(x => x.PlaceTradeAsync(
+                It.Is<Trade>(t =>
+                    t.Symbol == trade.Symbol &&
+                    t.OrderType == OrderType.Market &&
+                    t.LimitPrice == null &&
+                    t.Amount == -10m),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task ManageOrdersAsync_WhenInitialTradeIsMarket_ShouldEmitMarketOrderPlacedAndComplete()
     {
         var trade = new Trade(
@@ -166,6 +212,39 @@ public class OrderManagerTest
 
         updates.Count.ShouldBe(1);
         updates[0].Type.ShouldBe(OrderUpdateType.MarketOrderPlaced);
+    }
+
+    [Fact]
+    public async Task ManageOrdersAsync_ShouldEstablishOrderUpdateSubscriptionBeforePlacingTrades()
+    {
+        var trade = CreateLimitTrade(clientOrderId: "c5", amount: 2m, limitPrice: 100m);
+        var openOrder = CreateOrder(id: 1005, clientId: "c5", status: OrderStatus.Open, amount: 2m, filled: 0m);
+        var subscriptionReady = false;
+
+        var broker = new Mock<IYoloBroker>();
+        broker.Setup(x => x.SubscribeOrderUpdatesAsync(It.IsAny<CancellationToken>()))
+            .Returns((CancellationToken ct) =>
+            {
+                Thread.Sleep(50);
+                subscriptionReady = true;
+                return EmptyEventsAsync(ct);
+            });
+        broker.Setup(x => x.PlaceTradesAsync(It.IsAny<IEnumerable<Trade>>(), It.IsAny<CancellationToken>()))
+            .Returns((IEnumerable<Trade> _, CancellationToken _) =>
+            {
+                subscriptionReady.ShouldBeTrue();
+                return ToAsyncEnumerable(new TradeResult(trade, Success: true, Order: openOrder));
+            });
+
+        var sut = CreateSut(broker.Object);
+        var settings = new OrderManagementSettings(
+            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20),
+            SwitchToMarketOnTimeout: false,
+            StatusCheckInterval: TimeSpan.FromMilliseconds(10));
+
+        var updates = await CollectUpdatesAsync(sut.ManageOrdersAsync([trade], settings));
+
+        updates.ShouldContain(x => x.Type == OrderUpdateType.Created);
     }
 
     private static OrderManager CreateSut(IYoloBroker broker)
