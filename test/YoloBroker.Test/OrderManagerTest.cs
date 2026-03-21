@@ -28,7 +28,8 @@ public class OrderManagerTest
 
         var sut = CreateSut(broker.Object);
         var settings = new OrderManagementSettings(
-            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20));
+            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20),
+            MaxRepriceRetries: 2);
 
         var updates = await CollectUpdatesAsync(sut.ManageOrdersAsync([trade], settings, CreateAdvisor(null)));
 
@@ -62,7 +63,8 @@ public class OrderManagerTest
 
         var sut = CreateSut(broker.Object);
         var settings = new OrderManagementSettings(
-            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20));
+            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20),
+            MaxRepriceRetries: 2);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
         var updates = await CollectUpdatesUntilCanceledAsync(sut.ManageOrdersAsync([trade], settings, CreateAdvisor(replacementTrade), cts.Token));
@@ -96,7 +98,8 @@ public class OrderManagerTest
 
         var sut = CreateSut(broker.Object);
         var settings = new OrderManagementSettings(
-            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20));
+            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20),
+            MaxRepriceRetries: 2);
 
         var updates = await CollectUpdatesAsync(sut.ManageOrdersAsync([trade], settings, CreateAdvisor(null)));
 
@@ -126,7 +129,8 @@ public class OrderManagerTest
 
         var sut = CreateSut(broker.Object);
         var settings = new OrderManagementSettings(
-            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20));
+            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20),
+            MaxRepriceRetries: 2);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
         var updates = await CollectUpdatesUntilCanceledAsync(sut.ManageOrdersAsync([trade], settings, CreateAdvisor(trade with { Amount = 5m, OrderType = OrderType.Market, LimitPrice = null }), cts.Token));
@@ -165,7 +169,8 @@ public class OrderManagerTest
 
         var sut = CreateSut(broker.Object);
         var settings = new OrderManagementSettings(
-            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20));
+            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20),
+            MaxRepriceRetries: 2);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
         var updates = await CollectUpdatesUntilCanceledAsync(sut.ManageOrdersAsync([trade], settings, CreateAdvisor(replacementTrade), cts.Token));
@@ -255,7 +260,7 @@ public class OrderManagerTest
                     Order: CreateOrder(id: 1004, clientId: "c4", status: OrderStatus.Filled, amount: 2m, filled: 2m))));
 
         var sut = CreateSut(broker.Object);
-        var updates = await CollectUpdatesAsync(sut.ManageOrdersAsync([trade], OrderManagementSettings.Default, CreateAdvisor(null)));
+        var updates = await CollectUpdatesAsync(sut.ManageOrdersAsync([trade], new OrderManagementSettings(TimeSpan.FromMilliseconds(20), 1), CreateAdvisor(null)));
 
         updates.Count.ShouldBe(1);
         updates[0].Type.ShouldBe(OrderUpdateType.MarketOrderPlaced);
@@ -285,7 +290,8 @@ public class OrderManagerTest
 
         var sut = CreateSut(broker.Object);
         var settings = new OrderManagementSettings(
-            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20));
+            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20),
+            MaxRepriceRetries: 2);
 
         var updates = await CollectUpdatesAsync(sut.ManageOrdersAsync([trade], settings, CreateAdvisor(null)));
 

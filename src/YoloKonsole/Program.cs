@@ -186,13 +186,10 @@ __  ______  __    ____  __
                 {
                     ctx.UpdateTarget(table);
 
-                    var settings = OrderManagementSettings.Default with
-                    {
-                        UnfilledOrderTimeout = TimeSpan.TryParse(yoloConfig.UnfilledOrderTimeout, out var timeout)
-                            ? timeout
-                            : OrderManagementSettings.Default.UnfilledOrderTimeout,
-                        MaxRepriceRetries = yoloConfig.MaxRepriceRetries
-                    };
+                    var settings = new OrderManagementSettings(
+                        UnfilledOrderTimeout: TimeSpan.Parse(yoloConfig.UnfilledOrderTimeout),
+                        MaxRepriceRetries: yoloConfig.MaxRepriceRetries
+                    );
 
                     var advisor = new TradeAdvisor(weights, tradeFactory, broker, yoloConfig.BaseAsset, yoloConfig.AssetPermissions);
 
