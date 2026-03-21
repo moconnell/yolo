@@ -8,6 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using YoloAbstractions;
+using YoloAbstractions.Config;
+using YoloAbstractions.Interfaces;
 using YoloBroker.Interface;
 using YoloFunk.Dto;
 using YoloFunk.Functions;
@@ -50,6 +52,85 @@ public class EffectiveWeightsFunctionBaseTest
         payload.ShouldNotBeNull();
         payload.Strategy.ShouldBe("test");
         payload.Error.ShouldBe("Invalid strategy configuration");
+    }
+
+    [Fact]
+    public async Task GivenValidStrategyServices_WhenRun_ShouldReturnEffectiveWeights()
+    {
+        const string strategy = "test";
+        var accountContext = new BrokerAccountContext("0x1111111111111111111111111111111111111111", null);
+
+        var broker = new Mock<IYoloBroker>();
+        broker.Setup(x => x.GetAccountContext()).Returns(accountContext);
+        broker.Setup(x => x.GetPositionsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, IReadOnlyList<Position>>
+            {
+                ["SOL"] =
+                [
+                    new Position("SOL-PERP", "SOL", AssetType.Future, 2m)
+                ]
+            });
+        broker.Setup(x => x.GetMarketsAsync(
+                It.IsAny<ISet<string>?>(),
+                It.IsAny<string?>(),
+                It.IsAny<AssetPermissions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, IReadOnlyList<MarketInfo>>
+            {
+                ["SOL"] =
+                [
+                    new MarketInfo(
+                        Name: "SOL-PERP",
+                        BaseAsset: "SOL",
+                        QuoteAsset: "USDC",
+                        AssetType: AssetType.Future,
+                        TimeStamp: DateTime.UtcNow,
+                        Ask: 100m,
+                        Bid: 99m,
+                        Last: 99.5m,
+                        PriceStep: 0.1m,
+                        QuantityStep: 0.01m,
+                        MinProvideSize: 0.01m)
+                ]
+            });
+
+        var weights = new Mock<ICalcWeights>();
+        weights.Setup(x => x.CalculateWeightsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, decimal>
+            {
+                ["SOL"] = 0.4m
+            });
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddOptions<WorkerOptions>()
+            .Configure(options => options.Serializer = new JsonObjectSerializer());
+        services.AddKeyedSingleton(strategy, broker.Object);
+        services.AddKeyedSingleton(strategy, weights.Object);
+        services.AddKeyedSingleton(strategy, new YoloConfig
+        {
+            BaseAsset = "USDC",
+            NominalCash = 1000m,
+            MaxLeverage = 2m,
+            TradeBuffer = 0.01m,
+            RebalanceMode = RebalanceMode.Center,
+            AssetPermissions = AssetPermissions.All
+        });
+
+        using var provider = services.BuildServiceProvider();
+        var request = TestHttpRequestData.Create("GET", "http://localhost/api/rebalance/test/effective-weights", provider);
+        var sut = new EffectiveWeightsFunctionHarness(request.FunctionContext.InstanceServices, NullLogger<EffectiveWeightsFunctionHarness>.Instance);
+
+        var response = await sut.Run(request, CancellationToken.None);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var payload = await TestHttpRequestData.ReadJsonAsync<EffectiveWeightsResponse>(response);
+        payload.ShouldNotBeNull();
+        payload.Strategy.ShouldBe(strategy);
+        payload.Address.ShouldBe(accountContext.Address);
+        payload.Nominal.ShouldBe(1000m);
+        payload.Weights.ShouldNotBeEmpty();
+        payload.Weights.ShouldContain(x => x.Token == "SOL");
     }
 
     private sealed class EffectiveWeightsFunctionHarness(IServiceProvider serviceProvider, ILogger<EffectiveWeightsFunctionHarness> logger)

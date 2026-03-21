@@ -41,4 +41,35 @@ public class EffectiveWeightsResponseTest
         response.Weights[0].Token.ShouldBe("SOL");
         response.Weights[0].HasTradableMarket.ShouldBeTrue();
     }
+
+    [Fact]
+    public void Constructor_ShouldAllowNullablesAndFalseFlags()
+    {
+        var items = new[]
+        {
+            new EffectiveWeightItem(
+                Token: "BTC",
+                RawTargetWeight: 0m,
+                ConstrainedTargetWeight: 0m,
+                CurrentWeight: null,
+                EffectiveWeight: null,
+                DeltaWeight: null,
+                IsInUniverse: false,
+                WithinTradeBuffer: false,
+                HasTradableMarket: false)
+        };
+
+        var response = new EffectiveWeightsResponse(
+            Strategy: "unraveldaily",
+            Address: "0xabc",
+            VaultAddress: null,
+            GeneratedAtUtc: DateTime.UtcNow,
+            Nominal: 0m,
+            WeightConstraint: 1m,
+            Weights: items);
+
+        response.VaultAddress.ShouldBeNull();
+        response.Weights.Single().CurrentWeight.ShouldBeNull();
+        response.Weights.Single().HasTradableMarket.ShouldBeFalse();
+    }
 }
