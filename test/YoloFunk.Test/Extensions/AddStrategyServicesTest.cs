@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using YoloAbstractions.Exceptions;
 using YoloAbstractions.Interfaces;
 using YoloApp.Commands;
 using YoloBroker.Interface;
@@ -63,7 +64,7 @@ public class AddStrategyServicesTest
 
         var services = new ServiceCollection();
 
-        Should.Throw<Exception>(() =>
+        Should.Throw<ConfigException>(() =>
             services.AddStrategy(config, "test", "Strategies:Test"));
     }
 
