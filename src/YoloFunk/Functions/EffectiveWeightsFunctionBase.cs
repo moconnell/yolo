@@ -77,6 +77,21 @@ public abstract class EffectiveWeightsFunctionBase
                 cancellationToken);
             return response;
         }
+        catch (DuplicateBaseAssetWeightsException ex)
+        {
+            _logger.LogWarning(ex,
+                "Invalid raw weights for strategy {Strategy}",
+                StrategyKey);
+
+            var errorResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+            await errorResponse.WriteAsJsonAsync(
+                new RebalanceErrorResponse(
+                    StrategyKey,
+                    "Invalid raw weights",
+                    ex.Message),
+                cancellationToken);
+            return errorResponse;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex,
@@ -101,9 +116,29 @@ public abstract class EffectiveWeightsFunctionBase
         YoloConfig yoloConfig,
         decimal nominal)
     {
-        var factors = rawWeights.ToDictionary(
-            kvp => kvp.Key.GetBaseAndQuoteAssets().BaseAsset,
-            kvp => (Weight: kvp.Value, IsInUniverse: true));
+        var groupedWeights = rawWeights
+            .GroupBy(kvp => kvp.Key.GetBaseAndQuoteAssets().BaseAsset, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var duplicateGroups = groupedWeights
+            .Where(group => group.Count() > 1)
+            .ToArray();
+
+        if (duplicateGroups.Length > 0)
+        {
+            var duplicatesDescription = string.Join(
+                "; ",
+                duplicateGroups.Select(group =>
+                    $"{group.Key}: {string.Join(", ", group.Select(x => x.Key).OrderBy(x => x, StringComparer.OrdinalIgnoreCase))}"));
+
+            throw new DuplicateBaseAssetWeightsException(
+                $"Duplicate raw weight symbols normalize to the same base asset: {duplicatesDescription}");
+        }
+
+        var factors = groupedWeights.ToDictionary(
+            group => group.Key,
+            group => (Weight: group.Sum(x => x.Value), IsInUniverse: true),
+            StringComparer.OrdinalIgnoreCase);
 
         var unconstrainedTargetLeverage = factors
             .Values
@@ -187,5 +222,7 @@ public abstract class EffectiveWeightsFunctionBase
         currentWeight > idealWeight
             ? idealWeight + tradeBuffer
             : idealWeight - tradeBuffer;
+
+    private sealed class DuplicateBaseAssetWeightsException(string message) : InvalidOperationException(message);
 
 }
