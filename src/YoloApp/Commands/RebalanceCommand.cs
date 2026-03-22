@@ -1,6 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
-
-using System.Threading.Channels;
+﻿using System.Threading.Channels;
 
 using YoloAbstractions;
 using YoloAbstractions.Config;
@@ -8,7 +6,10 @@ using YoloAbstractions.Extensions;
 using YoloAbstractions.Interfaces;
 using YoloApp.Extensions;
 using YoloBroker.Interface;
+using YoloTrades;
+
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 
 namespace YoloApp.Commands;
 
@@ -16,24 +17,28 @@ public class RebalanceCommand : ICommand
 {
     private readonly ICalcWeights _weightsService;
     private readonly ITradeFactory _tradeFactory;
+    private readonly IOrderManager _orderManager;
     private readonly IYoloBroker _broker;
     private readonly YoloConfig _yoloConfig;
     private readonly ILogger<RebalanceCommand> _logger;
-    public RebalanceCommand(ICalcWeights weightsService, ITradeFactory tradeFactory, IYoloBroker broker, IOptions<YoloConfig> options, ILogger<RebalanceCommand> logger)
-        : this(weightsService, tradeFactory, broker, options.Value, logger)
+
+    public RebalanceCommand(ICalcWeights weightsService, ITradeFactory tradeFactory, IOrderManager orderManager, IYoloBroker broker, IOptions<YoloConfig> options, ILogger<RebalanceCommand> logger)
+        : this(weightsService, tradeFactory, orderManager, broker, options.Value, logger)
     {
     }
 
-    public RebalanceCommand(ICalcWeights weightsService, ITradeFactory tradeFactory, IYoloBroker broker, YoloConfig yoloConfig, ILogger<RebalanceCommand> logger)
+    public RebalanceCommand(ICalcWeights weightsService, ITradeFactory tradeFactory, IOrderManager orderManager, IYoloBroker broker, YoloConfig yoloConfig, ILogger<RebalanceCommand> logger)
     {
         ArgumentNullException.ThrowIfNull(weightsService, nameof(weightsService));
         ArgumentNullException.ThrowIfNull(tradeFactory, nameof(tradeFactory));
+        ArgumentNullException.ThrowIfNull(orderManager, nameof(orderManager));
         ArgumentNullException.ThrowIfNull(broker, nameof(broker));
         ArgumentNullException.ThrowIfNull(yoloConfig, nameof(yoloConfig));
         ArgumentNullException.ThrowIfNull(logger, nameof(logger));
 
         _weightsService = weightsService;
         _tradeFactory = tradeFactory;
+        _orderManager = orderManager;
         _broker = broker;
         _yoloConfig = yoloConfig;
         _logger = logger;
@@ -90,18 +95,14 @@ public class RebalanceCommand : ICommand
             return;
         }
 
-        var settings = OrderManagementSettings.Default with
-        {
-            UnfilledOrderTimeout = TimeSpan.TryParse(_yoloConfig.UnfilledOrderTimeout, out var timeout)
-                ? timeout
-                : OrderManagementSettings.Default.UnfilledOrderTimeout
-        };
+        var settings = new OrderManagementSettings(TimeSpan.Parse(_yoloConfig.UnfilledOrderTimeout), _yoloConfig.MaxRepriceRetries);
+        var advisor = new TradeAdvisor(weights, _tradeFactory, _broker, _yoloConfig.BaseAsset, _yoloConfig.AssetPermissions);
 
-        _logger.LogInformation("Managing orders for {TradeCount} trades", trades.Length);
+        _logger.LogInformation("Order management settings: {Settings}, Advisor={AdvisorType}", settings, advisor.GetType().Name);
 
         try
         {
-            await foreach (var update in _broker.ManageOrdersAsync(trades, settings, cancellationToken))
+            await foreach (var update in _orderManager.ManageOrdersAsync(trades, settings, advisor, cancellationToken))
             {
                 if (update.Type == OrderUpdateType.Error)
                 {

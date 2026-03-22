@@ -27,7 +27,7 @@ public record Trade(
             return false;
 
         // Ensure the order value meets the minimum requirement
-        return ReduceOnly == true || !minOrderValue.HasValue || !LimitPrice.HasValue || !(AbsoluteAmount * LimitPrice.Value < minOrderValue);
+        return !minOrderValue.HasValue || !LimitPrice.HasValue || !(AbsoluteAmount * LimitPrice.Value < minOrderValue);
     }
 
     public decimal AbsoluteAmount => Math.Abs(Amount);

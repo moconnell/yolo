@@ -48,6 +48,8 @@ public static class AddStrategyServices
             throw new ConfigException($"Strategy '{strategyKey}' missing Hyperliquid broker configuration");
         }
 
+        services.AddKeyedSingleton(strategyKey, hyperliquidConfig);
+
         var throwOnMissingData = !hyperliquidConfig.UseTestnet;
 
         services.AddKeyedSingleton<IYoloBroker>(strategyKey, (sp, key) =>
@@ -83,6 +85,12 @@ public static class AddStrategyServices
                 tickerAliasService,
                 hyperliquidConfig,
                 sp.GetRequiredService<ILogger<HyperliquidBroker>>());
+        });
+
+        services.AddKeyedSingleton<IOrderManager>(strategyKey, (sp, key) =>
+        {
+            var broker = sp.GetRequiredKeyedService<IYoloBroker>(strategyKey);
+            return new OrderManager(broker, sp.GetRequiredService<ILogger<OrderManager>>());
         });
 
         // Register factor providers for this strategy
@@ -166,6 +174,7 @@ public static class AddStrategyServices
             return new RebalanceCommand(
                 sp.GetRequiredKeyedService<ICalcWeights>(strategyKey),
                 sp.GetRequiredKeyedService<ITradeFactory>(strategyKey),
+                sp.GetRequiredKeyedService<IOrderManager>(strategyKey),
                 sp.GetRequiredKeyedService<IYoloBroker>(strategyKey),
                 sp.GetRequiredKeyedService<YoloConfig>(strategyKey),
                 sp.GetRequiredService<ILogger<RebalanceCommand>>());

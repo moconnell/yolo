@@ -83,7 +83,9 @@ __  ______  __    ____  __
             var yoloConfig = config.GetYoloConfig() ??
                              throw new ConfigException("YOLO configuration is missing or invalid");
 
-            using var broker = serviceProvider.GetService<IYoloBroker>()!;
+            var orderManager = serviceProvider.GetRequiredService<IOrderManager>();
+
+            using var broker = serviceProvider.GetRequiredService<IYoloBroker>();
             var orders = await broker.GetOpenOrdersAsync(cancellationToken);
 
             if (orders.Count != 0)
@@ -184,18 +186,18 @@ __  ______  __    ____  __
                 {
                     ctx.UpdateTarget(table);
 
-                    var settings = OrderManagementSettings.Default with
-                    {
-                        UnfilledOrderTimeout = TimeSpan.TryParse(yoloConfig.UnfilledOrderTimeout, out var timeout)
-                            ? timeout
-                            : OrderManagementSettings.Default.UnfilledOrderTimeout
-                    };
+                    var settings = new OrderManagementSettings(
+                        UnfilledOrderTimeout: TimeSpan.Parse(yoloConfig.UnfilledOrderTimeout),
+                        MaxRepriceRetries: yoloConfig.MaxRepriceRetries
+                    );
+
+                    var advisor = new TradeAdvisor(weights, tradeFactory, broker, yoloConfig.BaseAsset, yoloConfig.AssetPermissions);
 
                     _logger.LogInformation("Managing orders for {TradeCount} trades", trades.Length);
 
                     try
                     {
-                        await foreach (var update in broker.ManageOrdersAsync(trades, settings, cancellationToken))
+                        await foreach (var update in orderManager.ManageOrdersAsync(trades, settings, advisor, cancellationToken))
                         {
                             UpdateOrderTable(table, index, update);
 

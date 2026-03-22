@@ -1,13 +1,13 @@
 namespace YoloBroker.Exceptions;
 
-public abstract class BrokerException : ApplicationException
+public class BrokerException : ApplicationException
 {
-    protected BrokerException(string message)
+    public BrokerException(string message)
         : base(message)
     {
     }
 
-    protected BrokerException(string message, Exception innerException)
+    public BrokerException(string message, Exception innerException)
         : base(message, innerException)
     {
     }

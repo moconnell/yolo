@@ -212,6 +212,52 @@ Center  // (default)
 Edge
 ```
 
+## Azure Functions - Effective Weights Verification
+
+The function app exposes verification endpoints that calculate and return effective rebalance weights using each strategy's configured Hyperliquid account context.
+
+Routes:
+
+- `GET /api/rebalance/yolodaily/effective-weights`
+- `GET /api/rebalance/unraveldaily/effective-weights`
+
+The account context is taken from:
+
+- `Strategies.<Strategy>.Hyperliquid.Address`
+- `Strategies.<Strategy>.Hyperliquid.VaultAddress`
+
+Notes:
+
+- Endpoints use `AuthorizationLevel.Function`.
+- Callers cannot override `address` or `vault` via query parameters.
+- Response includes both raw target and constrained/effective weights to validate rebalance behavior.
+
+Example response shape:
+
+```json
+{
+  "strategy": "yolodaily",
+  "address": "0x...",
+  "vaultAddress": "0x...",
+  "generatedAtUtc": "2026-02-23T12:34:56Z",
+  "nominal": 100000.0,
+  "weightConstraint": 0.85,
+  "weights": [
+    {
+      "token": "BTC",
+      "rawTargetWeight": 0.12,
+      "constrainedTargetWeight": 0.102,
+      "currentWeight": 0.09,
+      "effectiveWeight": 0.102,
+      "deltaWeight": 0.012,
+      "isInUniverse": true,
+      "withinTradeBuffer": false,
+      "hasTradableMarket": true
+    }
+  ]
+}
+```
+
 ### Yolo/SpreadSplit
 
 This setting determines the placement of the limit price within the bid-ask price spread and can take any value between 0 and 1 (values greater than 1 will be treated as 1).

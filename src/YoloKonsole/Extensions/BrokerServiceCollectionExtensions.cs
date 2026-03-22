@@ -1,9 +1,7 @@
 using CryptoExchange.Net.Authentication;
 using HyperLiquid.Net;
-using HyperLiquid.Net.Interfaces.Clients;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using YoloAbstractions.Exceptions;
 using YoloAbstractions.Interfaces;
 using YoloBroker;
@@ -36,6 +34,7 @@ public static class BrokerServiceCollectionExtensions
 
             services.AddSingleton<ITickerAliasService>(new TickerAliasService(hyperliquidConfig.Aliases));
             services.AddSingleton<IYoloBroker, HyperliquidBroker>();
+            services.AddSingleton<IOrderManager, OrderManager>();
             services.AddSingleton<IGetFactors, BrokerVolatilityFactorService>();
 
             return services;

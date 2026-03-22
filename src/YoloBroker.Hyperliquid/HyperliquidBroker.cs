@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading.Channels;
@@ -36,6 +35,7 @@ public sealed class HyperliquidBroker : IYoloBroker
     private readonly IHyperLiquidRestClient _hyperliquidClient;
     private readonly IHyperLiquidSocketClient _hyperliquidSocketClient;
     private readonly ITickerAliasService _tickerAliasService;
+    private readonly string? _address;
     private readonly string? _vaultAddress;
     private readonly ILogger<HyperliquidBroker> _logger;
 
@@ -62,6 +62,7 @@ public sealed class HyperliquidBroker : IYoloBroker
             hyperliquidClient,
             hyperliquidSocketClient,
             tickerAliasService,
+            config.Address,
             config.VaultAddress,
             logger)
     {
@@ -72,17 +73,39 @@ public sealed class HyperliquidBroker : IYoloBroker
         IHyperLiquidSocketClient hyperliquidSocketClient,
         ITickerAliasService tickerAliasService,
         string? vaultAddress,
+        ILogger<HyperliquidBroker> logger) : this(
+            hyperliquidClient,
+            hyperliquidSocketClient,
+            tickerAliasService,
+            null,
+            vaultAddress,
+            logger)
+    {
+    }
+
+    public HyperliquidBroker(
+        IHyperLiquidRestClient hyperliquidClient,
+        IHyperLiquidSocketClient hyperliquidSocketClient,
+        ITickerAliasService tickerAliasService,
+        string? address,
+        string? vaultAddress,
         ILogger<HyperliquidBroker> logger)
     {
         _hyperliquidClient = hyperliquidClient;
         _hyperliquidSocketClient = hyperliquidSocketClient;
         _tickerAliasService = tickerAliasService;
+        _address = address.IsValidEthereumAddressHexFormat() && !address.IsAnEmptyAddress()
+            ? address
+            : null;
         _vaultAddress = vaultAddress.IsValidEthereumAddressHexFormat() && !vaultAddress.IsAnEmptyAddress()
             ? vaultAddress
             : null;
         _logger = logger;
+        _logger.LogInformation(
+            "Initialized HyperliquidBroker with address: {Address}, vaultAddress: {VaultAddress}, net",
+            _address ?? "null",
+            _vaultAddress ?? "null");
     }
-
 
     public void Dispose()
     {
@@ -93,6 +116,19 @@ public sealed class HyperliquidBroker : IYoloBroker
     ~HyperliquidBroker()
     {
         Dispose(false);
+    }
+
+    public BrokerAccountContext GetAccountContext() => new(_address, _vaultAddress);
+
+    public async Task<IReadOnlyList<decimal>> GetDailyClosePricesAsync(
+        string ticker,
+        int periods,
+        bool includeToday = false,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(ticker, nameof(ticker));
+        var klines = await GetDailyPriceHistoryAsync(ticker, periods, includeToday, ct);
+        return [.. klines.Select(x => x.ClosePrice)];
     }
 
     public async Task<TradeResult> PlaceTradeAsync(Trade trade, CancellationToken ct = default)
@@ -142,6 +178,8 @@ public sealed class HyperliquidBroker : IYoloBroker
         var spotTrades = tradeArray.Where(t => t.AssetType == AssetType.Spot).ToList();
         var futuresTrades = tradeArray.Where(t => t.AssetType == AssetType.Future).ToList();
 
+        _logger.LogInformation("Placing {SpotCount} spot trades and {FuturesCount} futures trades", spotTrades.Count, futuresTrades.Count);
+
         var spotTask = spotTrades.Count != 0
             ? PlaceSpotOrdersAsync(spotTrades, ct)
             : Task.FromResult(new WebCallResultWrapper<IReadOnlyList<OrderResult>>(true, null, null, []));
@@ -153,12 +191,15 @@ public sealed class HyperliquidBroker : IYoloBroker
         await Task.WhenAll(spotTask, futuresTask);
 
         var spotResult = spotTask.Result;
+        _logger.LogInformation("Processing spot order results for {Count} trades", spotResult.OrderResult.Count);
         for (var i = 0; i < spotResult.OrderResult.Count; i++)
         {
             var or = spotResult.OrderResult[i];
             var t = spotTrades[i];
 
-            yield return spotResult.Success
+            var orderSuccess = spotResult.Success && or.Success;
+
+            yield return orderSuccess
                 ? new TradeResult(
                     t,
                     true,
@@ -177,8 +218,8 @@ public sealed class HyperliquidBroker : IYoloBroker
                     t,
                     false,
                     null,
-                    spotResult.Error?.Message,
-                    spotResult.Error?.Code);
+                    or.ErrorMessage ?? spotResult.Error?.Message,
+                    or.ErrorCode ?? spotResult.Error?.Code);
         }
 
         if (futuresTrades.Count == 0)
@@ -187,12 +228,15 @@ public sealed class HyperliquidBroker : IYoloBroker
         }
 
         var futuresResult = futuresTask.Result;
+        _logger.LogInformation("Processing futures order results for {Count} trades", futuresResult.OrderResult.Count);
         for (var i = 0; i < futuresResult.OrderResult.Count; i++)
         {
             var or = futuresResult.OrderResult[i];
             var t = futuresTrades[i];
 
-            yield return futuresResult.Success
+            var orderSuccess = futuresResult.Success && or.Success;
+
+            yield return orderSuccess
                 ? new TradeResult(
                     t,
                     true,
@@ -211,94 +255,56 @@ public sealed class HyperliquidBroker : IYoloBroker
                     t,
                     false,
                     null,
-                    futuresResult.Error?.Message,
-                    futuresResult.Error?.Code);
+                    or.ErrorMessage ?? futuresResult.Error?.Message,
+                    or.ErrorCode ?? futuresResult.Error?.Code);
         }
     }
 
-    public async Task<IReadOnlyList<decimal>> GetDailyClosePricesAsync(
-        string ticker,
-        int periods,
-        bool includeToday = false,
-        CancellationToken ct = default)
+    public async IAsyncEnumerable<BrokerOrderEvent> SubscribeOrderUpdatesAsync([EnumeratorCancellation] CancellationToken ct = default)
     {
-        ArgumentException.ThrowIfNullOrEmpty(ticker, nameof(ticker));
-        var klines = await GetDailyPriceHistoryAsync(ticker, periods, includeToday, ct);
-        return [.. klines.Select(x => x.ClosePrice)];
-    }
-
-    public async IAsyncEnumerable<OrderUpdate> ManageOrdersAsync(
-        IEnumerable<Trade> trades,
-        OrderManagementSettings settings,
-        [EnumeratorCancellation] CancellationToken ct = default)
-    {
-        ArgumentNullException.ThrowIfNull(trades);
-        ArgumentNullException.ThrowIfNull(settings);
-
-        var tradeArray = trades as Trade[] ?? [.. trades];
-        if (tradeArray.Length == 0)
-        {
-            yield break;
-        }
-
-        var updateChannel = Channel.CreateUnbounded<OrderUpdate>(
+        var tradeResultUpdateChannel = Channel.CreateUnbounded<BrokerOrderEvent>(
             new UnboundedChannelOptions
             {
                 SingleReader = true,
-                SingleWriter = true
             });
 
-        var orderTrackers = new ConcurrentDictionary<long, OrderTracker>();
-        var pendingOrderUpdates = new ConcurrentDictionary<long, HyperLiquidOrderStatus>();
+        var subscriptionAddress = _vaultAddress ?? _address;
 
-        var spotOrderUpdatesSub = await CallAsync(
-            () => _hyperliquidSocketClient.SpotApi.SubscribeToOrderUpdatesAsync(null, HandleOrderStatusUpdates, ct),
-            "Could not subscribe to spot order updates");
+        _logger.LogInformation(
+            "Subscribing to Hyperliquid order updates for address {Address}",
+            subscriptionAddress ?? "(api credential default)");
 
-        var futuresOrderUpdatesSub = await CallAsync(
-            () => _hyperliquidSocketClient.FuturesApi.SubscribeToOrderUpdatesAsync(null, HandleOrderStatusUpdates, ct),
+        var subscription = await CallAsync<UpdateSubscription>(
+            () => _hyperliquidSocketClient.FuturesApi.SubscribeToOrderUpdatesAsync(
+                subscriptionAddress,
+                HandleOrderStatusUpdates,
+                ct),
             "Could not subscribe to futures order updates");
 
-        _logger.LogDebug("Subscribed to spot and futures order & trade updates");
+        _logger.LogInformation("Subscribed to Hyperliquid order updates");
 
         try
         {
-            // Place initial limit orders
-            await foreach (var result in PlaceTradesAsync(tradeArray, ct))
+            await foreach (var orderEvent in tradeResultUpdateChannel.Reader.ReadAllAsync(ct))
             {
-                AddOrderTracker(result);
-                var update = ToOrderUpdate(result);
-                _logger.LogDebug("Returning OrderUpdate {OrderUpdate}", update);
-                yield return update;
+                yield return orderEvent;
             }
-
-            // Start timeout checking task
-            var timeoutTask = StartTimeoutMonitoringTask(settings, updateChannel, orderTrackers, ct);
-
-            // If all orders already completed (e.g., filled immediately before trackers were registered),
-            // complete the channel now rather than waiting for the timeout monitor's next tick
-            if (orderTrackers.IsEmpty)
-            {
-                updateChannel.Writer.TryComplete();
-            }
-
-            await foreach (var update in updateChannel.Reader.ReadAllAsync(ct))
-            {
-                _logger.LogDebug("Returning OrderUpdate {OrderUpdate}", update);
-                yield return update;
-            }
-
-            await timeoutTask;
         }
         finally
         {
-            updateChannel.Writer.TryComplete();
-            if (spotOrderUpdatesSub != null) await spotOrderUpdatesSub.CloseAsync();
-            if (futuresOrderUpdatesSub != null) await futuresOrderUpdatesSub.CloseAsync();
-            _logger.LogDebug("Unsubscribed from spot and futures order updates");
+            try
+            {
+                await subscription.CloseAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to close Hyperliquid order updates subscription cleanly");
+            }
+            finally
+            {
+                tradeResultUpdateChannel.Writer.TryComplete();
+            }
         }
-
-        yield break;
 
         void HandleOrderStatusUpdates(DataEvent<HyperLiquidOrderStatus[]> e)
         {
@@ -308,259 +314,69 @@ public sealed class HyperliquidBroker : IYoloBroker
                 return;
             }
 
+            _logger.LogInformation(
+                "Received Hyperliquid WS order status callback with {Count} update(s)",
+                e.Data.Length);
+
             foreach (var update in e.Data)
             {
-                if (!orderTrackers.ContainsKey(update.Order.OrderId))
-                {
-                    _logger.LogWarning(
-                        "Received order update for unknown order {OrderId}: {Update}",
-                        update.Order.OrderId,
-                        update);
-                    // Buffer the update so it can be replayed when AddOrderTracker registers this order.
-                    // If multiple events arrive before registration, the latest one is kept; this is safe
-                    // because the most recent status (e.g., Filled after PartiallyFilled) is the one
-                    // that matters for correct order handling.
-                    pendingOrderUpdates[update.Order.OrderId] = update;
-                    continue;
-                }
-
                 HandleSingleOrderUpdate(update);
-            }
-
-            if (orderTrackers.IsEmpty && pendingOrderUpdates.IsEmpty)
-            {
-                updateChannel.Writer.TryComplete();
             }
         }
 
         void HandleSingleOrderUpdate(HyperLiquidOrderStatus update)
         {
-            if (!orderTrackers.TryGetValue(update.Order.OrderId, out var tracker))
+            if (string.IsNullOrEmpty(update.Order.ClientOrderId) || string.IsNullOrEmpty(update.Order.Symbol))
             {
-                _logger.LogDebug(
-                    "Order {OrderId} tracker not found during update processing; order may have already completed",
-                    update.Order.OrderId);
+                _logger.LogWarning(
+                    "Ignoring order update missing client order id or symbol. OrderId={OrderId}, Symbol={Symbol}, ClientOrderId={ClientOrderId}",
+                    update.Order.OrderId,
+                    update.Order.Symbol,
+                    update.Order.ClientOrderId);
                 return;
             }
+
+            _logger.LogInformation(
+                "Received Hyperliquid order update: ClientOrderId={ClientOrderId}, OrderId={OrderId}, Symbol={Symbol}, Status={Status}",
+                update.Order.ClientOrderId,
+                update.Order.OrderId,
+                update.Order.Symbol,
+                update.Status);
 
             var orderStatus = update.Status.ToYoloOrderStatus();
-            var newOrder = tracker.Order with
+            var success = orderStatus switch
             {
-                Filled = tracker.Order.Amount - update.Order.QuantityRemaining,
-                OrderStatus = orderStatus
+                OrderStatus.Canceled or OrderStatus.MarginCanceled or OrderStatus.Rejected => false,
+                _ => true
             };
 
-            orderTrackers[tracker.Order.Id] = tracker with
+            var filledQuantity = Math.Max(0m, update.Order.Quantity - update.Order.QuantityRemaining);
+
+            var order = new Order(
+                update.Order.OrderId,
+                update.Order.Symbol,
+                update.Order.SymbolType.ToYolo(),
+                update.Order.Timestamp,
+                update.Order.OrderSide.ToYolo(),
+                orderStatus,
+                update.Order.Quantity,
+                filledQuantity,
+                update.Order.Price,
+                update.Order.ClientOrderId);
+
+            var e = new BrokerOrderEvent(
+                update.Order.ClientOrderId,
+                order,
+                success,
+                success ? null : orderStatus.ToString());
+
+            if (!tradeResultUpdateChannel.Writer.TryWrite(e))
             {
-                Order = newOrder
-            };
-
-            var message = update.Status.ToString();
-
-            switch (orderStatus)
-            {
-                case OrderStatus.Filled:
-                    updateChannel.Writer.TryWrite(
-                        new OrderUpdate(newOrder.Symbol, OrderUpdateType.Filled, newOrder, Message: message));
-                    RemoveOrderTracker(tracker.MarkComplete().Order.Id);
-                    break;
-
-                case OrderStatus.Canceled:
-                case OrderStatus.MarginCanceled:
-                case OrderStatus.Rejected:
-                    updateChannel.Writer.TryWrite(
-                        new OrderUpdate(newOrder.Symbol, OrderUpdateType.Cancelled, newOrder, Message: message));
-                    RemoveOrderTracker(tracker.MarkComplete().Order.Id);
-                    break;
-
-                default:
-                    var orderUpdateType =
-                        (update.Order.QuantityRemaining > 0 &&
-                         update.Order.QuantityRemaining < tracker.Order.Amount)
-                            ? OrderUpdateType.PartiallyFilled
-                            : OrderUpdateType.Created;
-                    updateChannel.Writer.TryWrite(
-                        new OrderUpdate(tracker.Order.Symbol, orderUpdateType, newOrder, Message: message));
-                    break;
+                _logger.LogWarning(
+                    "Failed to write order update to channel for ClientOrderId={ClientOrderId}. Channel may be completed.",
+                    update.Order.ClientOrderId);
             }
         }
-
-        OrderUpdate ToOrderUpdate(TradeResult result)
-        {
-            return new OrderUpdate(
-                result.Trade.Symbol,
-                GetOrderUpdateType(),
-                result.Order,
-                Error: result.Success
-                    ? null
-                    : new HyperliquidException(result.Error!, result.ErrorCode.GetValueOrDefault()));
-
-            OrderUpdateType GetOrderUpdateType()
-            {
-                if (!result.Success || result.Order == null)
-                {
-                    return OrderUpdateType.Error;
-                }
-
-                if (result.Trade.OrderType == OrderType.Market)
-                {
-                    return OrderUpdateType.MarketOrderPlaced;
-                }
-
-                var order = result.Order;
-                return order.OrderStatus switch
-                {
-                    OrderStatus.Canceled or OrderStatus.MarginCanceled => OrderUpdateType.Cancelled,
-                    OrderStatus.Filled => OrderUpdateType.Filled,
-                    OrderStatus.Rejected => OrderUpdateType.Error,
-                    _ when order.Filled > 0 && order.Filled < order.Amount => OrderUpdateType.PartiallyFilled,
-                    _ => OrderUpdateType.Created
-                };
-            }
-        }
-
-        void AddOrderTracker(TradeResult result)
-        {
-            if (!result.Success || result.Order == null || result.Order.IsCompleted())
-            {
-                return;
-            }
-
-            var orderId = result.Order.Id;
-            var order = result.Order;
-            var trade = result.Trade;
-
-            if (orderTrackers.TryAdd(orderId, new OrderTracker(order, trade, DateTime.UtcNow)))
-            {
-                _logger.LogDebug("Added order tracker for order {OrderId} for {Symbol}", orderId, order.Symbol);
-
-                if (pendingOrderUpdates.TryRemove(orderId, out var pendingUpdate))
-                {
-                    _logger.LogDebug("Replaying buffered order update for order {OrderId}", orderId);
-                    HandleSingleOrderUpdate(pendingUpdate);
-                }
-            }
-        }
-
-        void RemoveOrderTracker(long orderId)
-        {
-            if (orderTrackers.TryRemove(orderId, out _))
-            {
-                _logger.LogDebug("Removed order tracker for order {OrderId}", orderId);
-            }
-        }
-    }
-
-    private Task StartTimeoutMonitoringTask(
-        OrderManagementSettings settings,
-        Channel<OrderUpdate> updateChannel,
-        ConcurrentDictionary<long, OrderTracker> orderTrackers,
-        CancellationToken ct)
-    {
-        return Task.Run(
-            async () =>
-            {
-                try
-                {
-                    var timerInterval = settings.StatusCheckInterval > TimeSpan.Zero
-                        ? settings.StatusCheckInterval
-                        : TimeSpan.FromSeconds(5);
-                    using var timer = new PeriodicTimer(timerInterval);
-
-                    while (!ct.IsCancellationRequested && await timer.WaitForNextTickAsync(ct))
-                    {
-                        var now = DateTime.UtcNow;
-                        var timedOutTrackers = orderTrackers.Values
-                            .Where(t => now - t.CreatedAt > settings.UnfilledOrderTimeout && !t.IsComplete)
-                            .ToList();
-
-                        foreach (var tracker in timedOutTrackers)
-                        {
-                            _logger.LogInformation(
-                                "Order {OrderId} for {AssetName} timed out and will be cancelled",
-                                tracker.Order.Id,
-                                tracker.Order.Symbol);
-
-                            try
-                            {
-                                await CancelOrderAsync(tracker.Order, ct);
-                                updateChannel.Writer.TryWrite(
-                                    new OrderUpdate(
-                                        tracker.Order.Symbol,
-                                        OrderUpdateType.TimedOut,
-                                        tracker.Order with { OrderStatus = OrderStatus.Canceled },
-                                        Message: "Order timed out"));
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger.LogError(
-                                    ex,
-                                    $"Failed to cancel order {{OrderId}} for {{AssetName}}: {{ErrorMessage}}",
-                                    tracker.Order.Id,
-                                    tracker.Order.Symbol,
-                                    ex.Message);
-                            }
-
-                            if (settings.SwitchToMarketOnTimeout)
-                            {
-                                _logger.LogInformation("Creating market order for {AssetName}", tracker.Order.Symbol);
-
-                                try
-                                {
-                                    var marketTrade = tracker.OriginalTrade with { OrderType = OrderType.Market };
-                                    var marketTradeResult = await PlaceTradeAsync(marketTrade, ct);
-                                    if (marketTradeResult.Success)
-                                    {
-                                        updateChannel.Writer.TryWrite(
-                                            new OrderUpdate(
-                                                marketTrade.Symbol,
-                                                OrderUpdateType.MarketOrderPlaced,
-                                                marketTradeResult.Order));
-                                    }
-                                    else
-                                    {
-                                        updateChannel.Writer.TryWrite(
-                                            new OrderUpdate(
-                                                tracker.Order.Symbol,
-                                                OrderUpdateType.Error,
-                                                Message: $"Failed to create market order: {marketTradeResult.Error}"));
-                                    }
-                                }
-                                catch (Exception ex)
-                                {
-                                    updateChannel.Writer.TryWrite(
-                                        new OrderUpdate(
-                                            tracker.Order.Symbol,
-                                            OrderUpdateType.Error,
-                                            Message: $"Failed to create market order: {ex.Message}",
-                                            Error: ex));
-                                }
-                            }
-
-                            tracker.MarkComplete();
-                            orderTrackers.TryRemove(tracker.Order.Id, out _);
-                        }
-
-                        // Check if all orders are complete after timeout processing
-                        if (orderTrackers.IsEmpty)
-                        {
-                            _logger.LogInformation("All orders completed after timeout processing, completing channel");
-                            updateChannel.Writer.TryComplete();
-                            break;
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error in timeout monitoring task");
-                    updateChannel.Writer.TryComplete(ex);
-                }
-                finally
-                {
-                    updateChannel.Writer.TryComplete();
-                }
-            },
-            ct);
     }
 
     public async Task CancelOrderAsync(Order order, CancellationToken ct = default)
@@ -954,12 +770,14 @@ public sealed class HyperliquidBroker : IYoloBroker
 
     private async Task<WebCallResultWrapper<OrderResult>> PlaceFuturesOrderAsync(Trade trade, CancellationToken ct)
     {
+        var orderPrice = await ResolveOrderPriceAsync(trade, ct);
+
         var result = await _hyperliquidClient.FuturesApi.Trading.PlaceOrderAsync(
             trade.Symbol,
             trade.OrderSide.ToHyperLiquid(),
             trade.OrderType.ToHyperLiquid(),
             trade.AbsoluteAmount,
-            trade.LimitPrice.GetValueOrDefault(),
+            orderPrice,
             clientOrderId: trade.ClientOrderId,
             reduceOnly: trade.ReduceOnly,
             vaultAddress: _vaultAddress,
@@ -970,18 +788,57 @@ public sealed class HyperliquidBroker : IYoloBroker
 
     private async Task<WebCallResultWrapper<OrderResult>> PlaceSpotOrderAsync(Trade trade, CancellationToken ct)
     {
+        var orderPrice = await ResolveOrderPriceAsync(trade, ct);
+
         var result = await _hyperliquidClient.SpotApi.Trading.PlaceOrderAsync(
             trade.Symbol,
             trade.OrderSide.ToHyperLiquid(),
             trade.OrderType.ToHyperLiquid(),
             trade.AbsoluteAmount,
-            trade.LimitPrice.GetValueOrDefault(),
+            orderPrice,
             clientOrderId: trade.ClientOrderId,
             reduceOnly: trade.ReduceOnly,
             vaultAddress: _vaultAddress,
             ct: ct);
 
         return Wrap(result);
+    }
+
+    private async Task<decimal> ResolveOrderPriceAsync(Trade trade, CancellationToken ct)
+    {
+        if (trade.LimitPrice.HasValue)
+        {
+            return trade.LimitPrice.Value;
+        }
+
+        if (trade.OrderType != OrderType.Market)
+        {
+            return trade.LimitPrice.GetValueOrDefault();
+        }
+
+        var orderBook = trade.AssetType switch
+        {
+            AssetType.Spot => await GetSpotOrderBookAsync(trade.Symbol, ct),
+            AssetType.Future => await GetFuturesOrderBookAsync(trade.Symbol, ct),
+            _ => throw new ArgumentOutOfRangeException(nameof(trade.AssetType), trade.AssetType, "AssetType not supported")
+        };
+
+        var bestAsk = orderBook.Levels.Asks.ElementAtOrDefault(0)?.Price;
+        var bestBid = orderBook.Levels.Bids.ElementAtOrDefault(0)?.Price;
+
+        var price = trade.OrderSide switch
+        {
+            YoloAbstractions.OrderSide.Buy => bestAsk ?? bestBid,
+            YoloAbstractions.OrderSide.Sell => bestBid ?? bestAsk,
+            _ => bestAsk ?? bestBid
+        };
+
+        if (!price.HasValue)
+        {
+            throw new InvalidOperationException($"Could not determine market order price for {trade.Symbol}: order book has no bid/ask");
+        }
+
+        return price.Value;
     }
 
     private async Task<WebCallResultWrapper<IReadOnlyList<OrderResult>>> PlaceSpotOrdersAsync(
@@ -1020,9 +877,12 @@ public sealed class HyperliquidBroker : IYoloBroker
                 clientOrderId: trade.ClientOrderId,
                 reduceOnly: trade.ReduceOnly)).ToArray();
 
-        _logger.LogDebug("Placing {Count} futures orders: {Orders}", orders.Length, orders);
+        _logger.LogInformation("Placing {Count} futures orders: {Orders}", orders.Length, orders);
 
         var result = await _hyperliquidClient.FuturesApi.Trading.PlaceMultipleOrdersAsync(orders, vaultAddress: _vaultAddress, ct: ct);
+
+        _logger.LogInformation("PlaceMultipleOrdersAsync returned: Success={Success}, Error={Error}, DataNull={DataNull}, StatusCode={StatusCode}",
+            result.Success, result.Error?.Message, result.Data is null, result.ResponseStatusCode);
 
         return Wrap(result);
     }
@@ -1045,23 +905,42 @@ public sealed class HyperliquidBroker : IYoloBroker
 
     private WebCallResultWrapper<IReadOnlyList<OrderResult>> Wrap(WebCallResult<CallResult<HyperLiquidOrderResult>[]> result)
     {
-        _logger.LogDebug(
-            "Wrapping result for multiple orders with Success: {Success}, Error: {Error}, ResponseStatusCode: {ResponseStatusCode}, Data: {Data}",
+        _logger.LogInformation(
+            "Wrapping result for multiple orders with Success: {Success}, Error: {Error}, ResponseStatusCode: {ResponseStatusCode}, DataNull: {DataNull}, DataLength: {DataLength}",
             result.Success,
             result.Error,
             result.ResponseStatusCode,
-            result.Data);
+            result.Data is null,
+            result.Data?.Length ?? 0);
+
+        // Fail fast if the API returned an error
+        if (!result.Success)
+        {
+            var errorMessage = result.Error?.Message ?? $"PlaceMultipleOrdersAsync failed with status code {result.ResponseStatusCode}";
+            _logger.LogError("PlaceMultipleOrdersAsync returned error: {Error}", errorMessage);
+            throw new HyperliquidException(errorMessage, result);
+        }
 
         if (result.Data is null)
         {
-            return new(result.Success, result.Error, result.ResponseStatusCode, []);
+            _logger.LogError("PlaceMultipleOrdersAsync returned null Data despite Success=true");
+            throw new HyperliquidException("PlaceMultipleOrdersAsync returned null Data despite Success=true", result);
         }
 
+        if (result.Data.Length == 0)
+        {
+            _logger.LogWarning("PlaceMultipleOrdersAsync returned empty Data array");
+            return new(true, null, result.ResponseStatusCode, []);
+        }
+
+        var orderResults = result.Data.Select(x => ToOrderResult(x?.Success ?? false, x?.Error, x?.Data)).ToList();
+        _logger.LogInformation("Successfully wrapped {Count} order results from PlaceMultipleOrdersAsync", orderResults.Count);
+
         return new(
-            result.Success,
-            result.Error,
+            true,
+            null,
             result.ResponseStatusCode,
-            [.. result.Data.Select(x => ToOrderResult(x?.Success ?? false, x?.Error, x?.Data))]);
+            orderResults);
     }
 
     private static OrderResult ToOrderResult(bool success, Error? error, HyperLiquidOrderResult? data) =>
@@ -1073,15 +952,4 @@ public sealed class HyperliquidBroker : IYoloBroker
             data?.Status.ToYoloOrderStatus() ?? OrderStatus.NotSet,
             data?.AveragePrice,
             data?.FilledQuantity);
-
-    private record OrderTracker(Order Order, Trade OriginalTrade, DateTime CreatedAt)
-    {
-        public bool IsComplete { get; private set; }
-
-        public OrderTracker MarkComplete()
-        {
-            IsComplete = true;
-            return this;
-        }
-    }
 }

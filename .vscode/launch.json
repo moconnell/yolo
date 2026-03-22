@@ -44,7 +44,7 @@
       "name": "Azure Functions (host + attach)",
       "type": "coreclr",
       "request": "attach",
-      "preLaunchTask": "func: host start (with azurite)",
+      "preLaunchTask": "func: host start",
       "processId": "${command:azureFunctions.pickProcess}"
     },
     {

@@ -31,12 +31,13 @@ public class RebalanceCommandTest
         // arrange
         var mockTradeFactory = new Mock<ITradeFactory>();
         var mockBroker = new Mock<IYoloBroker>();
+        var mockOrderManager = new Mock<IOrderManager>();
         var options = Options.Create(new YoloConfig { BaseAsset = "USDC" });
         var logger = _loggerFactory.CreateLogger<RebalanceCommand>();
 
         // act & assert
         Should.Throw<ArgumentNullException>(() =>
-            new RebalanceCommand(null!, mockTradeFactory.Object, mockBroker.Object, options, logger));
+            new RebalanceCommand(null!, mockTradeFactory.Object, mockOrderManager.Object, mockBroker.Object, options, logger));
     }
 
     [Fact]
@@ -45,12 +46,13 @@ public class RebalanceCommandTest
         // arrange
         var mockWeightsService = new Mock<ICalcWeights>();
         var mockBroker = new Mock<IYoloBroker>();
+        var mockOrderManager = new Mock<IOrderManager>();
         var options = Options.Create(new YoloConfig { BaseAsset = "USDC" });
         var logger = _loggerFactory.CreateLogger<RebalanceCommand>();
 
         // act & assert
         Should.Throw<ArgumentNullException>(() =>
-            new RebalanceCommand(mockWeightsService.Object, null!, mockBroker.Object, options, logger));
+            new RebalanceCommand(mockWeightsService.Object, null!, mockOrderManager.Object, mockBroker.Object, options, logger));
     }
 
     [Fact]
@@ -59,12 +61,14 @@ public class RebalanceCommandTest
         // arrange
         var mockWeightsService = new Mock<ICalcWeights>();
         var mockTradeFactory = new Mock<ITradeFactory>();
+        var mockOrderManager = new Mock<IOrderManager>();
+        var mockBroker = new Mock<IYoloBroker>();
         var options = Options.Create(new YoloConfig { BaseAsset = "USDC" });
         var logger = _loggerFactory.CreateLogger<RebalanceCommand>();
 
         // act & assert
         Should.Throw<ArgumentNullException>(() =>
-            new RebalanceCommand(mockWeightsService.Object, mockTradeFactory.Object, null!, options, logger));
+            new RebalanceCommand(mockWeightsService.Object, mockTradeFactory.Object, mockOrderManager.Object, null!, options, logger));
     }
 
     [Fact]
@@ -89,6 +93,8 @@ public class RebalanceCommandTest
         mockTradeFactory.Setup(x => x.CalculateTrades(weights, positions, markets))
             .Returns(trades);
 
+        var mockOrderManager = new Mock<IOrderManager>();
+
         var mockBroker = new Mock<IYoloBroker>();
         mockBroker.Setup(x => x.GetOpenOrdersAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<long, Order>());
@@ -107,6 +113,7 @@ public class RebalanceCommandTest
         var command = new RebalanceCommand(
             mockWeightsService.Object,
             mockTradeFactory.Object,
+            mockOrderManager.Object,
             mockBroker.Object,
             options,
             logger);
@@ -140,6 +147,8 @@ public class RebalanceCommandTest
                 It.IsAny<IReadOnlyDictionary<string, IReadOnlyList<MarketInfo>>>()))
             .Returns(Array.Empty<Trade>());
 
+        var mockOrderManager = new Mock<IOrderManager>();
+
         var mockBroker = new Mock<IYoloBroker>();
         mockBroker.Setup(x => x.GetOpenOrdersAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(openOrders);
@@ -162,6 +171,7 @@ public class RebalanceCommandTest
         var command = new RebalanceCommand(
             mockWeightsService.Object,
             mockTradeFactory.Object,
+            mockOrderManager.Object,
             mockBroker.Object,
             options,
             logger);
@@ -186,6 +196,7 @@ public class RebalanceCommandTest
 
         var mockWeightsService = new Mock<ICalcWeights>();
         var mockTradeFactory = new Mock<ITradeFactory>();
+        var mockOrderManager = new Mock<IOrderManager>();
         var mockBroker = new Mock<IYoloBroker>();
         mockBroker.Setup(x => x.GetOpenOrdersAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(openOrders);
@@ -200,6 +211,7 @@ public class RebalanceCommandTest
         var command = new RebalanceCommand(
             mockWeightsService.Object,
             mockTradeFactory.Object,
+            mockOrderManager.Object,
             mockBroker.Object,
             options,
             logger);
@@ -227,6 +239,7 @@ public class RebalanceCommandTest
                 It.IsAny<Dictionary<string, IReadOnlyList<MarketInfo>>>()))
             .Returns(Array.Empty<Trade>());
 
+        var mockOrderManager = new Mock<IOrderManager>();
         var mockBroker = new Mock<IYoloBroker>();
         mockBroker.Setup(x => x.GetOpenOrdersAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<long, Order>());
@@ -245,6 +258,7 @@ public class RebalanceCommandTest
         var command = new RebalanceCommand(
             mockWeightsService.Object,
             mockTradeFactory.Object,
+            mockOrderManager.Object,
             mockBroker.Object,
             options,
             logger);
@@ -253,9 +267,10 @@ public class RebalanceCommandTest
         await command.ExecuteAsync();
 
         // assert
-        mockBroker.Verify(x => x.ManageOrdersAsync(
+        mockOrderManager.Verify(x => x.ManageOrdersAsync(
             It.IsAny<Trade[]>(),
             It.IsAny<OrderManagementSettings>(),
+            It.IsAny<ITradeAdvisor>(),
             It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -307,6 +322,8 @@ public class RebalanceCommandTest
         mockTradeFactory.Setup(x => x.CalculateTrades(weights, positions, markets))
             .Returns(Array.Empty<Trade>());
 
+        var mockOrderManager = new Mock<IOrderManager>();
+
         var mockBroker = new Mock<IYoloBroker>();
         mockBroker.Setup(x => x.GetOpenOrdersAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<long, Order>());
@@ -325,6 +342,7 @@ public class RebalanceCommandTest
         var command = new RebalanceCommand(
             mockWeightsService.Object,
             mockTradeFactory.Object,
+            mockOrderManager.Object,
             mockBroker.Object,
             options,
             logger);
@@ -334,9 +352,10 @@ public class RebalanceCommandTest
 
         // assert
         mockTradeFactory.Verify(x => x.CalculateTrades(weights, positions, markets), Times.Once);
-        mockBroker.Verify(x => x.ManageOrdersAsync(
+        mockOrderManager.Verify(x => x.ManageOrdersAsync(
             It.IsAny<Trade[]>(),
             It.IsAny<OrderManagementSettings>(),
+            It.IsAny<ITradeAdvisor>(),
             It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -377,10 +396,13 @@ public class RebalanceCommandTest
                 It.IsAny<AssetPermissions>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(markets);
-        mockBroker.Setup(x => x.ManageOrdersAsync(
+
+        var mockOrderManager = new Mock<IOrderManager>();
+        mockOrderManager.Setup(x => x.ManageOrdersAsync(
                 It.IsAny<Trade[]>(),
                 It.IsAny<OrderManagementSettings>(),
-                It.IsAny<CancellationToken>()))
+            It.IsAny<ITradeAdvisor>(),
+            It.IsAny<CancellationToken>()))
             .Returns(channel.Reader.ReadAllAsync());
 
         var options = Options.Create(new YoloConfig { BaseAsset = "USDC" });
@@ -389,6 +411,7 @@ public class RebalanceCommandTest
         var command = new RebalanceCommand(
             mockWeightsService.Object,
             mockTradeFactory.Object,
+            mockOrderManager.Object,
             mockBroker.Object,
             options,
             logger);
@@ -397,9 +420,10 @@ public class RebalanceCommandTest
         await command.ExecuteAsync();
 
         // assert
-        mockBroker.Verify(x => x.ManageOrdersAsync(
+        mockOrderManager.Verify(x => x.ManageOrdersAsync(
             It.Is<Trade[]>(t => t.Length == 3),
             It.IsAny<OrderManagementSettings>(),
+            It.IsAny<ITradeAdvisor>(),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -412,16 +436,17 @@ public class RebalanceCommandTest
 
         var mockWeightsService = new Mock<ICalcWeights>();
         var mockTradeFactory = new Mock<ITradeFactory>();
+        var mockOrderManager = new Mock<IOrderManager>();
         var mockBroker = new Mock<IYoloBroker>();
         mockBroker.Setup(x => x.GetOpenOrdersAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new OperationCanceledException());
 
         var options = Options.Create(new YoloConfig { BaseAsset = "USDC" });
         var logger = _loggerFactory.CreateLogger<RebalanceCommand>();
-
         var command = new RebalanceCommand(
             mockWeightsService.Object,
             mockTradeFactory.Object,
+            mockOrderManager.Object,
             mockBroker.Object,
             options,
             logger);
@@ -455,6 +480,14 @@ public class RebalanceCommandTest
         mockTradeFactory.Setup(x => x.CalculateTrades(weights, positions, markets))
             .Returns(trades);
 
+        var mockOrderManager = new Mock<IOrderManager>();
+        mockOrderManager.Setup(x => x.ManageOrdersAsync(
+                It.IsAny<Trade[]>(),
+                It.IsAny<OrderManagementSettings>(),
+            It.IsAny<ITradeAdvisor>(),
+            It.IsAny<CancellationToken>()))
+            .Throws<SocketException>();
+
         var mockBroker = new Mock<IYoloBroker>();
         mockBroker.Setup(x => x.GetOpenOrdersAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<long, Order>());
@@ -466,11 +499,6 @@ public class RebalanceCommandTest
                 It.IsAny<AssetPermissions>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(markets);
-        mockBroker.Setup(x => x.ManageOrdersAsync(
-                It.IsAny<Trade[]>(),
-                It.IsAny<OrderManagementSettings>(),
-                It.IsAny<CancellationToken>()))
-            .Throws<SocketException>();
 
         var options = Options.Create(new YoloConfig { BaseAsset = "USDC" });
         Mock<ILogger<RebalanceCommand>> mock = new();
@@ -479,6 +507,7 @@ public class RebalanceCommandTest
         var command = new RebalanceCommand(
             mockWeightsService.Object,
             mockTradeFactory.Object,
+            mockOrderManager.Object,
             mockBroker.Object,
             options,
             logger);
@@ -518,6 +547,14 @@ public class RebalanceCommandTest
         mockTradeFactory.Setup(x => x.CalculateTrades(weights, positions, markets))
             .Returns(trades);
 
+        var mockOrderManager = new Mock<IOrderManager>();
+        mockOrderManager.Setup(x => x.ManageOrdersAsync(
+                It.IsAny<Trade[]>(),
+                It.IsAny<OrderManagementSettings>(),
+            It.IsAny<ITradeAdvisor>(),
+            It.IsAny<CancellationToken>()))
+            .Returns(channel.Reader.ReadAllAsync());
+
         var mockBroker = new Mock<IYoloBroker>();
         mockBroker.Setup(x => x.GetOpenOrdersAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<long, Order>());
@@ -529,11 +566,6 @@ public class RebalanceCommandTest
                 It.IsAny<AssetPermissions>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(markets);
-        mockBroker.Setup(x => x.ManageOrdersAsync(
-                It.IsAny<Trade[]>(),
-                It.IsAny<OrderManagementSettings>(),
-                It.IsAny<CancellationToken>()))
-            .Returns(channel.Reader.ReadAllAsync());
 
         var options = Options.Create(new YoloConfig { BaseAsset = "USDC" });
         var logger = _loggerFactory.CreateLogger<RebalanceCommand>();
@@ -541,6 +573,7 @@ public class RebalanceCommandTest
         var command = new RebalanceCommand(
             mockWeightsService.Object,
             mockTradeFactory.Object,
+            mockOrderManager.Object,
             mockBroker.Object,
             options,
             logger);
@@ -549,9 +582,10 @@ public class RebalanceCommandTest
         await command.ExecuteAsync();
 
         // assert - verify that ManageOrdersAsync was called and completed without throwing
-        mockBroker.Verify(x => x.ManageOrdersAsync(
+        mockOrderManager.Verify(x => x.ManageOrdersAsync(
             It.Is<Trade[]>(t => t.Length == 1),
             It.IsAny<OrderManagementSettings>(),
+            It.IsAny<ITradeAdvisor>(),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 }
