@@ -29,6 +29,8 @@ public sealed class OrderManager : IOrderManager
         ArgumentNullException.ThrowIfNull(trades);
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(advisor);
+        ArgumentOutOfRangeException.ThrowIfNegative(settings.MaxRepriceRetries, nameof(settings.MaxRepriceRetries));
+        ArgumentOutOfRangeException.ThrowIfNegative(settings.UnfilledOrderTimeout.TotalMilliseconds, nameof(settings.UnfilledOrderTimeout));
 
         var pending = new ConcurrentDictionary<string, OrderTracker>();
         var eventChannel = Channel.CreateUnbounded<ManagerEvent>();
