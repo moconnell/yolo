@@ -260,7 +260,7 @@ public sealed class HyperliquidBroker : IYoloBroker
         }
     }
 
-    public IAsyncEnumerable<BrokerOrderEvent> SubscribeOrderUpdatesAsync(CancellationToken ct = default)
+    public async IAsyncEnumerable<BrokerOrderEvent> SubscribeOrderUpdatesAsync([EnumeratorCancellation] CancellationToken ct = default)
     {
         var tradeResultUpdateChannel = Channel.CreateUnbounded<BrokerOrderEvent>(
             new UnboundedChannelOptions
@@ -274,18 +274,37 @@ public sealed class HyperliquidBroker : IYoloBroker
             "Subscribing to Hyperliquid order updates for address {Address}",
             subscriptionAddress ?? "(api credential default)");
 
-        var subscriptionTask = CallAsync(
+        var subscription = await CallAsync<UpdateSubscription>(
             () => _hyperliquidSocketClient.FuturesApi.SubscribeToOrderUpdatesAsync(
                 subscriptionAddress,
                 HandleOrderStatusUpdates,
                 ct),
             "Could not subscribe to futures order updates");
 
-        subscriptionTask.GetAwaiter().GetResult();
-
         _logger.LogInformation("Subscribed to Hyperliquid order updates");
 
-        return tradeResultUpdateChannel.Reader.ReadAllAsync(ct);
+        try
+        {
+            await foreach (var orderEvent in tradeResultUpdateChannel.Reader.ReadAllAsync(ct))
+            {
+                yield return orderEvent;
+            }
+        }
+        finally
+        {
+            try
+            {
+                await subscription.CloseAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to close Hyperliquid order updates subscription cleanly");
+            }
+            finally
+            {
+                tradeResultUpdateChannel.Writer.TryComplete();
+            }
+        }
 
         void HandleOrderStatusUpdates(DataEvent<HyperLiquidOrderStatus[]> e)
         {

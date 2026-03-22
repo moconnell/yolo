@@ -185,6 +185,7 @@ public class EffectiveWeightsFunctionBaseTest
         payload.ShouldNotBeNull();
         payload.Strategy.ShouldBe(strategy);
         payload.Error.ShouldBe("Invalid raw weights");
+        payload.Details.ShouldNotBeNull();
         payload.Details.ShouldContain("BTC");
         payload.Details.ShouldContain("BTC/USDC");
     }
