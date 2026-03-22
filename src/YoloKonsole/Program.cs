@@ -83,9 +83,9 @@ __  ______  __    ____  __
             var yoloConfig = config.GetYoloConfig() ??
                              throw new ConfigException("YOLO configuration is missing or invalid");
 
-            var orderManager = serviceProvider.GetService<IOrderManager>()!;
+            var orderManager = serviceProvider.GetRequiredService<IOrderManager>();
 
-            using var broker = serviceProvider.GetService<IYoloBroker>()!;
+            using var broker = serviceProvider.GetRequiredService<IYoloBroker>();
             var orders = await broker.GetOpenOrdersAsync(cancellationToken);
 
             if (orders.Count != 0)
