@@ -272,21 +272,26 @@ public class OrderManagerTest
         var trade = CreateLimitTrade(clientOrderId: "c5", amount: 2m, limitPrice: 100m);
         var openOrder = CreateOrder(id: 1005, clientId: "c5", status: OrderStatus.Open, amount: 2m, filled: 0m);
         var subscriptionReady = false;
+        var subscriptionConsumed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var broker = new Mock<IYoloBroker>();
         broker.Setup(x => x.SubscribeOrderUpdatesAsync(It.IsAny<CancellationToken>()))
-            .Returns((CancellationToken ct) =>
-            {
-                Thread.Sleep(50);
-                subscriptionReady = true;
-                return EmptyEventsAsync(ct);
-            });
+            .Returns((CancellationToken ct) => SubscriptionEventsAsync(ct));
         broker.Setup(x => x.PlaceTradesAsync(It.IsAny<IEnumerable<Trade>>(), It.IsAny<CancellationToken>()))
             .Returns((IEnumerable<Trade> _, CancellationToken _) =>
             {
+                subscriptionConsumed.Task.Wait(TimeSpan.FromSeconds(1)).ShouldBeTrue();
                 subscriptionReady.ShouldBeTrue();
                 return ToAsyncEnumerable(new TradeResult(trade, Success: true, Order: openOrder));
             });
+
+        async IAsyncEnumerable<BrokerOrderEvent> SubscriptionEventsAsync([EnumeratorCancellation] CancellationToken ct)
+        {
+            subscriptionReady = true;
+            subscriptionConsumed.TrySetResult(true);
+            await Task.Yield();
+            yield break;
+        }
 
         var sut = CreateSut(broker.Object);
         var settings = new OrderManagementSettings(
