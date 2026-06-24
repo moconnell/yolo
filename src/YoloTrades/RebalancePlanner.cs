@@ -13,6 +13,8 @@ public static class RebalancePlanner
         YoloConfig config,
         decimal nominal)
     {
+        var positionsByToken = ToCaseInsensitiveDictionary(positions);
+        var marketsByToken = ToCaseInsensitiveDictionary(markets);
         var factors = weights
             .GroupBy(kvp => kvp.Key.GetBaseAndQuoteAssets().BaseAsset, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(
@@ -28,20 +30,31 @@ public static class RebalancePlanner
             ? 1
             : config.MaxLeverage / unconstrainedTargetLeverage;
 
-        var droppedTokens = positions.Keys.Except(factors.Keys.Union([config.BaseAsset]));
+        var droppedTokens = positionsByToken.Keys.Except(
+            factors.Keys.Append(config.BaseAsset),
+            StringComparer.OrdinalIgnoreCase);
         foreach (var token in droppedTokens)
         {
             factors[token] = (0m, false);
         }
 
         var items = factors
-            .Select(kvp => CreateItem(kvp, positions, markets, config, nominal, weightConstraint))
+            .Select(kvp => CreateItem(kvp, positionsByToken, marketsByToken, config, nominal, weightConstraint))
             .ToArray();
 
         SetBufferAdjustedTargets(items, config.RebalanceMode, config.TradeBuffer);
 
         return new RebalancePlan(weightConstraint, items);
     }
+
+    private static Dictionary<string, IReadOnlyList<T>> ToCaseInsensitiveDictionary<T>(
+        IReadOnlyDictionary<string, IReadOnlyList<T>> values) =>
+        values
+            .GroupBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                IReadOnlyList<T> (group) => group.SelectMany(kvp => kvp.Value).ToArray(),
+                StringComparer.OrdinalIgnoreCase);
 
     private static RebalancePlanItem CreateItem(
         KeyValuePair<string, (decimal Weight, bool IsInUniverse)> kvp,
@@ -65,16 +78,19 @@ public static class RebalancePlanner
                     var position = tokenPositions
                                        .FirstOrDefault(p =>
                                            p.AssetType == market.AssetType &&
-                                           (p.AssetName == market.Name && market.AssetType == AssetType.Future ||
-                                            p.BaseAsset == market.BaseAsset && market.AssetType == AssetType.Spot)) ??
+                                           (string.Equals(p.AssetName, market.Name, StringComparison.OrdinalIgnoreCase) &&
+                                            market.AssetType == AssetType.Future ||
+                                            string.Equals(p.BaseAsset, market.BaseAsset, StringComparison.OrdinalIgnoreCase) &&
+                                            market.AssetType == AssetType.Spot)) ??
                                    Position.Null;
 
                     return new ProjectedPosition(market, position.Amount, nominal);
-                });
+                },
+                StringComparer.OrdinalIgnoreCase);
 
         var hasTradableMarket = projectedPositions.Count != 0;
         var hasMultipleOpenPositions = projectedPositions.Count(kvp => kvp.Value.HasPosition) > 1;
-        var currentWeight = hasTradableMarket && !hasMultipleOpenPositions
+        var currentWeight = hasTradableMarket
             ? projectedPositions.Values.Sum(projectedPosition => projectedPosition.ProjectedWeight)
             : null;
 

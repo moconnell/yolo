@@ -149,7 +149,7 @@ public abstract class EffectiveWeightsFunctionBase
                 item.RawTargetWeight,
                 item.ConstrainedTargetWeight,
                 item.CurrentWeight,
-                item.BufferAdjustedTargetWeight,
+                item.HasTradableMarket ? item.ConstrainedTargetWeight : null,
                 item.DeltaWeight,
                 item.IsInUniverse,
                 item.WithinTradeBuffer,
@@ -160,30 +160,30 @@ public abstract class EffectiveWeightsFunctionBase
             plan.WeightConstraint,
             CalculateGrossExposure(effectiveItems, item => item.CurrentWeight),
             CalculateNetExposure(effectiveItems, item => item.CurrentWeight),
-            CalculateGrossExposure(effectiveItems, item => item.ConstrainedTargetWeight),
-            CalculateNetExposure(effectiveItems, item => item.ConstrainedTargetWeight),
             CalculateGrossExposure(effectiveItems, item => item.EffectiveWeight),
             CalculateNetExposure(effectiveItems, item => item.EffectiveWeight),
+            CalculateGrossExposure(plan.Items, item => item.BufferAdjustedTargetWeight),
+            CalculateNetExposure(plan.Items, item => item.BufferAdjustedTargetWeight),
             effectiveItems);
     }
 
-    private static decimal? CalculateGrossExposure(
-        IReadOnlyList<EffectiveWeightItem> items,
-        Func<EffectiveWeightItem, decimal?> selectWeight) =>
+    private static decimal? CalculateGrossExposure<T>(
+        IReadOnlyList<T> items,
+        Func<T, decimal?> selectWeight) =>
         TryGetCompleteWeights(items, selectWeight, out var weights)
             ? weights.Sum(Math.Abs)
             : null;
 
-    private static decimal? CalculateNetExposure(
-        IReadOnlyList<EffectiveWeightItem> items,
-        Func<EffectiveWeightItem, decimal?> selectWeight) =>
+    private static decimal? CalculateNetExposure<T>(
+        IReadOnlyList<T> items,
+        Func<T, decimal?> selectWeight) =>
         TryGetCompleteWeights(items, selectWeight, out var weights)
             ? weights.Sum()
             : null;
 
-    private static bool TryGetCompleteWeights(
-        IReadOnlyList<EffectiveWeightItem> items,
-        Func<EffectiveWeightItem, decimal?> selectWeight,
+    private static bool TryGetCompleteWeights<T>(
+        IReadOnlyList<T> items,
+        Func<T, decimal?> selectWeight,
         out decimal[] weights)
     {
         var selected = items.Select(selectWeight).ToArray();

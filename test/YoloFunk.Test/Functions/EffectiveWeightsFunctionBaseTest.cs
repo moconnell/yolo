@@ -101,9 +101,28 @@ public class EffectiveWeightsFunctionBaseTest
         var sol = payload.Weights.Single(x => x.Token == "SOL");
         sol.CurrentWeight.ShouldBe(0.396m);
         sol.ConstrainedTargetWeight.ShouldBe(0.4m);
-        sol.EffectiveWeight.ShouldBe(0.396m);
+        sol.EffectiveWeight.ShouldBe(0.4m);
         sol.DeltaWeight.ShouldBe(0m);
         sol.WithinTradeBuffer.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task GivenCurrentWeightWithinTradeBuffer_WhenRun_ShouldKeepEffectiveExposureConsistentWithEffectiveWeights()
+    {
+        var (response, _) = await RunEffectiveWeightsAsync(
+            positionAmount: 4m,
+            rawTargetWeight: 0.4m,
+            tradeBuffer: 0.01m,
+            rebalanceMode: RebalanceMode.Center);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var payload = await TestHttpRequestData.ReadJsonAsync<EffectiveWeightsResponse>(response);
+        payload.ShouldNotBeNull();
+
+        payload.EffectiveGrossExposure.ShouldBe(payload.Weights.Sum(item => Math.Abs(item.EffectiveWeight.GetValueOrDefault())));
+        payload.EffectiveNetExposure.ShouldBe(payload.Weights.Sum(item => item.EffectiveWeight.GetValueOrDefault()));
+        payload.BufferAdjustedGrossExposure.ShouldBe(0.396m);
+        payload.Weights.Single(x => x.Token == "SOL").DeltaWeight.ShouldBe(0m);
     }
 
     [Fact]

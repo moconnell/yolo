@@ -61,7 +61,8 @@ public class TradeFactory : ITradeFactory
 
         return plan.Items
             .Select(RebalancePosition)
-            .SelectMany(CombineOrders);
+            .SelectMany(CombineOrders)
+            .ToArray();
 
         IEnumerable<Trade> RebalancePosition(RebalancePlanItem item)
         {
