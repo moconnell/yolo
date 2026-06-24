@@ -12,4 +12,12 @@ public enum FactorType
     RetailFlow,
     SupplyVelocity,
     TrendLongonlyAdaptive,
+    MeanReversion,
+    EnhancedMomentum,
+    InstantaneousMomentum,
+    Polaris,
+    Altair,
+    MarginRisk,
+    EnhancedMeanReversion,
+    InstantaneousVolatility,
 }

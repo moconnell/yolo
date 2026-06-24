@@ -12,9 +12,17 @@ public class UnravelApiService : IUnravelApiService
     private const string ApiKeyHeader = "X-API-KEY";
     private static readonly Dictionary<FactorType, string> FactorTypeToStringMap = new()
     {
+        { FactorType.Altair, "altair" },
         { FactorType.Carry, "carry_enhanced" },
-        { FactorType.Momentum, "momentum_enhanced" },
+        { FactorType.EnhancedMeanReversion, "mean_reversion_enhanced" },
+        { FactorType.EnhancedMomentum, "momentum_enhanced" },
+        { FactorType.InstantaneousMomentum, "instantaneous_momentum" },
+        { FactorType.InstantaneousVolatility, "instantaneous_volatility" },
+        { FactorType.MarginRisk, "margin_risk" },
+        { FactorType.MeanReversion, "mean_reversion" },
+        { FactorType.Momentum, "momentum" },
         { FactorType.OpenInterestDivergence, "open_interest_divergence" },
+        { FactorType.Polaris, "polaris" },
         { FactorType.RelativeIlliquidity, "relative_illiquidity" },
         { FactorType.RetailFlow, "retail_flow" },
         { FactorType.SupplyVelocity, "supply_velocity" },

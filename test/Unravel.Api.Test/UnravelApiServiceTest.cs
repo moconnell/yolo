@@ -11,8 +11,20 @@ namespace Unravel.Api.Test;
 
 public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
 {
-    private const string RetailFlow = "retail_flow";
-    private const string Momentum = "momentum_enhanced";
+    private Dictionary<FactorType, string> FactorTypeToStringMap { get; } = new()
+    {
+        { FactorType.RetailFlow, "retail_flow" },
+        { FactorType.SupplyVelocity, "supply_velocity" },
+        { FactorType.TrendLongonlyAdaptive, "trend_longonly_adaptive" },
+        { FactorType.MeanReversion, "mean_reversion" },
+        { FactorType.EnhancedMomentum, "momentum_enhanced" },
+        { FactorType.InstantaneousMomentum, "momentum_instantaneous" },
+        { FactorType.Polaris, "polaris" },
+        { FactorType.Altair, "altair" },
+        { FactorType.MarginRisk, "margin_risk" },
+        { FactorType.EnhancedMeanReversion, "mean_reversion_enhanced" },
+        { FactorType.InstantaneousVolatility, "volatility_instantaneous" }
+    };
 
     [Fact]
     public async Task GivenGoodConfig_WhenMocked_ShouldReturnFactors()
@@ -30,7 +42,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         };
         handler.SetupRequest(
                 HttpMethod.Get,
-                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, RetailFlow, btc)}")
+                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, FactorTypeToStringMap[FactorType.RetailFlow], btc)}")
             .ReturnsAsync(
                 new HttpResponseMessage
                 {
@@ -61,8 +73,11 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         result[FactorType.RetailFlow, btc].ShouldBe(0.25, 0.000000001);
     }
 
-    [Fact]
-    public async Task GivenGoodConfig_WhenMockedHistorical_ShouldReturnFactors()
+    [Theory]
+    [InlineData(FactorType.EnhancedMomentum)]
+    [InlineData(FactorType.EnhancedMeanReversion)]
+    [InlineData(FactorType.TrendLongonlyAdaptive)]
+    public async Task GivenGoodConfig_WhenMockedHistorical_ShouldReturnFactors(FactorType factorType)
     {
         // arrange
         const string btc = "BTC";
@@ -75,7 +90,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         var config = new UnravelConfig
         {
             ApiBaseUrl = "http://foo.org/api",
-            Factors = [FactorType.Momentum],
+            Factors = [factorType],
             UrlPathFactors = "portfolio/factors?id={0}&tickers={1}&smoothing={2}&start_date={3}",
             Smoothing = 5,
             DateFormat = "yyyy-MM-dd"
@@ -83,7 +98,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
 
         handler.SetupRequest(
                 HttpMethod.Get,
-                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactors, Momentum, tickersCsv, config.Smoothing, startDate)}")
+                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactors, FactorTypeToStringMap[factorType], tickersCsv, config.Smoothing, startDate)}")
             .ReturnsAsync(
                 new HttpResponseMessage
                 {
@@ -109,10 +124,10 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
 
         // assert
         result.ShouldNotBeNull();
-        result.FactorTypes.ShouldBe([FactorType.Momentum]);
+        result.FactorTypes.ShouldBe([factorType]);
         result.Tickers.ShouldBe([btc, eth]);
-        result[FactorType.Momentum, btc].ShouldBe(double.NaN);
-        result[FactorType.Momentum, eth].ShouldBe(0.25, 0.000000001);
+        result[factorType, btc].ShouldBe(double.NaN);
+        result[factorType, eth].ShouldBe(0.25, 0.000000001);
     }
 
     [Fact]
@@ -128,7 +143,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         var config = new UnravelConfig
         {
             ApiBaseUrl = "http://foo.org/api",
-            Factors = [FactorType.Momentum],
+            Factors = [FactorType.EnhancedMomentum],
             UrlPathFactors = "portfolio/factors?id={0}&tickers={1}&smoothing={2}&start_date={3}",
             Smoothing = 5,
             DateFormat = "yyyy-MM-dd"
@@ -136,7 +151,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
 
         handler.SetupRequest(
                 HttpMethod.Get,
-                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactors, Momentum, tickersCsv, config.Smoothing, startDate)}")
+                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactors, FactorTypeToStringMap[FactorType.EnhancedMomentum], tickersCsv, config.Smoothing, startDate)}")
             .ReturnsAsync(
                 new HttpResponseMessage
                 {
@@ -176,7 +191,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         var config = new UnravelConfig
         {
             ApiBaseUrl = "http://foo.org/api",
-            Factors = [FactorType.Momentum],
+            Factors = [FactorType.EnhancedMomentum],
             UrlPathFactors = "portfolio/factors?id={0}&tickers={1}&smoothing={2}&start_date={3}",
             Smoothing = 5,
             DateFormat = "yyyy-MM-dd"
@@ -187,7 +202,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
 
         handler.SetupRequest(
                 HttpMethod.Get,
-                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactors, Momentum, tickersCsv, config.Smoothing, startDate)}")
+                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactors, FactorTypeToStringMap[FactorType.EnhancedMomentum], tickersCsv, config.Smoothing, startDate)}")
             .ReturnsAsync(
                 new HttpResponseMessage
                 {
@@ -214,9 +229,9 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         // assert
         result.ShouldNotBeNull();
         result.Tickers.ShouldBe(requestedTickers);
-        result[FactorType.Momentum, "ADA"].ShouldBe(double.NaN);
-        result[FactorType.Momentum, "BTC"].ShouldBe(0.5, 0.000000001);
-        result[FactorType.Momentum, "ETH"].ShouldBe(0.7, 0.000000001);
+        result[FactorType.EnhancedMomentum, "ADA"].ShouldBe(double.NaN);
+        result[FactorType.EnhancedMomentum, "BTC"].ShouldBe(0.5, 0.000000001);
+        result[FactorType.EnhancedMomentum, "ETH"].ShouldBe(0.7, 0.000000001);
     }
 
     [Fact]
@@ -262,7 +277,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
         {
             handler.SetupRequest(
                     HttpMethod.Get,
-                    $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, RetailFlow, btc)}")
+                    $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, FactorTypeToStringMap[factorType], btc)}")
                 .ReturnsAsync(
                     new HttpResponseMessage
                     {
@@ -451,7 +466,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
 
         handler.SetupRequest(
                 HttpMethod.Get,
-                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, RetailFlow, tickersCsv)}")
+                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, FactorTypeToStringMap[FactorType.RetailFlow], tickersCsv)}")
             .ReturnsAsync(
                 new HttpResponseMessage
                 {
@@ -497,7 +512,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
 
         handler.SetupRequest(
                 HttpMethod.Get,
-                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, RetailFlow, tickersCsv)}")
+                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, FactorTypeToStringMap[FactorType.RetailFlow], tickersCsv)}")
             .ReturnsAsync(
                 new HttpResponseMessage
                 {
@@ -544,7 +559,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
 
         handler.SetupRequest(
                 HttpMethod.Get,
-                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, RetailFlow, tickersCsv)}")
+                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, FactorTypeToStringMap[FactorType.RetailFlow], tickersCsv)}")
             .ReturnsAsync(
                 new HttpResponseMessage
                 {
@@ -588,7 +603,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
 
         handler.SetupRequest(
                 HttpMethod.Get,
-                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, RetailFlow, tickersCsv)}")
+                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, FactorTypeToStringMap[FactorType.RetailFlow], tickersCsv)}")
             .ReturnsAsync(
                 new HttpResponseMessage
                 {
@@ -636,7 +651,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
 
         handler.SetupRequest(
                 HttpMethod.Get,
-                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, RetailFlow, tickersCsv)}")
+                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, FactorTypeToStringMap[FactorType.RetailFlow], tickersCsv)}")
             .ReturnsAsync(
                 new HttpResponseMessage
                 {
@@ -679,7 +694,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
 
         handler.SetupRequest(
                 HttpMethod.Get,
-                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, RetailFlow, tickersCsv)}")
+                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, FactorTypeToStringMap[FactorType.RetailFlow], tickersCsv)}")
             .ReturnsAsync(
                 new HttpResponseMessage
                 {
@@ -766,7 +781,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
 
         handler.SetupRequest(
                 HttpMethod.Get,
-                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, RetailFlow, tickersCsv)}")
+                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, FactorTypeToStringMap[FactorType.RetailFlow], tickersCsv)}")
             .ReturnsAsync(
                 new HttpResponseMessage
                 {
@@ -810,7 +825,7 @@ public class UnravelApiServiceTest(ITestOutputHelper outputHelper)
 
         handler.SetupRequest(
                 HttpMethod.Get,
-                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, RetailFlow, tickersCsv)}")
+                $"{config.ApiBaseUrl}/{string.Format(config.UrlPathFactorsLive, FactorTypeToStringMap[FactorType.RetailFlow], tickersCsv)}")
             .ReturnsAsync(
                 new HttpResponseMessage
                 {
