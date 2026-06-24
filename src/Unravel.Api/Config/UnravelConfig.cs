@@ -1,4 +1,3 @@
-using YoloAbstractions;
 using YoloAbstractions.Config;
 
 namespace Unravel.Api.Config;
@@ -7,7 +6,7 @@ public record UnravelConfig : ApiConfig
 {
     public string DateFormat { get; init; } = "yyyy-MM-dd";
 
-    public FactorType[] Factors { get; init; } = [];
+    public UnravelFactorType[] Factors { get; init; } = [];
 
     public bool UseLiveFactors { get; init; }
 
