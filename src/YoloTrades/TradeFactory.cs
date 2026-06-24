@@ -9,17 +9,16 @@ namespace YoloTrades;
 public class TradeFactory : ITradeFactory
 {
     private readonly ILogger<TradeFactory> _logger;
+    private readonly YoloConfig _yoloConfig;
 
     public TradeFactory(YoloConfig yoloConfig, ILogger<TradeFactory> logger)
     {
         _logger = logger;
+        _yoloConfig = yoloConfig;
         AssetPermissions = yoloConfig.AssetPermissions;
         BaseAsset = yoloConfig.BaseAsset;
         MinOrderValue = yoloConfig.MinOrderValue;
         NominalCash = yoloConfig.NominalCash;
-        MaxLeverage = yoloConfig.MaxLeverage;
-        TradeBuffer = yoloConfig.TradeBuffer;
-        RebalanceMode = yoloConfig.RebalanceMode;
         SpreadSplit = Math.Max(0, Math.Min(1, yoloConfig.SpreadSplit));
     }
 
@@ -27,9 +26,6 @@ public class TradeFactory : ITradeFactory
     private string BaseAsset { get; }
     private decimal? MinOrderValue { get; }
     private decimal? NominalCash { get; }
-    private decimal MaxLeverage { get; }
-    private decimal TradeBuffer { get; }
-    private RebalanceMode RebalanceMode { get; }
     private decimal SpreadSplit { get; }
 
     public IEnumerable<Trade> CalculateTrades(
@@ -39,106 +35,48 @@ public class TradeFactory : ITradeFactory
     {
         var nominal = NominalCash ??
                       positions.GetTotalValue(markets, BaseAsset);
-        var factorsDict = weights.ToDictionary(
-            kvp => kvp.Key.GetBaseAndQuoteAssets().BaseAsset,
-            kvp => (Weight: kvp.Value, IsInUniverse: true));
+        var plan = RebalancePlanner.Create(weights, positions, markets, _yoloConfig, nominal);
+        var factorsDict = plan.Items.ToDictionary(
+            item => item.Token,
+            item => (Weight: item.RawTargetWeight, item.IsInUniverse));
 
         _logger.CalculateTrades(factorsDict, positions, markets);
 
-        var unconstrainedTargetLeverage = factorsDict
-            .Values
-            .Sum(w => Math.Abs(w.Weight));
-
-        var weightConstraint = unconstrainedTargetLeverage < MaxLeverage
-            ? 1
-            : MaxLeverage / unconstrainedTargetLeverage;
-
-        var droppedTokens = positions.Keys.Except(factorsDict.Keys.Union([BaseAsset]));
-        foreach (var token in droppedTokens)
+        foreach (var item in plan.Items)
         {
-            factorsDict[token] = (0m, false);
+            _logger.Weight(item.Token, item.RawTargetWeight);
+            if (!item.HasTradableMarket)
+                _logger.NoMarkets(item.Token);
+            if (item.HasMultipleOpenPositions)
+                _logger.MultiplePositions(item.Token);
+            if (item.WithinTradeBuffer && item.CurrentWeight.HasValue)
+            {
+                _logger.WithinTradeBuffer(
+                    item.Token,
+                    item.CurrentWeight.Value,
+                    item.ConstrainedTargetWeight,
+                    item.ConstrainedTargetWeight - item.CurrentWeight.Value);
+            }
         }
 
-        return factorsDict
+        return plan.Items
             .Select(RebalancePosition)
             .SelectMany(CombineOrders);
 
-        IEnumerable<Trade> RebalancePosition(KeyValuePair<string, (decimal, bool)> kvp)
+        IEnumerable<Trade> RebalancePosition(RebalancePlanItem item)
         {
-            var (token, (weight, isInUniverse)) = kvp;
-
-            _logger.Weight(token, weight);
-
-            var tokenPositions = positions.TryGetValue(token, out var pos)
-                ? pos.ToArray()
-                : [];
-            var constrainedTargetWeight = weightConstraint * weight;
-
-            var projectedPositions = markets.GetMarkets(token)
-                .ToDictionary(
-                    market => market.Name,
-                    market =>
-                    {
-                        if (market.Bid is null)
-                            _logger.NoBid(token, market.Key);
-                        if (market.Ask is null)
-                            _logger.NoAsk(token, market.Key);
-
-                        var position = tokenPositions
-                                           .FirstOrDefault(p =>
-                                               p.AssetType == market.AssetType &&
-                                               (p.AssetName == market.Name &&
-                                                market.AssetType == AssetType.Future ||
-                                                p.BaseAsset == market.BaseAsset &&
-                                                market.AssetType == AssetType.Spot)) ??
-                                       Position.Null;
-
-                        return new ProjectedPosition(market, position.Amount, nominal);
-                    });
-
-            if (projectedPositions.Count == 0)
-            {
-                _logger.NoMarkets(token);
-                yield break;
-            }
-
-            bool HasPosition(KeyValuePair<string, ProjectedPosition> keyValuePair) => keyValuePair.Value.HasPosition;
-
-            if (projectedPositions.Count(HasPosition) > 1)
-            {
-                _logger.MultiplePositions(token);
-                yield break;
-            }
-
-            var currentWeight = projectedPositions.Values.Sum(projectedPosition => projectedPosition.ProjectedWeight);
-            if (currentWeight is null)
+            var rebalanceTarget = item.BufferAdjustedTargetWeight;
+            if (rebalanceTarget is null)
                 yield break;
 
-            if (isInUniverse &&
-                Math.Abs(currentWeight.Value - constrainedTargetWeight) <= TradeBuffer)
-            {
-                _logger.WithinTradeBuffer(
-                    token,
-                    currentWeight.Value,
-                    constrainedTargetWeight,
-                    constrainedTargetWeight - currentWeight.Value);
-                yield break;
-            }
-
-            var rebalanceTarget = RebalanceMode switch
-            {
-                RebalanceMode.Edge => CalculateEdgeTarget(currentWeight.Value, constrainedTargetWeight, TradeBuffer),
-                _ => constrainedTargetWeight
-            };
-
-            var remainingDelta = rebalanceTarget - currentWeight.Value;
+            var remainingDelta = rebalanceTarget.Value - item.CurrentWeight.GetValueOrDefault();
 
             while (remainingDelta != 0)
             {
                 var trades = CalcTrades(
-                        token,
-                        [.. projectedPositions.Values],
-                        rebalanceTarget,
+                        item.Token,
+                        [.. item.ProjectedPositions.Values],
+                        rebalanceTarget.Value,
                         remainingDelta)
                     .ToArray();
 
@@ -147,15 +85,15 @@ public class TradeFactory : ITradeFactory
 
                 foreach (var (trade, remainingDeltaPostTrade) in trades)
                 {
-                    var currentProjectedPosition = projectedPositions[trade.Symbol];
+                    var currentProjectedPosition = item.ProjectedPositions[trade.Symbol];
                     var newProjectedPosition = currentProjectedPosition + trade;
-                    projectedPositions[trade.Symbol] = newProjectedPosition;
+                    item.ProjectedPositions[trade.Symbol] = newProjectedPosition;
                     // For tokens that dropped out of the universe, bypass MinOrderValue check
-                    var minOrderValueForCheck = isInUniverse ? MinOrderValue : null;
+                    var minOrderValueForCheck = item.IsInUniverse ? MinOrderValue : null;
                     if (trade.IsTradable(minOrderValueForCheck))
                         yield return trade;
                     else
-                        _logger.DeltaTooSmall(token, remainingDelta);
+                        _logger.DeltaTooSmall(item.Token, remainingDelta);
                     remainingDelta = remainingDeltaPostTrade;
                 }
             }
@@ -308,11 +246,4 @@ public class TradeFactory : ITradeFactory
         return isBuy ? LogNull(market.Ask, _logger.NoAsk) : LogNull(market.Bid, _logger.NoBid);
     }
 
-    private static decimal CalculateEdgeTarget(decimal currentWeight, decimal idealWeight, decimal tradeBuffer) =>
-        // Calculate the nearest edge of the tolerance band
-        // If current weight is above ideal, rebalance to upper edge: idealWeight + tradeBuffer
-        // If current weight is below ideal, rebalance to lower edge: idealWeight - tradeBuffer
-        currentWeight > idealWeight
-            ? idealWeight + tradeBuffer
-            : idealWeight - tradeBuffer;
 }

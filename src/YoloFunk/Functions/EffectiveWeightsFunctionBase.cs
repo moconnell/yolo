@@ -73,6 +73,12 @@ public abstract class EffectiveWeightsFunctionBase
                     DateTime.UtcNow,
                     nominal,
                     verification.WeightConstraint,
+                    verification.CurrentGrossExposure,
+                    verification.CurrentNetExposure,
+                    verification.EffectiveGrossExposure,
+                    verification.EffectiveNetExposure,
+                    verification.BufferAdjustedGrossExposure,
+                    verification.BufferAdjustedNetExposure,
                     verification.Weights),
                 cancellationToken);
             return response;
@@ -109,7 +115,7 @@ public abstract class EffectiveWeightsFunctionBase
         }
     }
 
-    private static (decimal WeightConstraint, IReadOnlyList<EffectiveWeightItem> Weights) CalculateEffectiveWeights(
+    private static EffectiveWeightsVerification CalculateEffectiveWeights(
         IReadOnlyDictionary<string, decimal> rawWeights,
         IReadOnlyDictionary<string, IReadOnlyList<Position>> positions,
         IReadOnlyDictionary<string, IReadOnlyList<MarketInfo>> markets,
@@ -135,94 +141,72 @@ public abstract class EffectiveWeightsFunctionBase
                 $"Duplicate raw weight symbols normalize to the same base asset: {duplicatesDescription}");
         }
 
-        var factors = groupedWeights.ToDictionary(
-            group => group.Key,
-            group => (Weight: group.Sum(x => x.Value), IsInUniverse: true),
-            StringComparer.OrdinalIgnoreCase);
+        var plan = RebalancePlanner.Create(rawWeights, positions, markets, yoloConfig, nominal);
+        var effectiveItems = plan.Items
+            .OrderBy(item => item.Token, StringComparer.OrdinalIgnoreCase)
+            .Select(item => new EffectiveWeightItem(
+                item.Token,
+                item.RawTargetWeight,
+                item.ConstrainedTargetWeight,
+                item.CurrentWeight,
+                item.BufferAdjustedTargetWeight,
+                item.DeltaWeight,
+                item.IsInUniverse,
+                item.WithinTradeBuffer,
+                item.HasTradableMarket))
+            .ToArray();
 
-        var unconstrainedTargetLeverage = factors
-            .Values
-            .Sum(w => Math.Abs(w.Weight));
-
-        var weightConstraint = unconstrainedTargetLeverage < yoloConfig.MaxLeverage
-            ? 1
-            : yoloConfig.MaxLeverage / unconstrainedTargetLeverage;
-
-        var droppedTokens = positions.Keys.Except(factors.Keys.Union([yoloConfig.BaseAsset]));
-        foreach (var token in droppedTokens)
-        {
-            factors[token] = (0m, false);
-        }
-
-        var effectiveItems = new List<EffectiveWeightItem>(factors.Count);
-
-        foreach (var (token, (weight, isInUniverse)) in factors.OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase))
-        {
-            var tokenPositions = positions.TryGetValue(token, out var pos)
-                ? pos.ToArray()
-                : [];
-
-            var constrainedTargetWeight = weightConstraint * weight;
-            var marketList = markets.GetMarkets(token);
-            var projectedPositions = marketList
-                .ToDictionary(
-                    market => market.Name,
-                    market =>
-                    {
-                        var position = tokenPositions
-                                           .FirstOrDefault(p =>
-                                               p.AssetType == market.AssetType &&
-                                               (p.AssetName == market.Name && market.AssetType == AssetType.Future ||
-                                                p.BaseAsset == market.BaseAsset && market.AssetType == AssetType.Spot)) ??
-                                       Position.Null;
-
-                        return new ProjectedPosition(market, position.Amount, nominal);
-                    });
-
-            var hasTradableMarket = projectedPositions.Count != 0;
-            var hasMultipleOpenPositions = projectedPositions.Count(kvp => kvp.Value.HasPosition) > 1;
-            var currentWeight = hasTradableMarket && !hasMultipleOpenPositions
-                ? projectedPositions.Values.Sum(projectedPosition => projectedPosition.ProjectedWeight)
-                : null;
-
-            var withinTradeBuffer = isInUniverse &&
-                                    currentWeight.HasValue &&
-                                    Math.Abs(currentWeight.Value - constrainedTargetWeight) <= yoloConfig.TradeBuffer;
-
-            decimal? effectiveWeight = currentWeight.HasValue
-                ? withinTradeBuffer
-                    ? currentWeight.Value
-                    : yoloConfig.RebalanceMode switch
-                    {
-                        RebalanceMode.Edge => CalculateEdgeTarget(currentWeight.Value, constrainedTargetWeight, yoloConfig.TradeBuffer),
-                        _ => constrainedTargetWeight
-                    }
-                : null;
-
-            decimal? deltaWeight = effectiveWeight.HasValue && currentWeight.HasValue
-                ? effectiveWeight.Value - currentWeight.Value
-                : null;
-
-            effectiveItems.Add(new EffectiveWeightItem(
-                token,
-                weight,
-                constrainedTargetWeight,
-                currentWeight,
-                effectiveWeight,
-                deltaWeight,
-                isInUniverse,
-                withinTradeBuffer,
-                hasTradableMarket));
-        }
-
-        return (weightConstraint, effectiveItems);
+        return new EffectiveWeightsVerification(
+            plan.WeightConstraint,
+            CalculateGrossExposure(effectiveItems, item => item.CurrentWeight),
+            CalculateNetExposure(effectiveItems, item => item.CurrentWeight),
+            CalculateGrossExposure(effectiveItems, item => item.ConstrainedTargetWeight),
+            CalculateNetExposure(effectiveItems, item => item.ConstrainedTargetWeight),
+            CalculateGrossExposure(effectiveItems, item => item.EffectiveWeight),
+            CalculateNetExposure(effectiveItems, item => item.EffectiveWeight),
+            effectiveItems);
     }
 
-    private static decimal CalculateEdgeTarget(decimal currentWeight, decimal idealWeight, decimal tradeBuffer) =>
-        currentWeight > idealWeight
-            ? idealWeight + tradeBuffer
-            : idealWeight - tradeBuffer;
+    private static decimal? CalculateGrossExposure(
+        IReadOnlyList<EffectiveWeightItem> items,
+        Func<EffectiveWeightItem, decimal?> selectWeight) =>
+        TryGetCompleteWeights(items, selectWeight, out var weights)
+            ? weights.Sum(Math.Abs)
+            : null;
+
+    private static decimal? CalculateNetExposure(
+        IReadOnlyList<EffectiveWeightItem> items,
+        Func<EffectiveWeightItem, decimal?> selectWeight) =>
+        TryGetCompleteWeights(items, selectWeight, out var weights)
+            ? weights.Sum()
+            : null;
+
+    private static bool TryGetCompleteWeights(
+        IReadOnlyList<EffectiveWeightItem> items,
+        Func<EffectiveWeightItem, decimal?> selectWeight,
+        out decimal[] weights)
+    {
+        var selected = items.Select(selectWeight).ToArray();
+        if (selected.Any(weight => !weight.HasValue))
+        {
+            weights = [];
+            return false;
+        }
+
+        weights = [.. selected.Select(weight => weight.GetValueOrDefault())];
+        return true;
+    }
 
     private sealed class DuplicateBaseAssetWeightsException(string message) : InvalidOperationException(message);
+
+    private sealed record EffectiveWeightsVerification(
+        decimal WeightConstraint,
+        decimal? CurrentGrossExposure,
+        decimal? CurrentNetExposure,
+        decimal? EffectiveGrossExposure,
+        decimal? EffectiveNetExposure,
+        decimal? BufferAdjustedGrossExposure,
+        decimal? BufferAdjustedNetExposure,
+        IReadOnlyList<EffectiveWeightItem> Weights);
 
 }

@@ -144,7 +144,7 @@ public class TradeFactoryTests
         "./Data/json/005_EdgeRebalance",
         RebalanceMode.Edge,
         "BTC",
-        0.009,
+        0.017,
         0.00001)]
     [InlineData(
         "./Data/json/006_EdgeRebalanceOverweight",
@@ -156,7 +156,7 @@ public class TradeFactoryTests
         "./Data/json/006_EdgeRebalanceOverweight",
         RebalanceMode.Edge,
         "BTC",
-        -0.012,
+        -0.02,
         0.00001)]
     [InlineData(
         "./Data/json/007_EdgeRebalanceOverweight_CrossingZeroBoundary",
@@ -168,7 +168,7 @@ public class TradeFactoryTests
         "./Data/json/007_EdgeRebalanceOverweight_CrossingZeroBoundary",
         RebalanceMode.Edge,
         "BTC",
-        -0.052,
+        -0.06,
         0.00001)]
     [InlineData(
         "./Data/json/008_EdgeRebalanceOverweight_CrossingZeroBoundary",
@@ -241,6 +241,138 @@ public class TradeFactoryTests
         var trade = trades[0];
         trade.Symbol.ShouldBe(expectedSymbol);
         trade.Amount.ShouldBe(expectedTradeSize, tolerance);
+    }
+
+    [Fact]
+    public void GivenEdgeRebalanceModeWithMultipleLongTargets_WhenCalculatingTrades_ShouldPreserveTargetGrossExposure()
+    {
+        // arrange
+        var logger = _loggerFactory.CreateLogger<TradeFactory>();
+        var config = new YoloConfig
+        {
+            AssetPermissions = AssetPermissions.PerpetualFutures,
+            BaseAsset = "USDC",
+            MaxLeverage = 2,
+            NominalCash = 10000,
+            TradeBuffer = 0.01m,
+            RebalanceMode = RebalanceMode.Edge,
+            MinOrderValue = null
+        };
+        var tradeFactory = new TradeFactory(config, logger);
+
+        var weights = new Dictionary<string, decimal>
+        {
+            ["BTC"] = 0.6m,
+            ["ETH"] = 0.4m
+        };
+        var positions = new Dictionary<string, IReadOnlyList<Position>>();
+        var markets = new Dictionary<string, IReadOnlyList<MarketInfo>>
+        {
+            ["BTC"] =
+            [
+                new MarketInfo(
+                    "BTC",
+                    "BTC",
+                    "USDC",
+                    AssetType.Future,
+                    DateTime.UtcNow,
+                    PriceStep: 1m,
+                    QuantityStep: 0.00000001m,
+                    MinProvideSize: 0,
+                    Ask: 100m,
+                    Bid: 100m,
+                    Last: 100m)
+            ],
+            ["ETH"] =
+            [
+                new MarketInfo(
+                    "ETH",
+                    "ETH",
+                    "USDC",
+                    AssetType.Future,
+                    DateTime.UtcNow,
+                    PriceStep: 1m,
+                    QuantityStep: 0.00000001m,
+                    MinProvideSize: 0,
+                    Ask: 100m,
+                    Bid: 100m,
+                    Last: 100m)
+            ]
+        };
+
+        // act
+        var trades = tradeFactory.CalculateTrades(weights, positions, markets).ToArray();
+
+        // assert
+        trades.Length.ShouldBe(2);
+        var grossExposure = trades.Sum(trade => Math.Abs(trade.Amount * trade.LimitPrice.GetValueOrDefault() / config.NominalCash.GetValueOrDefault()));
+        grossExposure.ShouldBe(1m, 0.00000001m);
+    }
+
+    [Fact]
+    public void GivenEdgeRebalanceModeWithLongAndShortTargets_WhenCalculatingTrades_ShouldPreserveTargetNetExposure()
+    {
+        // arrange
+        var logger = _loggerFactory.CreateLogger<TradeFactory>();
+        var config = new YoloConfig
+        {
+            AssetPermissions = AssetPermissions.PerpetualFutures,
+            BaseAsset = "USDC",
+            MaxLeverage = 2,
+            NominalCash = 10000,
+            TradeBuffer = 0.01m,
+            RebalanceMode = RebalanceMode.Edge,
+            MinOrderValue = null
+        };
+        var tradeFactory = new TradeFactory(config, logger);
+
+        var weights = new Dictionary<string, decimal>
+        {
+            ["BTC"] = 0.6m,
+            ["ETH"] = -0.4m
+        };
+        var positions = new Dictionary<string, IReadOnlyList<Position>>();
+        var markets = new Dictionary<string, IReadOnlyList<MarketInfo>>
+        {
+            ["BTC"] =
+            [
+                new MarketInfo(
+                    "BTC",
+                    "BTC",
+                    "USDC",
+                    AssetType.Future,
+                    DateTime.UtcNow,
+                    PriceStep: 1m,
+                    QuantityStep: 0.00000001m,
+                    MinProvideSize: 0,
+                    Ask: 100m,
+                    Bid: 100m,
+                    Last: 100m)
+            ],
+            ["ETH"] =
+            [
+                new MarketInfo(
+                    "ETH",
+                    "ETH",
+                    "USDC",
+                    AssetType.Future,
+                    DateTime.UtcNow,
+                    PriceStep: 1m,
+                    QuantityStep: 0.00000001m,
+                    MinProvideSize: 0,
+                    Ask: 100m,
+                    Bid: 100m,
+                    Last: 100m)
+            ]
+        };
+
+        // act
+        var trades = tradeFactory.CalculateTrades(weights, positions, markets).ToArray();
+
+        // assert
+        trades.Length.ShouldBe(2);
+        var netExposure = trades.Sum(trade => trade.Amount * trade.LimitPrice.GetValueOrDefault() / config.NominalCash.GetValueOrDefault());
+        netExposure.ShouldBe(0.2m, 0.00000001m);
     }
 
     [Theory]
