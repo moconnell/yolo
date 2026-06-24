@@ -265,7 +265,7 @@ public class TradeFactoryTests
         var trades = tradeFactory.CalculateTrades(weights, positions, markets).ToArray();
 
         // assert
-        Assert.Single(trades);
+        trades.ShouldHaveSingleItem();
         trades[0].Symbol.ShouldBe("BTC");
         trades[0].Amount.ShouldBe(9m, 0.00000001m);
     }
