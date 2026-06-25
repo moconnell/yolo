@@ -64,21 +64,24 @@ public sealed class HyperliquidBroker : IYoloBroker
             tickerAliasService,
             config.Address,
             config.VaultAddress,
+            config.UseTestnet,
             logger)
     {
     }
 
-    public HyperliquidBroker(
+    internal HyperliquidBroker(
         IHyperLiquidRestClient hyperliquidClient,
         IHyperLiquidSocketClient hyperliquidSocketClient,
         ITickerAliasService tickerAliasService,
         string? vaultAddress,
+        bool useTestnet,
         ILogger<HyperliquidBroker> logger) : this(
             hyperliquidClient,
             hyperliquidSocketClient,
             tickerAliasService,
             null,
             vaultAddress,
+            useTestnet,
             logger)
     {
     }
@@ -89,6 +92,7 @@ public sealed class HyperliquidBroker : IYoloBroker
         ITickerAliasService tickerAliasService,
         string? address,
         string? vaultAddress,
+        bool useTestnet,
         ILogger<HyperliquidBroker> logger)
     {
         _hyperliquidClient = hyperliquidClient;
@@ -102,9 +106,10 @@ public sealed class HyperliquidBroker : IYoloBroker
             : null;
         _logger = logger;
         _logger.LogInformation(
-            "Initialized HyperliquidBroker with address: {Address}, vaultAddress: {VaultAddress}, net",
+            "Initialized HyperliquidBroker with address: {Address}, vaultAddress: {VaultAddress}, net: {Net}",
             _address ?? "null",
-            _vaultAddress ?? "null");
+            _vaultAddress ?? "null",
+            useTestnet ? "testnet" : "mainnet");
     }
 
     public void Dispose()

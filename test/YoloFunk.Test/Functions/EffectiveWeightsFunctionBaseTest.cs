@@ -57,80 +57,99 @@ public class EffectiveWeightsFunctionBaseTest
     [Fact]
     public async Task GivenValidStrategyServices_WhenRun_ShouldReturnEffectiveWeights()
     {
-        const string strategy = "test";
-        var accountContext = new BrokerAccountContext("0x1111111111111111111111111111111111111111", null);
-
-        var broker = new Mock<IYoloBroker>();
-        broker.Setup(x => x.GetAccountContext()).Returns(accountContext);
-        broker.Setup(x => x.GetPositionsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Dictionary<string, IReadOnlyList<Position>>
-            {
-                ["SOL"] =
-                [
-                    new Position("SOL-PERP", "SOL", AssetType.Future, 2m)
-                ]
-            });
-        broker.Setup(x => x.GetMarketsAsync(
-                It.IsAny<ISet<string>?>(),
-                It.IsAny<string?>(),
-                It.IsAny<AssetPermissions>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Dictionary<string, IReadOnlyList<MarketInfo>>
-            {
-                ["SOL"] =
-                [
-                    new MarketInfo(
-                        Name: "SOL-PERP",
-                        BaseAsset: "SOL",
-                        QuoteAsset: "USDC",
-                        AssetType: AssetType.Future,
-                        TimeStamp: DateTime.UtcNow,
-                        Ask: 100m,
-                        Bid: 99m,
-                        Last: 99.5m,
-                        PriceStep: 0.1m,
-                        QuantityStep: 0.01m,
-                        MinProvideSize: 0.01m)
-                ]
-            });
-
-        var weights = new Mock<ICalcWeights>();
-        weights.Setup(x => x.CalculateWeightsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Dictionary<string, decimal>
-            {
-                ["SOL"] = 0.4m
-            });
-
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddOptions<WorkerOptions>()
-            .Configure(options => options.Serializer = new JsonObjectSerializer());
-        services.AddKeyedSingleton(strategy, broker.Object);
-        services.AddKeyedSingleton(strategy, weights.Object);
-        services.AddKeyedSingleton(strategy, new YoloConfig
-        {
-            BaseAsset = "USDC",
-            NominalCash = 1000m,
-            MaxLeverage = 2m,
-            TradeBuffer = 0.01m,
-            RebalanceMode = RebalanceMode.Center,
-            AssetPermissions = AssetPermissions.All
-        });
-
-        using var provider = services.BuildServiceProvider();
-        var request = TestHttpRequestData.Create("GET", "http://localhost/api/rebalance/test/effective-weights", provider);
-        var sut = new EffectiveWeightsFunctionHarness(request.FunctionContext.InstanceServices, NullLogger<EffectiveWeightsFunctionHarness>.Instance);
-
-        var response = await sut.Run(request, CancellationToken.None);
+        var (response, accountContext) = await RunEffectiveWeightsAsync(
+            positionAmount: 2m,
+            rawTargetWeight: 0.4m,
+            tradeBuffer: 0.01m,
+            rebalanceMode: RebalanceMode.Center);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var payload = await TestHttpRequestData.ReadJsonAsync<EffectiveWeightsResponse>(response);
         payload.ShouldNotBeNull();
-        payload.Strategy.ShouldBe(strategy);
+        payload.Strategy.ShouldBe("test");
         payload.Address.ShouldBe(accountContext.Address);
         payload.Nominal.ShouldBe(1000m);
+        payload.CurrentGrossExposure.ShouldBe(0.198m);
+        payload.CurrentNetExposure.ShouldBe(0.198m);
+        payload.EffectiveGrossExposure.ShouldBe(0.4m);
+        payload.EffectiveNetExposure.ShouldBe(0.4m);
+        payload.BufferAdjustedGrossExposure.ShouldBe(0.4m);
+        payload.BufferAdjustedNetExposure.ShouldBe(0.4m);
         payload.Weights.ShouldNotBeEmpty();
         payload.Weights.ShouldContain(x => x.Token == "SOL");
+    }
+
+    [Fact]
+    public async Task GivenCurrentWeightWithinTradeBuffer_WhenRun_ShouldUseCurrentExposureAsEffectiveExposure()
+    {
+        var (response, _) = await RunEffectiveWeightsAsync(
+            positionAmount: 4m,
+            rawTargetWeight: 0.4m,
+            tradeBuffer: 0.01m,
+            rebalanceMode: RebalanceMode.Center);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var payload = await TestHttpRequestData.ReadJsonAsync<EffectiveWeightsResponse>(response);
+        payload.ShouldNotBeNull();
+        payload.CurrentGrossExposure.ShouldBe(0.396m);
+        payload.CurrentNetExposure.ShouldBe(0.396m);
+        payload.EffectiveGrossExposure.ShouldBe(0.4m);
+        payload.EffectiveNetExposure.ShouldBe(0.4m);
+        payload.BufferAdjustedGrossExposure.ShouldBe(0.396m);
+        payload.BufferAdjustedNetExposure.ShouldBe(0.396m);
+
+        var sol = payload.Weights.Single(x => x.Token == "SOL");
+        sol.CurrentWeight.ShouldBe(0.396m);
+        sol.ConstrainedTargetWeight.ShouldBe(0.4m);
+        sol.EffectiveWeight.ShouldBe(0.4m);
+        sol.DeltaWeight.ShouldBe(0m);
+        sol.WithinTradeBuffer.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task GivenCurrentWeightWithinTradeBuffer_WhenRun_ShouldKeepEffectiveExposureConsistentWithEffectiveWeights()
+    {
+        var (response, _) = await RunEffectiveWeightsAsync(
+            positionAmount: 4m,
+            rawTargetWeight: 0.4m,
+            tradeBuffer: 0.01m,
+            rebalanceMode: RebalanceMode.Center);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var payload = await TestHttpRequestData.ReadJsonAsync<EffectiveWeightsResponse>(response);
+        payload.ShouldNotBeNull();
+
+        payload.EffectiveGrossExposure.ShouldBe(payload.Weights.Sum(item => Math.Abs(item.EffectiveWeight.GetValueOrDefault())));
+        payload.EffectiveNetExposure.ShouldBe(payload.Weights.Sum(item => item.EffectiveWeight.GetValueOrDefault()));
+        payload.BufferAdjustedGrossExposure.ShouldBe(0.396m);
+        payload.Weights.Single(x => x.Token == "SOL").DeltaWeight.ShouldBe(0m);
+    }
+
+    [Fact]
+    public async Task GivenEdgeRebalanceMode_WhenRun_ShouldPreserveTargetExposure()
+    {
+        var (response, _) = await RunEffectiveWeightsAsync(
+            positionAmount: 2m,
+            rawTargetWeight: 0.4m,
+            tradeBuffer: 0.01m,
+            rebalanceMode: RebalanceMode.Edge);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var payload = await TestHttpRequestData.ReadJsonAsync<EffectiveWeightsResponse>(response);
+        payload.ShouldNotBeNull();
+        payload.CurrentGrossExposure.ShouldBe(0.198m);
+        payload.CurrentNetExposure.ShouldBe(0.198m);
+        payload.EffectiveGrossExposure.ShouldBe(0.4m);
+        payload.EffectiveNetExposure.ShouldBe(0.4m);
+        payload.BufferAdjustedGrossExposure.ShouldBe(0.4m);
+        payload.BufferAdjustedNetExposure.ShouldBe(0.4m);
+
+        var sol = payload.Weights.Single(x => x.Token == "SOL");
+        sol.CurrentWeight.ShouldBe(0.198m);
+        sol.ConstrainedTargetWeight.ShouldBe(0.4m);
+        sol.EffectiveWeight.ShouldBe(0.4m);
+        sol.DeltaWeight.ShouldBe(0.202m);
+        sol.WithinTradeBuffer.ShouldBeFalse();
     }
 
     [Fact]
@@ -197,6 +216,79 @@ public class EffectiveWeightsFunctionBaseTest
 
         public Task<HttpResponseData> Run(HttpRequestData req, CancellationToken cancellationToken)
             => GetEffectiveWeightsAsync(req, cancellationToken);
+    }
+
+    private static async Task<(HttpResponseData Response, BrokerAccountContext AccountContext)> RunEffectiveWeightsAsync(
+        decimal positionAmount,
+        decimal rawTargetWeight,
+        decimal tradeBuffer,
+        RebalanceMode rebalanceMode)
+    {
+        const string strategy = "test";
+        var accountContext = new BrokerAccountContext("0x1111111111111111111111111111111111111111", null);
+
+        var broker = new Mock<IYoloBroker>();
+        broker.Setup(x => x.GetAccountContext()).Returns(accountContext);
+        broker.Setup(x => x.GetPositionsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, IReadOnlyList<Position>>
+            {
+                ["SOL"] =
+                [
+                    new Position("SOL-PERP", "SOL", AssetType.Future, positionAmount)
+                ]
+            });
+        broker.Setup(x => x.GetMarketsAsync(
+                It.IsAny<ISet<string>?>(),
+                It.IsAny<string?>(),
+                It.IsAny<AssetPermissions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, IReadOnlyList<MarketInfo>>
+            {
+                ["SOL"] =
+                [
+                    new MarketInfo(
+                        Name: "SOL-PERP",
+                        BaseAsset: "SOL",
+                        QuoteAsset: "USDC",
+                        AssetType: AssetType.Future,
+                        TimeStamp: DateTime.UtcNow,
+                        Ask: 100m,
+                        Bid: 99m,
+                        Last: 99.5m,
+                        PriceStep: 0.1m,
+                        QuantityStep: 0.01m,
+                        MinProvideSize: 0.01m)
+                ]
+            });
+
+        var weights = new Mock<ICalcWeights>();
+        weights.Setup(x => x.CalculateWeightsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<string, decimal>
+            {
+                ["SOL"] = rawTargetWeight
+            });
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddOptions<WorkerOptions>()
+            .Configure(options => options.Serializer = new JsonObjectSerializer());
+        services.AddKeyedSingleton(strategy, broker.Object);
+        services.AddKeyedSingleton(strategy, weights.Object);
+        services.AddKeyedSingleton(strategy, new YoloConfig
+        {
+            BaseAsset = "USDC",
+            NominalCash = 1000m,
+            MaxLeverage = 2m,
+            TradeBuffer = tradeBuffer,
+            RebalanceMode = rebalanceMode,
+            AssetPermissions = AssetPermissions.All
+        });
+
+        using var provider = services.BuildServiceProvider();
+        var request = TestHttpRequestData.Create("GET", "http://localhost/api/rebalance/test/effective-weights", provider);
+        var sut = new EffectiveWeightsFunctionHarness(request.FunctionContext.InstanceServices, NullLogger<EffectiveWeightsFunctionHarness>.Instance);
+
+        return (await sut.Run(request, CancellationToken.None), accountContext);
     }
 
     private sealed class TestHttpRequestData : HttpRequestData

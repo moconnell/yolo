@@ -92,7 +92,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/heads/feat* ]]; then
             # Extract branch name and sanitize for Azure naming
             # Handles both feat/* and feature/* patterns
-            BRANCH_NAME=$(echo "${{ github.ref }}" | sed 's/refs\/heads\/feat[^\/]*\///' | sed 's/[^a-zA-Z0-9-]/-/g' | cut -c1-20)
+            BRANCH_NAME=$(echo "${{ github.ref }}" | sed 's/refs\/heads\/feat[^\/]*\///' | sed 's/[^a-zA-Z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | cut -c1-20 | sed 's/-$//')
             ENV="feat-$BRANCH_NAME"
             echo "environment=$ENV" >> $GITHUB_OUTPUT
             echo "function-app-name=yolo-funk-$ENV" >> $GITHUB_OUTPUT
