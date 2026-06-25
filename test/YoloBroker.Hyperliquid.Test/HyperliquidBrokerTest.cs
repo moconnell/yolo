@@ -24,6 +24,7 @@ namespace YoloBroker.Hyperliquid.Test;
 
 public class HyperliquidBrokerTest
 {
+    private const bool IsTestnet = true;
     private readonly ILoggerFactory _loggerFactory;
 
     public HyperliquidBrokerTest(ITestOutputHelper testOutputHelper)
@@ -66,6 +67,7 @@ public class HyperliquidBrokerTest
             GetTickerAliasService(null),
             address,
             vaultAddress,
+            IsTestnet,
             _loggerFactory.CreateLogger<HyperliquidBroker>());
 
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
@@ -1121,6 +1123,7 @@ public class HyperliquidBrokerTest
             socketClient,
             GetTickerAliasService(aliases),
             "0x0",
+            IsTestnet,
             logger);
     }
 

@@ -16,6 +16,7 @@ namespace YoloBroker.Hyperliquid.Test;
 
 public class HyperliquidBrokerIntegrationTest
 {
+    private const bool IsTestnet = true;
     private readonly ITestOutputHelper _testOutputHelper;
     private readonly ILoggerFactory _loggerFactory;
 
@@ -439,6 +440,7 @@ public class HyperliquidBrokerIntegrationTest
             }),
             GetTickerAliasService(aliases),
             "0x0", // Dummy vault address for testing
+            IsTestnet,
             logger
         );
         return broker;
