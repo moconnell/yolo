@@ -1,4 +1,5 @@
 using YoloAbstractions;
+using YoloAbstractions.Extensions;
 using YoloAbstractions.Interfaces;
 using YoloBroker.Interface;
 
@@ -34,8 +35,13 @@ public class TradeAdvisor : ITradeAdvisor
     public async Task<Trade?> GetReplacementTradeAsync(Trade timedOutTrade, CancellationToken ct = default)
     {
         var positions = await _broker.GetPositionsAsync(ct);
+        var baseAssetFilter = positions.Keys
+            .Union(_weights.Keys.Select(x => x.GetBaseAndQuoteAssets().BaseAsset))
+            .Append(timedOutTrade.Symbol)
+            .ToHashSet();
+
         var markets = await _broker.GetMarketsAsync(
-            baseAssetFilter: null,
+            baseAssetFilter,
             _baseAsset,
             _assetPermissions,
             ct);
