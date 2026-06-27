@@ -86,11 +86,16 @@ public class TradeAdvisorTest
     }
 
     [Fact]
-    public async Task ShouldFetchAllMarketsForCorrectNominalComputation()
+    public async Task ShouldFetchMarketsForRelevantBaseAssets()
     {
+        var positions = new Dictionary<string, IReadOnlyList<Position>>
+        {
+            ["ETH"] = [new Position("ETH", "ETH", AssetType.Future, 1m)]
+        };
+
         var broker = new Mock<IYoloBroker>();
         broker.Setup(x => x.GetPositionsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(EmptyPositions);
+            .ReturnsAsync(positions);
         broker.Setup(x => x.GetMarketsAsync(
                 It.IsAny<ISet<string>?>(),
                 It.IsAny<string?>(),
@@ -110,7 +115,8 @@ public class TradeAdvisorTest
         await sut.GetReplacementTradeAsync(TimedOutTrade);
 
         broker.Verify(x => x.GetMarketsAsync(
-            null,
+            It.Is<ISet<string>>(filter =>
+                filter.SetEquals(new[] { "ETH", "SOL" })),
             "USDC",
             AssetPermissions.All,
             It.IsAny<CancellationToken>()), Times.Once);
