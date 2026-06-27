@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using CryptoExchange.Net.Authentication;
 using CryptoExchange.Net.Objects;
 using HyperLiquid.Net;
@@ -14,9 +15,10 @@ using static YoloBroker.Hyperliquid.Test.TradeUtil;
 
 namespace YoloBroker.Hyperliquid.Test;
 
-public class HyperliquidBrokerIntegrationTest
+public class HyperliquidBrokerIntegrationTest : IAsyncLifetime
 {
     private const bool IsTestnet = true;
+    private static readonly bool FlattenPositionsOnExit = true;
     private readonly ITestOutputHelper _testOutputHelper;
     private readonly ILoggerFactory _loggerFactory;
 
@@ -28,6 +30,37 @@ public class HyperliquidBrokerIntegrationTest
             builder.AddProvider(new XUnitLoggerProvider(testOutputHelper));
             builder.SetMinimumLevel(LogLevel.Debug);
         });
+    }
+
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    public async Task DisposeAsync()
+    {
+        if (!FlattenPositionsOnExit)
+            return;
+
+        var broker = GetTestBrokerForCleanup();
+        if (broker is null)
+            return;
+
+        try
+        {
+            var cleanupErrors = new List<Exception>();
+            await CancelOpenOrdersAsync(broker, cleanupErrors);
+            await FlattenFuturesPositionsAsync(broker, cleanupErrors);
+
+            if (cleanupErrors.Count != 0)
+                throw new AggregateException("Failed to clean up Hyperliquid integration-test account", cleanupErrors);
+        }
+        catch (Exception ex)
+        {
+            _testOutputHelper.WriteLine($"Failed to flatten Hyperliquid integration-test account: {ex}");
+            throw;
+        }
+        finally
+        {
+            broker.Dispose();
+        }
     }
 
     [Theory]
@@ -88,12 +121,14 @@ public class HyperliquidBrokerIntegrationTest
     [Trait("Category", "Integration")]
     // [InlineData("HYPE/USDC", Spot, 1)]
     // [InlineData("ETH", AssetType.Future, 0.01)]
-    [InlineData("BTC", AssetType.Future, 0.01)]
-    public async Task ShouldPlaceOrder(string symbol, AssetType assetType, double quantity)
+    [InlineData("BTC", AssetType.Future)]
+    public async Task ShouldPlaceOrder(string symbol, AssetType assetType)
     {
         // arrange
         var broker = GetTestBroker();
-        var orderPrice = await GetLimitPrice(broker, symbol, assetType, quantity);
+        var marketInfo = await GetMarketInfo(broker, symbol, assetType);
+        var quantity = GetTestOrderQuantity(marketInfo);
+        var orderPrice = GetLimitPrice(symbol, quantity, marketInfo);
         var trade = CreateTrade(symbol, assetType, quantity, orderPrice);
 
         // act
@@ -115,18 +150,19 @@ public class HyperliquidBrokerIntegrationTest
     [Theory]
     [Trait("Category", "Integration")]
     // [InlineData("HYPE/USDC", Spot, 1)]
-    [InlineData("ETH", AssetType.Future, 0.01)]
-    [InlineData("ETH", AssetType.Future, 0.01, OrderType.Market)]
-    [InlineData("BTC", AssetType.Future, 0.001)]
+    [InlineData("ETH", AssetType.Future)]
+    [InlineData("ETH", AssetType.Future, OrderType.Market)]
+    [InlineData("BTC", AssetType.Future)]
     public async Task ShouldPlaceOrders(
         string symbol,
         AssetType assetType,
-        double quantity,
         OrderType orderType = OrderType.Limit)
     {
         // arrange
         var broker = GetTestBroker();
-        var limitPrice = await GetLimitPrice(broker, symbol, assetType, quantity);
+        var marketInfo = await GetMarketInfo(broker, symbol, assetType);
+        var quantity = GetTestOrderQuantity(marketInfo);
+        var limitPrice = GetLimitPrice(symbol, quantity, marketInfo);
         var trade = CreateTrade(symbol, assetType, quantity, limitPrice, orderType);
 
         // act
@@ -439,11 +475,75 @@ public class HyperliquidBrokerIntegrationTest
                 options.Environment = HyperLiquidEnvironment.Testnet;
             }),
             GetTickerAliasService(aliases),
-            "0x0", // Dummy vault address for testing
+            address,
+            null,
             IsTestnet,
             logger
         );
         return broker;
+    }
+
+    private HyperliquidBroker? GetTestBrokerForCleanup()
+    {
+        var (address, privateKey) = GetConfig();
+        if (string.IsNullOrEmpty(address) || string.IsNullOrEmpty(privateKey))
+            return null;
+
+        return GetTestBroker();
+    }
+
+    private async Task CancelOpenOrdersAsync(HyperliquidBroker broker, List<Exception> cleanupErrors)
+    {
+        var openOrders = await broker.GetOpenOrdersAsync();
+        foreach (var order in openOrders.Values)
+        {
+            try
+            {
+                _testOutputHelper.WriteLine($"Cancelling open order {order.Id} for {order.Symbol}");
+                await broker.CancelOrderAsync(order);
+            }
+            catch (Exception ex)
+            {
+                _testOutputHelper.WriteLine($"Failed to cancel order {order.Id} for {order.Symbol}: {ex.Message}");
+                cleanupErrors.Add(ex);
+            }
+        }
+    }
+
+    private async Task FlattenFuturesPositionsAsync(HyperliquidBroker broker, List<Exception> cleanupErrors)
+    {
+        var positions = await broker.GetPositionsAsync();
+        var futuresPositions = positions
+            .Values
+            .SelectMany(x => x)
+            .Where(position => position.AssetType == AssetType.Future && position.Amount != 0)
+            .ToArray();
+
+        foreach (var position in futuresPositions)
+        {
+            var flattenTrade = new Trade(
+                position.AssetName,
+                position.AssetType,
+                -position.Amount,
+                OrderType: OrderType.Market,
+                PostPrice: false,
+                ReduceOnly: true,
+                ClientOrderId: $"0x{RandomNumberGenerator.GetHexString(32, true)}");
+
+            _testOutputHelper.WriteLine(
+                $"Flattening {position.AssetName} futures position {position.Amount} with market order {flattenTrade.Amount}");
+
+            try
+            {
+                var result = await broker.PlaceTradeAsync(flattenTrade);
+                result.Success.ShouldBeTrue(result.Error);
+            }
+            catch (Exception ex)
+            {
+                _testOutputHelper.WriteLine($"Failed to flatten {position.AssetName} futures position {position.Amount}: {ex.Message}");
+                cleanupErrors.Add(ex);
+            }
+        }
     }
 
     private static (string? Address, string? PrivateKey) GetConfig()
@@ -457,13 +557,11 @@ public class HyperliquidBrokerIntegrationTest
         return (config["Hyperliquid:Address"], config["Hyperliquid:PrivateKey"]);
     }
 
-    private async Task<decimal> GetLimitPrice(
+    private async Task<MarketInfo> GetMarketInfo(
         HyperliquidBroker broker,
         string symbol,
-        AssetType assetType,
-        double quantity)
+        AssetType assetType)
     {
-        // Get current market price first
         var assets = symbol.Split('/').Select(s => s.Trim()).ToArray();
         var markets = assetType switch
         {
@@ -479,8 +577,37 @@ public class HyperliquidBrokerIntegrationTest
 
         markets.ShouldNotBeNull();
         markets.ShouldContainKey(symbol);
-        var marketInfo = markets[symbol][0];
+        return markets[symbol][0];
+    }
 
+    private decimal GetTestOrderQuantity(MarketInfo marketInfo)
+    {
+        const decimal minProvideSizeMultiplier = 2m;
+
+        marketInfo.MinProvideSize.ShouldNotBeNull();
+        marketInfo.MinProvideSize.Value.ShouldBeGreaterThan(0);
+
+        var rawQuantity = marketInfo.MinProvideSize.Value * minProvideSizeMultiplier;
+        var quantityStep = marketInfo.QuantityStep;
+        if (quantityStep is not > 0)
+        {
+            _testOutputHelper.WriteLine(
+                $"Calculated test quantity for {marketInfo.Name}: {rawQuantity} (min provide size: {marketInfo.MinProvideSize.Value}, quantity step: null)");
+            return rawQuantity;
+        }
+
+        var quantity = Math.Ceiling(rawQuantity / quantityStep.Value) * quantityStep.Value;
+        _testOutputHelper.WriteLine(
+            $"Calculated test quantity for {marketInfo.Name}: {quantity} (min provide size: {marketInfo.MinProvideSize.Value}, quantity step: {quantityStep.Value})");
+
+        return quantity;
+    }
+
+    private decimal GetLimitPrice(
+        string symbol,
+        decimal quantity,
+        MarketInfo marketInfo)
+    {
         var isLong = quantity >= 0;
         var rawLimitPrice = isLong ? marketInfo.Bid * 0.99m : marketInfo.Ask * 1.01m;
         rawLimitPrice.ShouldNotBeNull();
@@ -497,5 +624,15 @@ public class HyperliquidBrokerIntegrationTest
             $"Calculated limit price for {symbol}: {roundedLimitPrice} (raw: {rawLimitPrice.Value}, step: {priceStep.Value})");
 
         return roundedLimitPrice;
+    }
+
+    private async Task<decimal> GetLimitPrice(
+        HyperliquidBroker broker,
+        string symbol,
+        AssetType assetType,
+        double quantity)
+    {
+        var marketInfo = await GetMarketInfo(broker, symbol, assetType);
+        return GetLimitPrice(symbol, Convert.ToDecimal(quantity), marketInfo);
     }
 }
