@@ -1,19 +1,25 @@
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
+using Microsoft.Azure.Functions.Worker.OpenTelemetry;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Azure.Monitor.OpenTelemetry.AspNetCore;
 using YoloFunk.Extensions;
 
 var builder = FunctionsApplication.CreateBuilder(args);
 
 builder.ConfigureFunctionsWebApplication();
 
-builder.Services
-    .AddApplicationInsightsTelemetryWorkerService()
-    .ConfigureFunctionsApplicationInsights();
-
 var config = builder.Configuration;
+
+var openTelemetry = builder.Services.AddOpenTelemetry();
+openTelemetry.UseFunctionsWorkerDefaults();
+if (!string.IsNullOrWhiteSpace(config["APPLICATIONINSIGHTS_CONNECTION_STRING"]) ||
+    !string.IsNullOrWhiteSpace(config["ApplicationInsights:ConnectionString"]))
+{
+    openTelemetry.UseAzureMonitor();
+}
 
 builder.Services.AddLogging()
                 .AddHttpClient()
