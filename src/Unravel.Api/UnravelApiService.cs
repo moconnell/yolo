@@ -10,17 +10,6 @@ namespace Unravel.Api;
 public class UnravelApiService : IUnravelApiService
 {
     private const string ApiKeyHeader = "X-API-KEY";
-    private static readonly Dictionary<FactorType, string> FactorTypeToStringMap = new()
-    {
-        { FactorType.Carry, "carry_enhanced" },
-        { FactorType.Momentum, "momentum_enhanced" },
-        { FactorType.OpenInterestDivergence, "open_interest_divergence" },
-        { FactorType.RelativeIlliquidity, "relative_illiquidity" },
-        { FactorType.RetailFlow, "retail_flow" },
-        { FactorType.SupplyVelocity, "supply_velocity" },
-        { FactorType.TrendLongonlyAdaptive, "trend_longonly_adaptive" },
-    };
-
     private readonly HttpClient _httpClient;
     private readonly UnravelConfig _config;
     private readonly Dictionary<string, string> _headers;
@@ -110,8 +99,8 @@ public class UnravelApiService : IUnravelApiService
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (!FactorTypeToStringMap.TryGetValue(fac, out var factorTypeString))
-                throw new InvalidOperationException($"Factor type {fac} is not supported.");
+            var factorTypeString = fac.ToApiName();
+            var factorType = fac.ToFactorType();
 
             var response = await fetchFactorDataAsync(factorTypeString, tickersCsv, cancellationToken);
 
@@ -120,7 +109,7 @@ public class UnravelApiService : IUnravelApiService
                 var dataFrame = FactorDataFrame.NewFrom(
                     response.Tickers,
                     response.Timestamp,
-                    (fac, response.Data.Select(d => d ?? double.NaN).ToArray()));
+                    (factorType, response.Data.Select(d => d ?? double.NaN).ToArray()));
                 results.Add(dataFrame);
                 continue;
             }
@@ -139,7 +128,7 @@ public class UnravelApiService : IUnravelApiService
                     values.Insert(insertIndex, double.NaN);
                 }
 
-                var dataFrame = FactorDataFrame.NewFrom(tickerList, response.Timestamp, (fac, values));
+                var dataFrame = FactorDataFrame.NewFrom(tickerList, response.Timestamp, (factorType, values));
                 results.Add(dataFrame);
             }
             else

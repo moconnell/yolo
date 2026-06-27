@@ -20,6 +20,10 @@ param tags object = {}
 var functionAppName = 'yolo-funk-${environmentName}'
 var storageAccountName = 'yolofunk${uniqueString(resourceGroup().id, environmentName)}'
 var appInsightsName = 'yolo-funk-insights'
+var contentShareName = contains([
+  'dev'
+  'prod'
+], environmentName) ? toLower(functionAppName) : 'yolofunk${uniqueString(resourceGroup().id, environmentName)}'
 
 // Determine secret suffix based on network (testnet or mainnet)
 var secretEnv = hyperliquidNetwork == 'mainnet' ? 'prod' : 'dev'
@@ -90,7 +94,7 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
         }
         {
           name: 'WEBSITE_CONTENTSHARE'
-          value: toLower(functionAppName)
+          value: contentShareName
         }
         {
           name: 'FUNCTIONS_EXTENSION_VERSION'

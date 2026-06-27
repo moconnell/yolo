@@ -7,6 +7,12 @@ public sealed record EffectiveWeightsResponse(
     DateTime GeneratedAtUtc,
     decimal Nominal,
     decimal WeightConstraint,
+    decimal? CurrentGrossExposure,
+    decimal? CurrentNetExposure,
+    decimal? EffectiveGrossExposure,
+    decimal? EffectiveNetExposure,
+    decimal? BufferAdjustedGrossExposure,
+    decimal? BufferAdjustedNetExposure,
     IReadOnlyList<EffectiveWeightItem> Weights);
 
 public sealed record EffectiveWeightItem(

@@ -46,24 +46,25 @@ public class RobotWealthFactorService : IGetFactors
 
         var orderedWeights = weights.OrderBy(x => x.Ticker).ToArray();
         var weightsTickers = orderedWeights.Select(w => w.Ticker).ToArray();
-        var carryFrame = orderedWeights.Select(w => w.CarryMegafactor).ToArray();
-        var momentumFrame = orderedWeights.Select(w => w.MomentumMegafactor).ToArray();
-        var trendFrame = orderedWeights.Select(w => w.TrendMegafactor).ToArray();
         var orderedVolatilities = volatilities.OrderBy(x => x.Ticker).ToArray();
         var volTickers = orderedVolatilities.Select(x => x.Ticker).ToArray();
         if (weightsTickers.Length != volTickers.Length ||
             weightsTickers.Except(volTickers).Any() ||
             volTickers.Except(weightsTickers).Any())
             throw new ApiException("Weights/volatilities tickers mismatch");
-        var volFrame = orderedVolatilities.Select(w => w.EwVol).ToArray();
+
+        var factorValues = RobotWealthFactorTypeMapper.All
+            .Select(factorType => (
+                factorType.ToFactorType(),
+                Values: (IReadOnlyList<double>)orderedWeights
+                    .Zip(orderedVolatilities, (weight, volatility) => factorType.GetValue(weight, volatility))
+                    .ToArray()))
+            .ToArray();
 
         return FactorDataFrame.NewFrom(
             weightsTickers,
             weightsDate,
-            (FactorType.Carry, carryFrame),
-            (FactorType.Momentum, momentumFrame),
-            (FactorType.Trend, trendFrame),
-            (FactorType.Volatility, volFrame)
+            factorValues
         );
     }
 }
