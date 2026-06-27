@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Azure;
 using Azure.Data.Tables;
@@ -18,15 +20,15 @@ public class RawJsonPersistenceHandler(
         CancellationToken cancellationToken)
     {
         var requestTime = DateTimeOffset.UtcNow;
-        var timestamp = requestTime.ToString("yyyy-MM-dd-HH-mm-ss-fff");
         var requestUri = request.RequestUri;
-        var blobName = BuildBlobName(requestUri, timestamp);
         var requestBody = request.Content != null
             ? await request.Content.ReadAsStringAsync(cancellationToken)
             : string.Empty;
 
         var response = await base.SendAsync(request, cancellationToken);
         var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+        var contentHash = BuildContentHash(requestUri, request.Method.Method, requestBody, response.StatusCode, responseBody);
+        var blobName = BuildBlobName(requestUri, contentHash);
 
         var payload = new HttpExchangePayload(
             requestTime,
@@ -45,12 +47,13 @@ public class RawJsonPersistenceHandler(
             tableClient.CreateIfNotExistsAsync(cancellationToken));
 
         var responseBlobClient = containerClient.GetBlobClient(blobName);
-        var blobUploadTask = responseBlobClient.UploadAsync(
-            BinaryData.FromString(JsonSerializer.Serialize(payload, SerializerOptions)),
-            overwrite: true,
-            cancellationToken: cancellationToken);
+        var payloadJson = JsonSerializer.Serialize(payload, SerializerOptions);
+        var blobUploadTask = UploadIfNotExistsAsync(
+            responseBlobClient,
+            BinaryData.FromString(payloadJson),
+            cancellationToken);
 
-        var indexEntity = BuildIndexEntity(requestTime, requestUri, request.Method.Method, response.StatusCode, blobName);
+        var indexEntity = BuildIndexEntity(requestTime, requestUri, request.Method.Method, response.StatusCode, blobName, contentHash);
         var indexUpsertTask = tableClient.UpsertEntityAsync(
             indexEntity,
             TableUpdateMode.Replace,
@@ -61,17 +64,50 @@ public class RawJsonPersistenceHandler(
         return response;
     }
 
-    private static string BuildBlobName(Uri? requestUri, string timestamp)
+    private static async Task UploadIfNotExistsAsync(
+        BlobClient blobClient,
+        BinaryData content,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await blobClient.UploadAsync(content, overwrite: false, cancellationToken);
+        }
+        catch (RequestFailedException ex) when (ex.ErrorCode == "BlobAlreadyExists")
+        {
+            // Identical request/response payload already captured.
+        }
+    }
+
+    private static string BuildBlobName(Uri? requestUri, string contentHash)
     {
         if (requestUri == null)
-            return $"unknown/unknown/{timestamp}.json";
+            return $"unknown/unknown/{contentHash}.json";
 
         var host = string.IsNullOrWhiteSpace(requestUri.Host) ? "unknown" : requestUri.Host;
         var path = requestUri.AbsolutePath.Trim('/');
         if (string.IsNullOrWhiteSpace(path))
             path = "root";
 
-        return $"{host}/{path}/{timestamp}.json";
+        return $"{host}/{path}/{contentHash}.json";
+    }
+
+    private static string BuildContentHash(
+        Uri? requestUri,
+        string method,
+        string requestBody,
+        System.Net.HttpStatusCode statusCode,
+        string responseBody)
+    {
+        var input = string.Join(
+            '\n',
+            method,
+            requestUri?.ToString() ?? string.Empty,
+            requestBody,
+            ((int)statusCode).ToString(),
+            responseBody);
+
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(input))).ToLowerInvariant();
     }
 
     private static Dictionary<string, string[]> GetQueryParameters(Uri? requestUri)
@@ -115,7 +151,8 @@ public class RawJsonPersistenceHandler(
         Uri? requestUri,
         string method,
         System.Net.HttpStatusCode statusCode,
-        string blobName)
+        string blobName,
+        string contentHash)
     {
         var host = requestUri?.Host ?? "unknown";
         var endpoint = requestUri?.AbsolutePath ?? "/";
@@ -123,7 +160,7 @@ public class RawJsonPersistenceHandler(
         if (string.IsNullOrWhiteSpace(endpointKey))
             endpointKey = "root";
 
-        var rowKey = $"{endpointKey}|{requestTime:yyyyMMddHHmmssfff}|{Guid.NewGuid():N}";
+        var rowKey = $"{endpointKey}|{contentHash}";
 
         return new HttpExchangeIndexEntity
         {
@@ -135,6 +172,7 @@ public class RawJsonPersistenceHandler(
             StatusCode = (int)statusCode,
             BlobContainer = ContainerName,
             BlobName = blobName,
+            ContentHash = contentHash,
             QueryParametersJson = requestUri == null
                 ? "{}"
                 : JsonSerializer.Serialize(GetQueryParameters(requestUri), SerializerOptions),
@@ -164,6 +202,7 @@ public class RawJsonPersistenceHandler(
         public int StatusCode { get; set; }
         public string BlobContainer { get; set; } = string.Empty;
         public string BlobName { get; set; } = string.Empty;
+        public string ContentHash { get; set; } = string.Empty;
         public string QueryParametersJson { get; set; } = string.Empty;
         public string Endpoint { get; set; } = string.Empty;
         public string Host { get; set; } = string.Empty;
