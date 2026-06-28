@@ -588,4 +588,196 @@ public class RebalanceCommandTest
             It.IsAny<ITradeAdvisor>(),
             It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task GivenOrderUpdates_WhenExecuting_ShouldRecordTradeExecutionTelemetry()
+    {
+        // arrange
+        var weights = new Dictionary<string, decimal> { { "BTC/USDT", 0.5m } };
+        var positions = new Dictionary<string, IReadOnlyList<Position>>
+        {
+            ["BTC"] = [new Position("BTC", "BTC", AssetType.Future, 1.5m)]
+        };
+        var markets = new Dictionary<string, IReadOnlyList<MarketInfo>>
+        {
+            ["BTC"] =
+            [
+                new MarketInfo(
+                    "BTC",
+                    "BTC",
+                    "USDC",
+                    AssetType.Future,
+                    DateTime.UtcNow,
+                    Ask: 101m,
+                    Bid: 99m,
+                    Mid: 100m)
+            ]
+        };
+        var trade = new Trade("BTC", AssetType.Future, 2m, 100.5m, ClientOrderId: "client-1");
+        var created = new Order(123, "BTC", AssetType.Future, DateTime.UtcNow, OrderSide.Buy, OrderStatus.Open, 2m, 0.5m, 100.5m, "client-1");
+        var filled = created with { OrderStatus = OrderStatus.Filled, Filled = 2m };
+
+        var channel = Channel.CreateUnbounded<OrderUpdate>();
+        await channel.Writer.WriteAsync(new OrderUpdate("BTC", OrderUpdateType.Created, created, "accepted"));
+        await channel.Writer.WriteAsync(new OrderUpdate("BTC", OrderUpdateType.Filled, filled));
+        channel.Writer.Complete();
+
+        var mockWeightsService = new Mock<ICalcWeights>();
+        mockWeightsService.Setup(x => x.CalculateWeightsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(weights);
+
+        var mockTradeFactory = new Mock<ITradeFactory>();
+        mockTradeFactory.Setup(x => x.CalculateTrades(weights, positions, markets))
+            .Returns([trade]);
+
+        var mockOrderManager = new Mock<IOrderManager>();
+        mockOrderManager.Setup(x => x.ManageOrdersAsync(
+                It.IsAny<Trade[]>(),
+                It.IsAny<OrderManagementSettings>(),
+                It.IsAny<ITradeAdvisor>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(channel.Reader.ReadAllAsync());
+
+        var mockBroker = new Mock<IYoloBroker>();
+        mockBroker.Setup(x => x.GetOpenOrdersAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<long, Order>());
+        mockBroker.Setup(x => x.GetPositionsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(positions);
+        mockBroker.Setup(x => x.GetMarketsAsync(
+                It.IsAny<HashSet<string>>(),
+                It.IsAny<string>(),
+                It.IsAny<AssetPermissions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(markets);
+        mockBroker.Setup(x => x.GetAccountContext())
+            .Returns(new BrokerAccountContext("0xwallet", "0xvault"));
+
+        var recorded = new List<TradeExecutionRecord>();
+        var mockRecorder = new Mock<ITradeExecutionRecorder>();
+        mockRecorder.Setup(x => x.RecordAsync(It.IsAny<TradeExecutionRecord>(), It.IsAny<CancellationToken>()))
+            .Callback<TradeExecutionRecord, CancellationToken>((record, _) => recorded.Add(record))
+            .Returns(Task.CompletedTask);
+
+        var logger = _loggerFactory.CreateLogger<RebalanceCommand>();
+        var command = new RebalanceCommand(
+            mockWeightsService.Object,
+            mockTradeFactory.Object,
+            mockOrderManager.Object,
+            mockBroker.Object,
+            new YoloConfig { BaseAsset = "USDC" },
+            logger,
+            mockRecorder.Object,
+            "yolodaily");
+
+        // act
+        await command.ExecuteAsync();
+
+        // assert
+        recorded.Count.ShouldBe(2);
+        recorded[0].ExecutionId.ShouldBe("client-1");
+        recorded[0].RunId.ShouldNotBeNullOrWhiteSpace();
+        recorded[0].StrategyName.ShouldBe("yolodaily");
+        recorded[0].WalletAddress.ShouldBe("0xwallet");
+        recorded[0].VaultAddress.ShouldBe("0xvault");
+        recorded[0].Coin.ShouldBe("BTC");
+        recorded[0].Side.ShouldBe("Buy");
+        recorded[0].CurrentPosition.ShouldBe(1.5m);
+        recorded[0].TargetPosition.ShouldBe(3.5m);
+        recorded[0].IntendedDelta.ShouldBe(2m);
+        recorded[0].ArrivalBid.ShouldBe(99m);
+        recorded[0].ArrivalAsk.ShouldBe(101m);
+        recorded[0].ArrivalMid.ShouldBe(100m);
+        recorded[0].SpreadBps.ShouldBe(200m);
+        recorded[0].OrderId.ShouldBe("123");
+        recorded[0].OrderType.ShouldBe("Limit");
+        recorded[0].LimitPrice.ShouldBe(100.5m);
+        recorded[0].FilledQty.ShouldBe(0.5m);
+        recorded[0].Status.ShouldBe("Created");
+        recorded[0].Error.ShouldBeNull();
+        recorded[0].CompletedAt.ShouldBeNull();
+        recorded[1].Status.ShouldBe("Filled");
+        recorded[1].CompletedAt.ShouldNotBeNull();
+        recorded[1].FilledQty.ShouldBe(2m);
+    }
+
+    [Fact]
+    public async Task GivenRecorderThrows_WhenExecuting_ShouldContinueProcessingUpdates()
+    {
+        // arrange
+        var weights = new Dictionary<string, decimal> { { "BTC/USDT", 0.5m } };
+        var positions = new Dictionary<string, IReadOnlyList<Position>>();
+        var markets = new Dictionary<string, IReadOnlyList<MarketInfo>>();
+        var trade = new Trade("BTC", AssetType.Future, 2m, ClientOrderId: "client-1");
+        var created = new Order(123, "BTC", AssetType.Future, DateTime.UtcNow, OrderSide.Buy, OrderStatus.Open, 2m, 0m, null, "client-1");
+        var timedOut = created with { OrderStatus = OrderStatus.Canceled, Filled = 0.5m };
+
+        var channel = Channel.CreateUnbounded<OrderUpdate>();
+        await channel.Writer.WriteAsync(new OrderUpdate("BTC", OrderUpdateType.Created, created));
+        await channel.Writer.WriteAsync(new OrderUpdate("BTC", OrderUpdateType.TimedOut, timedOut, "Order timed out"));
+        channel.Writer.Complete();
+
+        var mockWeightsService = new Mock<ICalcWeights>();
+        mockWeightsService.Setup(x => x.CalculateWeightsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(weights);
+
+        var mockTradeFactory = new Mock<ITradeFactory>();
+        mockTradeFactory.Setup(x => x.CalculateTrades(weights, positions, markets))
+            .Returns([trade]);
+
+        var mockOrderManager = new Mock<IOrderManager>();
+        mockOrderManager.Setup(x => x.ManageOrdersAsync(
+                It.IsAny<Trade[]>(),
+                It.IsAny<OrderManagementSettings>(),
+                It.IsAny<ITradeAdvisor>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(channel.Reader.ReadAllAsync());
+
+        var mockBroker = new Mock<IYoloBroker>();
+        mockBroker.Setup(x => x.GetOpenOrdersAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<long, Order>());
+        mockBroker.Setup(x => x.GetPositionsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(positions);
+        mockBroker.Setup(x => x.GetMarketsAsync(
+                It.IsAny<HashSet<string>>(),
+                It.IsAny<string>(),
+                It.IsAny<AssetPermissions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(markets);
+        mockBroker.Setup(x => x.GetAccountContext())
+            .Returns(new BrokerAccountContext(null, null));
+
+        var recorded = new List<TradeExecutionRecord>();
+        var callCount = 0;
+        var mockRecorder = new Mock<ITradeExecutionRecorder>();
+        mockRecorder.Setup(x => x.RecordAsync(It.IsAny<TradeExecutionRecord>(), It.IsAny<CancellationToken>()))
+            .Returns<TradeExecutionRecord, CancellationToken>((record, _) =>
+            {
+                recorded.Add(record);
+                callCount++;
+                return callCount == 1
+                    ? Task.FromException(new InvalidOperationException("telemetry failed"))
+                    : Task.CompletedTask;
+            });
+
+        var logger = _loggerFactory.CreateLogger<RebalanceCommand>();
+        var command = new RebalanceCommand(
+            mockWeightsService.Object,
+            mockTradeFactory.Object,
+            mockOrderManager.Object,
+            mockBroker.Object,
+            new YoloConfig { BaseAsset = "USDC" },
+            logger,
+            mockRecorder.Object,
+            "yolodaily");
+
+        // act
+        await command.ExecuteAsync();
+
+        // assert
+        mockRecorder.Verify(x => x.RecordAsync(It.IsAny<TradeExecutionRecord>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        recorded.Count.ShouldBe(2);
+        recorded[1].Status.ShouldBe("TimedOut");
+        recorded[1].Error.ShouldBe("Order timed out");
+        recorded[1].CancelledQty.ShouldBe(1.5m);
+    }
 }
