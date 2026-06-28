@@ -164,6 +164,56 @@ public class StorageQueryFunctionsTest
         payload.Items[0].ContentHash.ShouldBe("hash-1");
     }
 
+    [Fact]
+    public async Task GetRebalanceEvents_WhenTableHasRows_ShouldReturnFilteredEvents()
+    {
+        var tableServiceClient = CreateTableServiceClient(
+            "rebalanceevents",
+            [
+                new TableEntity("yolodaily|run-1", "202606281000000000000|000001|RunStarted")
+                {
+                    ["RunId"] = "run-1",
+                    ["StrategyName"] = "yolodaily",
+                    ["TimestampUtc"] = DateTimeOffset.Parse("2026-06-28T10:00:00+00:00"),
+                    ["Sequence"] = 1,
+                    ["EventType"] = "RunStarted",
+                    ["Level"] = "Info",
+                    ["Summary"] = "Rebalance run started",
+                    ["WalletAddress"] = "0xwallet",
+                    ["Coin"] = "BTC",
+                    ["PayloadJson"] = "{\"baseAsset\":\"USDC\"}"
+                },
+                new TableEntity("yolodaily|run-1", "202606281001000000000|000002|TradeProposed")
+                {
+                    ["RunId"] = "run-1",
+                    ["StrategyName"] = "yolodaily",
+                    ["TimestampUtc"] = DateTimeOffset.Parse("2026-06-28T10:01:00+00:00"),
+                    ["Sequence"] = 2,
+                    ["EventType"] = "TradeProposed",
+                    ["Level"] = "Info",
+                    ["Summary"] = "Buy ETH",
+                    ["Coin"] = "ETH",
+                    ["ClientOrderId"] = "client-1",
+                    ["PayloadJson"] = "{\"symbol\":\"ETH\"}"
+                }
+            ]);
+        var request = TestHttpRequestData.Create(
+            "GET",
+            "http://localhost/api/storage/rebalance-events?strategy=yolodaily&runId=run-1&eventType=TradeProposed",
+            services => services.AddSingleton(tableServiceClient));
+        var sut = new StorageQueryFunctions(request.FunctionContext.InstanceServices, NullLogger<StorageQueryFunctions>.Instance);
+
+        var response = await sut.GetRebalanceEvents(request, CancellationToken.None);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var payload = await TestHttpRequestData.ReadJsonAsync<PagedQueryResponse<RebalanceEventQueryItem>>(response);
+        payload.ShouldNotBeNull();
+        payload.Items.Count.ShouldBe(1);
+        payload.Items[0].EventType.ShouldBe("TradeProposed");
+        payload.Items[0].ClientOrderId.ShouldBe("client-1");
+        payload.Items[0].PayloadJson.ShouldBe("{\"symbol\":\"ETH\"}");
+    }
+
     private static TableServiceClient CreateTableServiceClient(
         string tableName,
         IReadOnlyList<TableEntity> entities,

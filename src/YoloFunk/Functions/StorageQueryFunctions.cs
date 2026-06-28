@@ -16,6 +16,7 @@ public sealed class StorageQueryFunctions(
     ILogger<StorageQueryFunctions> logger)
 {
     private const string TradeExecutionsTableName = "tradeexecutions";
+    private const string RebalanceEventsTableName = "rebalanceevents";
     private const string HttpRequestsTableName = "httprequestsindex";
     private const string HttpRequestsContainerName = "http-requests";
 
@@ -71,6 +72,46 @@ public sealed class StorageQueryFunctions(
         {
             logger.LogError(ex, "Failed to query trade executions");
             return await ErrorAsync(req, "Failed to query trade executions", cancellationToken);
+        }
+    }
+
+    [Function(nameof(GetRebalanceEvents))]
+    public async Task<HttpResponseData> GetRebalanceEvents(
+        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "storage/rebalance-events")]
+        HttpRequestData req,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetTableServiceClient(req, out var tableServiceClient))
+            return await ServiceUnavailableAsync(req, cancellationToken);
+
+        var query = HttpQueryParameters.Parse(req.Url);
+        var page = query.GetInt32("page", 1, 1, 10_000);
+        var pageSize = query.GetInt32("pageSize", 100, 1, 500);
+        var orderBy = query.GetString("orderBy") ?? "timestampUtc";
+        var direction = NormalizeDirection(query.GetString("direction"));
+
+        try
+        {
+            var items = await QueryRebalanceEventsAsync(tableServiceClient, query, cancellationToken);
+            items = ApplyRebalanceEventSort(items, orderBy, direction);
+
+            return await WritePagedResponseAsync(req, items, page, pageSize, orderBy, direction, cancellationToken);
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            return await WritePagedResponseAsync(
+                req,
+                Array.Empty<RebalanceEventQueryItem>(),
+                page,
+                pageSize,
+                orderBy,
+                direction,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to query rebalance events");
+            return await ErrorAsync(req, "Failed to query rebalance events", cancellationToken);
         }
     }
 
@@ -242,6 +283,38 @@ public sealed class StorageQueryFunctions(
             .Where(item => !to.HasValue || item.RequestTimeUtc <= to.Value)];
     }
 
+    private static async Task<IReadOnlyList<RebalanceEventQueryItem>> QueryRebalanceEventsAsync(
+        TableServiceClient tableServiceClient,
+        HttpQueryParameters query,
+        CancellationToken cancellationToken)
+    {
+        var strategy = query.GetString("strategy");
+        var runId = query.GetString("runId");
+        var eventType = query.GetString("eventType");
+        var level = query.GetString("level");
+        var coin = query.GetString("coin");
+        var clientOrderId = query.GetString("clientOrderId");
+        var from = query.GetDateTimeOffset("from");
+        var to = query.GetDateTimeOffset("to");
+
+        var tableClient = tableServiceClient.GetTableClient(RebalanceEventsTableName);
+        var partitionFilter = !string.IsNullOrWhiteSpace(strategy) && !string.IsNullOrWhiteSpace(runId)
+            ? BuildPartitionFilter($"{strategy}|{runId}")
+            : null;
+        var entities = await QueryEntitiesAsync(tableClient, partitionFilter, cancellationToken);
+
+        return [.. entities
+            .Select(ToRebalanceEventQueryItem)
+            .Where(item => Matches(item.StrategyName, strategy))
+            .Where(item => Matches(item.RunId, runId))
+            .Where(item => Matches(item.EventType, eventType))
+            .Where(item => Matches(item.Level, level))
+            .Where(item => Matches(item.Coin, coin))
+            .Where(item => Matches(item.ClientOrderId, clientOrderId))
+            .Where(item => !from.HasValue || item.TimestampUtc >= from.Value)
+            .Where(item => !to.HasValue || item.TimestampUtc <= to.Value)];
+    }
+
     private static async Task<IReadOnlyList<TableEntity>> QueryEntitiesAsync(
         TableClient tableClient,
         string? filter,
@@ -317,6 +390,24 @@ public sealed class StorageQueryFunctions(
             "method" => item => item.Method,
             "statuscode" => item => item.StatusCode,
             _ => item => item.RequestTimeUtc
+        };
+
+        return Sort(items, key, direction);
+    }
+
+    private static IReadOnlyList<RebalanceEventQueryItem> ApplyRebalanceEventSort(
+        IReadOnlyList<RebalanceEventQueryItem> items,
+        string orderBy,
+        string direction)
+    {
+        Func<RebalanceEventQueryItem, object?> key = orderBy.ToLowerInvariant() switch
+        {
+            "eventtype" => item => item.EventType,
+            "level" => item => item.Level,
+            "runid" => item => item.RunId,
+            "sequence" => item => item.Sequence,
+            "strategy" or "strategyname" => item => item.StrategyName,
+            _ => item => item.TimestampUtc
         };
 
         return Sort(items, key, direction);
@@ -409,6 +500,24 @@ public sealed class StorageQueryFunctions(
             GetString(entity, "ContentHash"),
             GetDateTimeOffset(entity, "RequestTimeUtc"),
             GetString(entity, "QueryParametersJson"));
+    }
+
+    private static RebalanceEventQueryItem ToRebalanceEventQueryItem(TableEntity entity)
+    {
+        return new RebalanceEventQueryItem(
+            GetString(entity, "RunId"),
+            GetString(entity, "StrategyName"),
+            GetDateTimeOffset(entity, "TimestampUtc"),
+            GetInt32(entity, "Sequence"),
+            GetString(entity, "EventType"),
+            GetString(entity, "Level"),
+            GetString(entity, "Summary"),
+            GetNullableString(entity, "WalletAddress"),
+            GetNullableString(entity, "VaultAddress"),
+            GetNullableString(entity, "Coin"),
+            GetNullableString(entity, "ClientOrderId"),
+            GetNullableString(entity, "OrderId"),
+            GetString(entity, "PayloadJson"));
     }
 
     private static bool Matches(string? actual, string? expected) =>

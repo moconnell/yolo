@@ -27,6 +27,7 @@ public static class AddAzureStorageServices
         services.AddSingleton(sp => new TableServiceClient(connectionString));
         services.AddTransient<RawJsonPersistenceHandler>();
         services.AddSingleton<ITradeExecutionRecorder, AzureTableTradeExecutionRecorder>();
+        services.AddSingleton<IRebalanceEventRecorder, AzureTableRebalanceEventRecorder>();
 
         return services;
     }

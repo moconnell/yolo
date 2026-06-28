@@ -657,6 +657,11 @@ public class RebalanceCommandTest
         mockRecorder.Setup(x => x.RecordAsync(It.IsAny<TradeExecutionRecord>(), It.IsAny<CancellationToken>()))
             .Callback<TradeExecutionRecord, CancellationToken>((record, _) => recorded.Add(record))
             .Returns(Task.CompletedTask);
+        var rebalanceEvents = new List<RebalanceEventRecord>();
+        var mockEventRecorder = new Mock<IRebalanceEventRecorder>();
+        mockEventRecorder.Setup(x => x.RecordAsync(It.IsAny<RebalanceEventRecord>(), It.IsAny<CancellationToken>()))
+            .Callback<RebalanceEventRecord, CancellationToken>((record, _) => rebalanceEvents.Add(record))
+            .Returns(Task.CompletedTask);
 
         var logger = _loggerFactory.CreateLogger<RebalanceCommand>();
         var command = new RebalanceCommand(
@@ -667,6 +672,7 @@ public class RebalanceCommandTest
             new YoloConfig { BaseAsset = "USDC" },
             logger,
             mockRecorder.Object,
+            mockEventRecorder.Object,
             "yolodaily");
 
         // act
@@ -698,6 +704,16 @@ public class RebalanceCommandTest
         recorded[1].Status.ShouldBe("Filled");
         recorded[1].CompletedAt.ShouldNotBeNull();
         recorded[1].FilledQty.ShouldBe(2m);
+
+        rebalanceEvents.ShouldContain(e => e.EventType == "RunStarted");
+        rebalanceEvents.ShouldContain(e => e.EventType == "PositionsFetched");
+        rebalanceEvents.ShouldContain(e => e.EventType == "WeightsCalculated");
+        rebalanceEvents.ShouldContain(e => e.EventType == "MarketsFetched");
+        rebalanceEvents.ShouldContain(e => e.EventType == "RebalancePlanCalculated");
+        rebalanceEvents.ShouldContain(e => e.EventType == "TradeProposed" && e.ClientOrderId == "client-1" && e.Coin == "BTC");
+        rebalanceEvents.ShouldContain(e => e.EventType == "OrderUpdate" && e.OrderId == "123");
+        rebalanceEvents.ShouldContain(e => e.EventType == "RunCompleted");
+        rebalanceEvents.Select(e => e.Sequence).ShouldBe(Enumerable.Range(1, rebalanceEvents.Count));
     }
 
     [Fact]
