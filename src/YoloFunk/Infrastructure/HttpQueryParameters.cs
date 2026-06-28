@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace YoloFunk.Infrastructure;
 
 internal sealed class HttpQueryParameters
@@ -56,6 +58,23 @@ internal sealed class HttpQueryParameters
     public DateTimeOffset? GetDateTimeOffset(string name)
     {
         var value = GetString(name);
-        return DateTimeOffset.TryParse(value, out var parsed) ? parsed : null;
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        string[] formats =
+        [
+            "O",
+            "yyyy-MM-dd'T'HH:mm:ss.FFFFFFFzzz",
+            "yyyy-MM-dd'T'HH:mm:sszzz"
+        ];
+
+        return DateTimeOffset.TryParseExact(
+            value,
+            formats,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out var parsed)
+            ? parsed
+            : null;
     }
 }

@@ -6,4 +6,5 @@ public sealed record PagedQueryResponse<T>(
     int PageSize,
     int TotalCount,
     string? OrderBy,
-    string Direction);
+    string Direction,
+    string? NextContinuationToken = null);

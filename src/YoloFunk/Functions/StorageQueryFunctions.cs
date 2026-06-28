@@ -25,7 +25,7 @@ public sealed class StorageQueryFunctions(
         HttpRequestData req,
         CancellationToken cancellationToken)
     {
-        if (!TryGetStorageClients(req, out var tableServiceClient, out _))
+        if (!TryGetTableServiceClient(req, out var tableServiceClient))
             return await ServiceUnavailableAsync(req, cancellationToken);
 
         var query = HttpQueryParameters.Parse(req.Url);
@@ -33,13 +33,28 @@ public sealed class StorageQueryFunctions(
         var pageSize = query.GetInt32("pageSize", 100, 1, 500);
         var orderBy = query.GetString("orderBy") ?? "submittedAt";
         var direction = NormalizeDirection(query.GetString("direction"));
+        var continuationToken = query.GetString("continuationToken");
 
         try
         {
-            var items = await QueryTradeExecutionsAsync(tableServiceClient, query, cancellationToken);
-            items = ApplyTradeExecutionSort(items, orderBy, direction);
+            var pageResult = await QueryTradeExecutionsAsync(
+                tableServiceClient,
+                query,
+                pageSize,
+                continuationToken,
+                cancellationToken);
+            var items = ApplyTradeExecutionSort(pageResult.Items, orderBy, direction);
 
-            return await WritePagedResponseAsync(req, items, page, pageSize, orderBy, direction, cancellationToken);
+            return await WritePagedResponseAsync(
+                req,
+                items,
+                page,
+                pageSize,
+                orderBy,
+                direction,
+                cancellationToken,
+                pageResult.NextContinuationToken,
+                skipItems: false);
         }
         catch (RequestFailedException ex) when (ex.Status == 404)
         {
@@ -65,7 +80,7 @@ public sealed class StorageQueryFunctions(
         HttpRequestData req,
         CancellationToken cancellationToken)
     {
-        if (!TryGetStorageClients(req, out var tableServiceClient, out _))
+        if (!TryGetTableServiceClient(req, out var tableServiceClient))
             return await ServiceUnavailableAsync(req, cancellationToken);
 
         var query = HttpQueryParameters.Parse(req.Url);
@@ -105,7 +120,7 @@ public sealed class StorageQueryFunctions(
         HttpRequestData req,
         CancellationToken cancellationToken)
     {
-        if (!TryGetStorageClients(req, out _, out var blobServiceClient))
+        if (!TryGetBlobServiceClient(req, out var blobServiceClient))
             return await ServiceUnavailableAsync(req, cancellationToken);
 
         var blobName = HttpQueryParameters.Parse(req.Url).GetString("blobName");
@@ -145,22 +160,31 @@ public sealed class StorageQueryFunctions(
         }
     }
 
-    private bool TryGetStorageClients(
+    private bool TryGetTableServiceClient(
         HttpRequestData req,
-        out TableServiceClient tableServiceClient,
-        out BlobServiceClient blobServiceClient)
+        out TableServiceClient tableServiceClient)
     {
         tableServiceClient = serviceProvider.GetService<TableServiceClient>() ??
                              req.FunctionContext.InstanceServices.GetService<TableServiceClient>()!;
+
+        return tableServiceClient is not null;
+    }
+
+    private bool TryGetBlobServiceClient(
+        HttpRequestData req,
+        out BlobServiceClient blobServiceClient)
+    {
         blobServiceClient = serviceProvider.GetService<BlobServiceClient>() ??
                             req.FunctionContext.InstanceServices.GetService<BlobServiceClient>()!;
 
-        return tableServiceClient is not null && blobServiceClient is not null;
+        return blobServiceClient is not null;
     }
 
-    private static async Task<IReadOnlyList<TradeExecutionQueryItem>> QueryTradeExecutionsAsync(
+    private static async Task<QueryPageResult<TradeExecutionQueryItem>> QueryTradeExecutionsAsync(
         TableServiceClient tableServiceClient,
         HttpQueryParameters query,
+        int pageSize,
+        string? continuationToken,
         CancellationToken cancellationToken)
     {
         var strategy = query.GetString("strategy");
@@ -171,16 +195,24 @@ public sealed class StorageQueryFunctions(
         var to = query.GetDateTimeOffset("to");
 
         var tableClient = tableServiceClient.GetTableClient(TradeExecutionsTableName);
-        var entities = await QueryEntitiesAsync(tableClient, BuildPartitionFilter(strategy), cancellationToken);
+        var page = await QueryEntitiesPageAsync(
+            tableClient,
+            BuildPartitionFilter(strategy),
+            pageSize,
+            continuationToken,
+            cancellationToken);
 
-        return [.. entities
+        var items = page.Items
             .Select(ToTradeExecutionQueryItem)
             .Where(item => Matches(item.StrategyName, strategy))
             .Where(item => Matches(item.Coin, coin))
             .Where(item => Matches(item.RunId, runId))
             .Where(item => Matches(item.Status, status))
             .Where(item => !from.HasValue || (item.SubmittedAt ?? item.RecordedAt) >= from.Value)
-            .Where(item => !to.HasValue || (item.SubmittedAt ?? item.RecordedAt) <= to.Value)];
+            .Where(item => !to.HasValue || (item.SubmittedAt ?? item.RecordedAt) <= to.Value)
+            .ToArray();
+
+        return new QueryPageResult<TradeExecutionQueryItem>(items, page.NextContinuationToken);
     }
 
     private static async Task<IReadOnlyList<HttpRequestCaptureQueryItem>> QueryHttpRequestCapturesAsync(
@@ -225,6 +257,26 @@ public sealed class StorageQueryFunctions(
         }
 
         return entities;
+    }
+
+    private static async Task<QueryPageResult<TableEntity>> QueryEntitiesPageAsync(
+        TableClient tableClient,
+        string? filter,
+        int pageSize,
+        string? continuationToken,
+        CancellationToken cancellationToken)
+    {
+        await foreach (var page in tableClient
+                           .QueryAsync<TableEntity>(
+                               filter,
+                               maxPerPage: pageSize,
+                               cancellationToken: cancellationToken)
+                           .AsPages(continuationToken, pageSize))
+        {
+            return new QueryPageResult<TableEntity>([.. page.Values], page.ContinuationToken);
+        }
+
+        return new QueryPageResult<TableEntity>([], null);
     }
 
     private static string? BuildPartitionFilter(string? partitionKey)
@@ -287,16 +339,20 @@ public sealed class StorageQueryFunctions(
         int pageSize,
         string? orderBy,
         string direction,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? nextContinuationToken = null,
+        bool skipItems = true)
     {
         var response = req.CreateResponse(HttpStatusCode.OK);
-        var pageItems = items
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToArray();
+        var pageItems = skipItems
+            ? items
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToArray()
+            : [.. items.Take(pageSize)];
 
         await response.WriteAsJsonAsync(
-            new PagedQueryResponse<T>(pageItems, page, pageSize, items.Count, orderBy, direction),
+            new PagedQueryResponse<T>(pageItems, page, pageSize, items.Count, orderBy, direction, nextContinuationToken),
             cancellationToken);
         return response;
     }
@@ -413,4 +469,6 @@ public sealed class StorageQueryFunctions(
         await response.WriteAsJsonAsync(new { Error = message }, cancellationToken);
         return response;
     }
+
+    private sealed record QueryPageResult<T>(IReadOnlyList<T> Items, string? NextContinuationToken);
 }
