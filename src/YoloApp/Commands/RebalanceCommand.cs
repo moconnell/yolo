@@ -146,7 +146,18 @@ public class RebalanceCommand : ICommand
                         runId,
                         out var record))
                 {
-                    await _tradeExecutionRecorder.RecordAsync(record, cancellationToken);
+                    try
+                    {
+                        await _tradeExecutionRecorder.RecordAsync(record, cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to record trade execution telemetry");
+                    }
                 }
             }
         }
@@ -225,11 +236,16 @@ public class RebalanceCommand : ICommand
                 : null,
             CompletedAt = isCompleted ? DateTimeOffset.UtcNow : null,
             Status = update.Type.ToString(),
-            Error = update.Error?.Message ?? update.Message
+            Error = IsFailureUpdate(update.Type)
+                ? update.Error?.Message ?? update.Message
+                : null
         };
 
         return true;
     }
+
+    private static bool IsFailureUpdate(OrderUpdateType updateType) =>
+        updateType is OrderUpdateType.Error or OrderUpdateType.Cancelled or OrderUpdateType.TimedOut;
 
     private static decimal FindCurrentPosition(
         Trade trade,
