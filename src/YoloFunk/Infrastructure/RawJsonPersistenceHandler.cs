@@ -99,13 +99,14 @@ public class RawJsonPersistenceHandler(
         System.Net.HttpStatusCode statusCode,
         string responseBody)
     {
-        var input = string.Join(
-            '\n',
+        var input = JsonSerializer.Serialize(
+            new HttpExchangeHashInput(
             method,
             requestUri?.ToString() ?? string.Empty,
             requestBody,
-            ((int)statusCode).ToString(),
-            responseBody);
+            (int)statusCode,
+            responseBody),
+            SerializerOptions);
 
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(input))).ToLowerInvariant();
     }
@@ -142,6 +143,13 @@ public class RawJsonPersistenceHandler(
         string Url,
         IReadOnlyDictionary<string, string[]> QueryParameters,
         string Method,
+        string RequestBody,
+        int StatusCode,
+        string ResponseBody);
+
+    private sealed record HttpExchangeHashInput(
+        string Method,
+        string Url,
         string RequestBody,
         int StatusCode,
         string ResponseBody);
