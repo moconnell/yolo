@@ -116,7 +116,7 @@ public class StorageQueryFunctionsTest
             ]);
         var request = TestHttpRequestData.Create(
             "GET",
-            "http://localhost/api/storage/trade-executions?strategy=yolodaily&from=06/28/2026",
+            "http://localhost/api/storage/trade-executions?strategy=yolodaily&from=not-a-date",
             services => services.AddSingleton(tableServiceClient));
         var sut = new StorageQueryFunctions(request.FunctionContext.InstanceServices, NullLogger<StorageQueryFunctions>.Instance);
 
