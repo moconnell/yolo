@@ -70,6 +70,34 @@ public class StorageQueryFunctionsTest
     }
 
     [Fact]
+    public async Task GetHttpRequestCaptures_WhenRawPagesContainNonMatches_ShouldFillFilteredPage()
+    {
+        var tableServiceClient = CreateTableServiceClient(
+            "httprequestsindex",
+            [
+                CreateHttpRequestEntity("api.robotwealth.com", "/v1/yolo/weights", "hash-1"),
+                CreateHttpRequestEntity("api.robotwealth.com", "/v1/yolo/factors", "hash-2"),
+                CreateHttpRequestEntity("api.robotwealth.com", "/v1/yolo/weights", "hash-3"),
+                CreateHttpRequestEntity("api.robotwealth.com", "/v1/yolo/weights", "hash-4")
+            ],
+            continuationTokens: ["token-1", "token-2", "token-3", "token-4"]);
+        var request = TestHttpRequestData.Create(
+            "GET",
+            "http://localhost/api/storage/http-requests?endpoint=weights&pageSize=2",
+            services => services.AddSingleton(tableServiceClient));
+        var sut = new StorageQueryFunctions(request.FunctionContext.InstanceServices, NullLogger<StorageQueryFunctions>.Instance);
+
+        var response = await sut.GetHttpRequestCaptures(request, CancellationToken.None);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var payload = await TestHttpRequestData.ReadJsonAsync<PagedQueryResponse<HttpRequestCaptureQueryItem>>(response);
+        payload.ShouldNotBeNull();
+        payload.Items.Select(item => item.ContentHash).ShouldBe(["hash-1", "hash-3"]);
+        payload.TotalCount.ShouldBe(2);
+        payload.NextContinuationToken.ShouldBe("token-3");
+    }
+
+    [Fact]
     public async Task GetRebalanceEvents_WhenTableHasRows_ShouldReturnFilteredEvents()
     {
         var tableServiceClient = CreateTableServiceClient(
@@ -119,12 +147,48 @@ public class StorageQueryFunctionsTest
         payload.Items[0].PayloadJson.ShouldBe("{\"symbol\":\"ETH\"}");
     }
 
+    [Fact]
+    public async Task GetRebalanceEvents_WhenRawPagesContainNonMatches_ShouldFillFilteredPage()
+    {
+        var tableServiceClient = CreateTableServiceClient(
+            "rebalanceevents",
+            [
+                CreateRebalanceEventEntity("yolodaily", "run-1", 1, "RunStarted", "BTC"),
+                CreateRebalanceEventEntity("yolodaily", "run-1", 2, "TradeProposed", "ETH"),
+                CreateRebalanceEventEntity("yolodaily", "run-1", 3, "RunCompleted", "BTC"),
+                CreateRebalanceEventEntity("yolodaily", "run-1", 4, "TradeProposed", "SOL")
+            ],
+            continuationTokens: ["token-1", "token-2", "token-3", "token-4"]);
+        var request = TestHttpRequestData.Create(
+            "GET",
+            "http://localhost/api/storage/rebalance-events?eventType=TradeProposed&pageSize=2",
+            services => services.AddSingleton(tableServiceClient));
+        var sut = new StorageQueryFunctions(request.FunctionContext.InstanceServices, NullLogger<StorageQueryFunctions>.Instance);
+
+        var response = await sut.GetRebalanceEvents(request, CancellationToken.None);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var payload = await TestHttpRequestData.ReadJsonAsync<PagedQueryResponse<RebalanceEventQueryItem>>(response);
+        payload.ShouldNotBeNull();
+        payload.Items.Select(item => item.Coin).ShouldBe(["ETH", "SOL"]);
+        payload.TotalCount.ShouldBe(2);
+        payload.NextContinuationToken.ShouldBe("token-4");
+    }
+
     private static TableServiceClient CreateTableServiceClient(
         string tableName,
         IReadOnlyList<TableEntity> entities,
-        string? continuationToken = null)
+        string? continuationToken = null,
+        IReadOnlyList<string?>? continuationTokens = null)
     {
-        var page = Page<TableEntity>.FromValues(entities, continuationToken, Mock.Of<Response>());
+        var pages = continuationTokens is null
+            ? [Page<TableEntity>.FromValues(entities, continuationToken, Mock.Of<Response>())]
+            : entities
+                .Select((entity, index) => Page<TableEntity>.FromValues(
+                    [entity],
+                    index < continuationTokens.Count ? continuationTokens[index] : null,
+                    Mock.Of<Response>()))
+                .ToArray();
         var tableClient = new Mock<TableClient>();
         tableClient
             .Setup(x => x.QueryAsync<TableEntity>(
@@ -132,7 +196,7 @@ public class StorageQueryFunctionsTest
                 It.IsAny<int?>(),
                 It.IsAny<IEnumerable<string>?>(),
                 It.IsAny<CancellationToken>()))
-            .Returns(AsyncPageable<TableEntity>.FromPages([page]));
+            .Returns(AsyncPageable<TableEntity>.FromPages(pages));
 
         var tableServiceClient = new Mock<TableServiceClient>();
         tableServiceClient
@@ -141,6 +205,40 @@ public class StorageQueryFunctionsTest
 
         return tableServiceClient.Object;
     }
+
+    private static TableEntity CreateHttpRequestEntity(string host, string endpoint, string contentHash) =>
+        new(host, $"{endpoint}|{contentHash}")
+        {
+            ["Host"] = host,
+            ["Endpoint"] = endpoint,
+            ["Url"] = $"https://{host}{endpoint}",
+            ["Method"] = "GET",
+            ["StatusCode"] = 200,
+            ["BlobContainer"] = "http-requests",
+            ["BlobName"] = $"{host}{endpoint}/{contentHash}.json",
+            ["ContentHash"] = contentHash,
+            ["RequestTimeUtc"] = DateTimeOffset.Parse("2026-06-28T10:00:00+00:00"),
+            ["QueryParametersJson"] = "{}"
+        };
+
+    private static TableEntity CreateRebalanceEventEntity(
+        string strategyName,
+        string runId,
+        int sequence,
+        string eventType,
+        string coin) =>
+        new($"{strategyName}|{runId}", $"202606281000000000000|{sequence:D6}|{eventType}")
+        {
+            ["RunId"] = runId,
+            ["StrategyName"] = strategyName,
+            ["TimestampUtc"] = DateTimeOffset.Parse("2026-06-28T10:00:00+00:00").AddMinutes(sequence),
+            ["Sequence"] = sequence,
+            ["EventType"] = eventType,
+            ["Level"] = "Info",
+            ["Summary"] = eventType,
+            ["Coin"] = coin,
+            ["PayloadJson"] = "{}"
+        };
 
     private sealed class TestHttpRequestData : HttpRequestData
     {

@@ -213,25 +213,20 @@ public sealed class StorageQueryFunctions(
         var to = query.GetDateTimeOffset("to");
 
         var tableClient = tableServiceClient.GetTableClient(HttpRequestsTableName);
-        var page = await QueryEntitiesPageAsync(
+        return await QueryFilteredEntitiesPageAsync(
             tableClient,
             BuildPartitionFilter(host),
             pageSize,
             continuationToken,
+            ToHttpRequestCaptureQueryItem,
+            item => Matches(item.Host, host) &&
+                    Contains(item.Endpoint, endpoint) &&
+                    Matches(item.Method, method) &&
+                    (!int.TryParse(statusCode, out var expectedStatusCode) || item.StatusCode == expectedStatusCode) &&
+                    Matches(item.ContentHash, contentHash) &&
+                    (!from.HasValue || item.RequestTimeUtc >= from.Value) &&
+                    (!to.HasValue || item.RequestTimeUtc <= to.Value),
             cancellationToken);
-
-        var items = page.Items
-            .Select(ToHttpRequestCaptureQueryItem)
-            .Where(item => Matches(item.Host, host))
-            .Where(item => Contains(item.Endpoint, endpoint))
-            .Where(item => Matches(item.Method, method))
-            .Where(item => !int.TryParse(statusCode, out var expectedStatusCode) || item.StatusCode == expectedStatusCode)
-            .Where(item => Matches(item.ContentHash, contentHash))
-            .Where(item => !from.HasValue || item.RequestTimeUtc >= from.Value)
-            .Where(item => !to.HasValue || item.RequestTimeUtc <= to.Value)
-            .ToArray();
-
-        return new QueryPageResult<HttpRequestCaptureQueryItem>(items, page.NextContinuationToken);
     }
 
     private static async Task<QueryPageResult<RebalanceEventQueryItem>> QueryRebalanceEventsAsync(
@@ -254,46 +249,58 @@ public sealed class StorageQueryFunctions(
         var partitionFilter = !string.IsNullOrWhiteSpace(strategy) && !string.IsNullOrWhiteSpace(runId)
             ? BuildPartitionFilter($"{strategy}|{runId}")
             : null;
-        var page = await QueryEntitiesPageAsync(
+        return await QueryFilteredEntitiesPageAsync(
             tableClient,
             partitionFilter,
             pageSize,
             continuationToken,
+            ToRebalanceEventQueryItem,
+            item => Matches(item.StrategyName, strategy) &&
+                    Matches(item.RunId, runId) &&
+                    Matches(item.EventType, eventType) &&
+                    Matches(item.Level, level) &&
+                    Matches(item.Coin, coin) &&
+                    Matches(item.ClientOrderId, clientOrderId) &&
+                    (!from.HasValue || item.TimestampUtc >= from.Value) &&
+                    (!to.HasValue || item.TimestampUtc <= to.Value),
             cancellationToken);
-
-        var items = page.Items
-            .Select(ToRebalanceEventQueryItem)
-            .Where(item => Matches(item.StrategyName, strategy))
-            .Where(item => Matches(item.RunId, runId))
-            .Where(item => Matches(item.EventType, eventType))
-            .Where(item => Matches(item.Level, level))
-            .Where(item => Matches(item.Coin, coin))
-            .Where(item => Matches(item.ClientOrderId, clientOrderId))
-            .Where(item => !from.HasValue || item.TimestampUtc >= from.Value)
-            .Where(item => !to.HasValue || item.TimestampUtc <= to.Value)
-            .ToArray();
-
-        return new QueryPageResult<RebalanceEventQueryItem>(items, page.NextContinuationToken);
     }
 
-    private static async Task<QueryPageResult<TableEntity>> QueryEntitiesPageAsync(
+    private static async Task<QueryPageResult<T>> QueryFilteredEntitiesPageAsync<T>(
         TableClient tableClient,
         string? filter,
         int pageSize,
         string? continuationToken,
+        Func<TableEntity, T> map,
+        Func<T, bool> predicate,
         CancellationToken cancellationToken)
     {
+        var items = new List<T>(pageSize);
+
         await foreach (var page in tableClient
                            .QueryAsync<TableEntity>(
                                filter,
-                               maxPerPage: pageSize,
+                               maxPerPage: 1,
                                cancellationToken: cancellationToken)
-                           .AsPages(continuationToken, pageSize))
+                           .AsPages(continuationToken, 1))
         {
-            return new QueryPageResult<TableEntity>([.. page.Values], page.ContinuationToken);
+            foreach (var entity in page.Values)
+            {
+                var item = map(entity);
+                if (!predicate(item))
+                {
+                    continue;
+                }
+
+                items.Add(item);
+                if (items.Count == pageSize)
+                {
+                    return new QueryPageResult<T>(items, page.ContinuationToken);
+                }
+            }
         }
 
-        return new QueryPageResult<TableEntity>([], null);
+        return new QueryPageResult<T>(items, null);
     }
 
     private static string? BuildPartitionFilter(string? partitionKey)
