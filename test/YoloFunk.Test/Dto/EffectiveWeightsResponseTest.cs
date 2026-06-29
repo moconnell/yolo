@@ -16,6 +16,7 @@ public class EffectiveWeightsResponseTest
                 ConstrainedTargetWeight: 0.3m,
                 CurrentWeight: 0.2m,
                 EffectiveWeight: 0.25m,
+                BufferAdjustedTargetWeight: 0.24m,
                 DeltaWeight: 0.05m,
                 IsInUniverse: true,
                 WithinTradeBuffer: false,
@@ -51,6 +52,7 @@ public class EffectiveWeightsResponseTest
         response.BufferAdjustedNetExposure.ShouldBe(0.24m);
         response.Weights.Count.ShouldBe(1);
         response.Weights[0].Token.ShouldBe("SOL");
+        response.Weights[0].BufferAdjustedTargetWeight.ShouldBe(0.24m);
         response.Weights[0].HasTradableMarket.ShouldBeTrue();
     }
 
@@ -65,6 +67,7 @@ public class EffectiveWeightsResponseTest
                 ConstrainedTargetWeight: 0m,
                 CurrentWeight: null,
                 EffectiveWeight: null,
+                BufferAdjustedTargetWeight: null,
                 DeltaWeight: null,
                 IsInUniverse: false,
                 WithinTradeBuffer: false,
@@ -94,6 +97,7 @@ public class EffectiveWeightsResponseTest
         response.BufferAdjustedGrossExposure.ShouldBeNull();
         response.BufferAdjustedNetExposure.ShouldBeNull();
         response.Weights.Single().CurrentWeight.ShouldBeNull();
+        response.Weights.Single().BufferAdjustedTargetWeight.ShouldBeNull();
         response.Weights.Single().HasTradableMarket.ShouldBeFalse();
     }
 }

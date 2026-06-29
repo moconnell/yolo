@@ -21,6 +21,7 @@ public sealed record EffectiveWeightItem(
     decimal ConstrainedTargetWeight,
     decimal? CurrentWeight,
     decimal? EffectiveWeight,
+    decimal? BufferAdjustedTargetWeight,
     decimal? DeltaWeight,
     bool IsInUniverse,
     bool WithinTradeBuffer,

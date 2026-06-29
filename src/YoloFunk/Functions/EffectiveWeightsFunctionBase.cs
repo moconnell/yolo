@@ -150,6 +150,7 @@ public abstract class EffectiveWeightsFunctionBase
                 item.ConstrainedTargetWeight,
                 item.CurrentWeight,
                 item.HasTradableMarket ? item.ConstrainedTargetWeight : null,
+                item.BufferAdjustedTargetWeight,
                 item.DeltaWeight,
                 item.IsInUniverse,
                 item.WithinTradeBuffer,

@@ -102,6 +102,7 @@ public class EffectiveWeightsFunctionBaseTest
         sol.CurrentWeight.ShouldBe(0.396m);
         sol.ConstrainedTargetWeight.ShouldBe(0.4m);
         sol.EffectiveWeight.ShouldBe(0.4m);
+        sol.BufferAdjustedTargetWeight.ShouldBe(0.396m);
         sol.DeltaWeight.ShouldBe(0m);
         sol.WithinTradeBuffer.ShouldBeTrue();
     }
@@ -148,6 +149,7 @@ public class EffectiveWeightsFunctionBaseTest
         sol.CurrentWeight.ShouldBe(0.198m);
         sol.ConstrainedTargetWeight.ShouldBe(0.4m);
         sol.EffectiveWeight.ShouldBe(0.4m);
+        sol.BufferAdjustedTargetWeight.ShouldBe(0.4m);
         sol.DeltaWeight.ShouldBe(0.202m);
         sol.WithinTradeBuffer.ShouldBeFalse();
     }
