@@ -48,7 +48,8 @@ public abstract class EffectiveWeightsFunctionBase
 
             var weightsService = _serviceProvider.GetRequiredKeyedService<ICalcWeights>(StrategyKey);
             var yoloConfig = _serviceProvider.GetRequiredKeyedService<YoloConfig>(StrategyKey);
-            var targetWeights = await weightsService.CalculateWeightsAsync(cancellationToken);
+            var weightsResult = await weightsService.CalculateWeightsAsync(cancellationToken);
+            var targetWeights = weightsResult.Weights;
 
             var positions = await broker.GetPositionsAsync(cancellationToken);
             var baseAssetFilter = positions.Keys
@@ -62,7 +63,12 @@ public abstract class EffectiveWeightsFunctionBase
                 cancellationToken);
 
             var nominal = yoloConfig.NominalCash ?? positions.GetTotalValue(markets, yoloConfig.BaseAsset);
-            var verification = CalculateEffectiveWeights(targetWeights, positions, markets, yoloConfig, nominal);
+            var verification = CalculateEffectiveWeights(
+                weightsResult,
+                positions,
+                markets,
+                yoloConfig,
+                nominal);
 
             var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(
@@ -116,12 +122,13 @@ public abstract class EffectiveWeightsFunctionBase
     }
 
     private static EffectiveWeightsVerification CalculateEffectiveWeights(
-        IReadOnlyDictionary<string, decimal> rawWeights,
+        WeightsCalculationResult weightsResult,
         IReadOnlyDictionary<string, IReadOnlyList<Position>> positions,
         IReadOnlyDictionary<string, IReadOnlyList<MarketInfo>> markets,
         YoloConfig yoloConfig,
         decimal nominal)
     {
+        var rawWeights = weightsResult.Weights;
         var groupedWeights = rawWeights
             .GroupBy(kvp => kvp.Key.GetBaseAndQuoteAssets().BaseAsset, StringComparer.OrdinalIgnoreCase)
             .ToArray();
@@ -152,6 +159,8 @@ public abstract class EffectiveWeightsFunctionBase
                 item.HasTradableMarket ? item.ConstrainedTargetWeight : null,
                 item.BufferAdjustedTargetWeight,
                 item.DeltaWeight,
+                GetFactorsForToken(weightsResult.RawFactors, item.Token),
+                GetFactorsForToken(weightsResult.NormalizedFactors, item.Token),
                 item.IsInUniverse,
                 item.WithinTradeBuffer,
                 item.HasTradableMarket))
@@ -166,6 +175,26 @@ public abstract class EffectiveWeightsFunctionBase
             CalculateGrossExposure(plan.Items, item => item.BufferAdjustedTargetWeight),
             CalculateNetExposure(plan.Items, item => item.BufferAdjustedTargetWeight),
             effectiveItems);
+    }
+
+    private static IReadOnlyDictionary<string, double?>? GetFactorsForToken(
+        FactorDataFrame factors,
+        string token)
+    {
+        if (factors.IsEmpty)
+            return null;
+
+        var ticker = factors.Tickers.FirstOrDefault(t =>
+            string.Equals(t.GetBaseAndQuoteAssets().BaseAsset, token, StringComparison.OrdinalIgnoreCase));
+        if (ticker is null)
+            return null;
+
+        return factors[ticker].ToDictionary(
+            kvp => kvp.Key.ToString(),
+            kvp => double.IsNaN(kvp.Value) || double.IsInfinity(kvp.Value)
+                ? (double?)null
+                : kvp.Value,
+            StringComparer.Ordinal);
     }
 
     private static decimal? CalculateGrossExposure<T>(

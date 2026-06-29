@@ -158,7 +158,8 @@ public class RebalanceCommand : ICommand
                 positions.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Select(ToPositionEventPayload).ToArray()),
                 cancellationToken: cancellationToken);
 
-            var weights = await _weightsService.CalculateWeightsAsync(cancellationToken);
+            var weightsResult = await _weightsService.CalculateWeightsAsync(cancellationToken);
+            var weights = weightsResult.Weights;
             await RecordRebalanceEventAsync(
                 runId,
                 accountContext,
@@ -167,6 +168,18 @@ public class RebalanceCommand : ICommand
                 $"Calculated {weights.Count} target weight(s)",
                 weights,
                 cancellationToken: cancellationToken);
+
+            if (TryGetFactorSnapshotEventPayload(weightsResult, out var factorSnapshotPayload))
+            {
+                await RecordRebalanceEventAsync(
+                    runId,
+                    accountContext,
+                    ++eventSequence,
+                    "FactorsCalculated",
+                    $"Calculated factor snapshots for {weightsResult.RawFactors.Tickers.Count} ticker(s)",
+                    factorSnapshotPayload,
+                    cancellationToken: cancellationToken);
+            }
 
             var baseAssetFilter = positions
                 .Keys
@@ -340,6 +353,25 @@ public class RebalanceCommand : ICommand
         {
             _logger.LogError(ex, "Failed to record rebalance event {EventType}", eventType);
         }
+    }
+
+    private static bool TryGetFactorSnapshotEventPayload(
+        WeightsCalculationResult weightsResult,
+        out object payload)
+    {
+        if (weightsResult.RawFactors.IsEmpty && weightsResult.NormalizedFactors.IsEmpty)
+        {
+            payload = new { };
+            return false;
+        }
+
+        payload = new
+        {
+            RawFactors = weightsResult.RawFactors.ToRows(),
+            NormalizedFactors = weightsResult.NormalizedFactors.ToRows(),
+            Weights = weightsResult.Weights
+        };
+        return true;
     }
 
     private static Trade EnsureClientOrderId(Trade trade) =>

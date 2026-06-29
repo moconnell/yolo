@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Net.Sockets;
+using System.Text.Json;
 using System.Threading.Channels;
 using Xunit.Abstractions;
 using YoloAbstractions;
@@ -87,7 +88,7 @@ public class RebalanceCommandTest
 
         var mockWeightsService = new Mock<ICalcWeights>();
         mockWeightsService.Setup(x => x.CalculateWeightsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(weights);
+            .ReturnsAsync(WeightsCalculationResult.FromWeights(weights));
 
         var mockTradeFactory = new Mock<ITradeFactory>();
         mockTradeFactory.Setup(x => x.CalculateTrades(weights, positions, markets))
@@ -138,7 +139,7 @@ public class RebalanceCommandTest
 
         var mockWeightsService = new Mock<ICalcWeights>();
         mockWeightsService.Setup(x => x.CalculateWeightsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Dictionary<string, decimal>());
+            .ReturnsAsync(WeightsCalculationResult.FromWeights(new Dictionary<string, decimal>()));
 
         var mockTradeFactory = new Mock<ITradeFactory>();
         mockTradeFactory.Setup(x => x.CalculateTrades(
@@ -230,7 +231,7 @@ public class RebalanceCommandTest
         // arrange
         var mockWeightsService = new Mock<ICalcWeights>();
         mockWeightsService.Setup(x => x.CalculateWeightsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Dictionary<string, decimal>());
+            .ReturnsAsync(WeightsCalculationResult.FromWeights(new Dictionary<string, decimal>()));
 
         var mockTradeFactory = new Mock<ITradeFactory>();
         mockTradeFactory.Setup(x => x.CalculateTrades(
@@ -316,7 +317,7 @@ public class RebalanceCommandTest
 
         var mockWeightsService = new Mock<ICalcWeights>();
         mockWeightsService.Setup(x => x.CalculateWeightsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(weights);
+            .ReturnsAsync(WeightsCalculationResult.FromWeights(weights));
 
         var mockTradeFactory = new Mock<ITradeFactory>();
         mockTradeFactory.Setup(x => x.CalculateTrades(weights, positions, markets))
@@ -379,7 +380,7 @@ public class RebalanceCommandTest
 
         var mockWeightsService = new Mock<ICalcWeights>();
         mockWeightsService.Setup(x => x.CalculateWeightsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(weights);
+            .ReturnsAsync(WeightsCalculationResult.FromWeights(weights));
 
         var mockTradeFactory = new Mock<ITradeFactory>();
         mockTradeFactory.Setup(x => x.CalculateTrades(weights, positions, markets))
@@ -474,7 +475,7 @@ public class RebalanceCommandTest
 
         var mockWeightsService = new Mock<ICalcWeights>();
         mockWeightsService.Setup(x => x.CalculateWeightsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(weights);
+            .ReturnsAsync(WeightsCalculationResult.FromWeights(weights));
 
         var mockTradeFactory = new Mock<ITradeFactory>();
         mockTradeFactory.Setup(x => x.CalculateTrades(weights, positions, markets))
@@ -541,7 +542,7 @@ public class RebalanceCommandTest
 
         var mockWeightsService = new Mock<ICalcWeights>();
         mockWeightsService.Setup(x => x.CalculateWeightsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(weights);
+            .ReturnsAsync(WeightsCalculationResult.FromWeights(weights));
 
         var mockTradeFactory = new Mock<ITradeFactory>();
         mockTradeFactory.Setup(x => x.CalculateTrades(weights, positions, markets))
@@ -624,7 +625,7 @@ public class RebalanceCommandTest
 
         var mockWeightsService = new Mock<ICalcWeights>();
         mockWeightsService.Setup(x => x.CalculateWeightsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(weights);
+            .ReturnsAsync(WeightsCalculationResult.FromWeights(weights));
 
         var mockTradeFactory = new Mock<ITradeFactory>();
         mockTradeFactory.Setup(x => x.CalculateTrades(weights, positions, markets))
@@ -681,6 +682,94 @@ public class RebalanceCommandTest
         rebalanceEvents.ShouldContain(e => e.EventType == "TradeProposed" && e.ClientOrderId == "client-1" && e.Coin == "BTC");
         rebalanceEvents.ShouldContain(e => e.EventType == "OrderUpdate" && e.OrderId == "123");
         rebalanceEvents.ShouldContain(e => e.EventType == "RunCompleted");
+        rebalanceEvents.Select(e => e.Sequence).ShouldBe(Enumerable.Range(1, rebalanceEvents.Count));
+    }
+
+    [Fact]
+    public async Task GivenWeightsCalculationResult_WhenExecuting_ShouldRecordFactorSnapshots()
+    {
+        // arrange
+        var weights = new Dictionary<string, decimal>
+        {
+            ["BTC/USDT"] = 0.5m,
+            ["ETH/USDT"] = -0.25m
+        };
+        var rawFactors = FactorDataFrame.NewFrom(
+            ["BTC/USDT", "ETH/USDT"],
+            DateTime.Today,
+            (FactorType.Carry, [0.1d, -0.2d]),
+            (FactorType.Volatility, [0.42d, double.NaN]));
+        var normalizedFactors = FactorDataFrame.NewFrom(
+            ["BTC/USDT", "ETH/USDT"],
+            DateTime.Today,
+            (FactorType.Carry, [1d, -1d]),
+            (FactorType.Volatility, [0.42d, double.NaN]));
+        var positions = new Dictionary<string, IReadOnlyList<Position>>();
+        var markets = new Dictionary<string, IReadOnlyList<MarketInfo>>();
+
+        var mockWeightsService = new Mock<ICalcWeights>();
+        mockWeightsService.Setup(x => x.CalculateWeightsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new WeightsCalculationResult(weights, rawFactors, normalizedFactors));
+
+        var mockTradeFactory = new Mock<ITradeFactory>();
+        mockTradeFactory.Setup(x => x.CalculateTrades(weights, positions, markets))
+            .Returns([]);
+
+        var mockOrderManager = new Mock<IOrderManager>();
+
+        var mockBroker = new Mock<IYoloBroker>();
+        mockBroker.Setup(x => x.GetOpenOrdersAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<long, Order>());
+        mockBroker.Setup(x => x.GetPositionsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(positions);
+        mockBroker.Setup(x => x.GetMarketsAsync(
+                It.IsAny<HashSet<string>>(),
+                It.IsAny<string>(),
+                It.IsAny<AssetPermissions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(markets);
+        mockBroker.Setup(x => x.GetAccountContext())
+            .Returns(new BrokerAccountContext("0xwallet", "0xvault"));
+
+        var rebalanceEvents = new List<RebalanceEventRecord>();
+        var mockEventRecorder = new Mock<IRebalanceEventRecorder>();
+        mockEventRecorder.Setup(x => x.RecordAsync(It.IsAny<RebalanceEventRecord>(), It.IsAny<CancellationToken>()))
+            .Callback<RebalanceEventRecord, CancellationToken>((record, _) => rebalanceEvents.Add(record))
+            .Returns(Task.CompletedTask);
+
+        var command = new RebalanceCommand(
+            mockWeightsService.Object,
+            mockTradeFactory.Object,
+            mockOrderManager.Object,
+            mockBroker.Object,
+            new YoloConfig { BaseAsset = "USDC" },
+            _loggerFactory.CreateLogger<RebalanceCommand>(),
+            mockEventRecorder.Object,
+            "yolodaily");
+
+        // act
+        await command.ExecuteAsync();
+
+        // assert
+        var factorEvent = rebalanceEvents.Single(e => e.EventType == "FactorsCalculated");
+        factorEvent.Summary.ShouldBe("Calculated factor snapshots for 2 ticker(s)");
+
+        using var payload = JsonDocument.Parse(factorEvent.PayloadJson);
+        var rawItems = payload.RootElement.GetProperty("rawFactors").EnumerateArray().ToArray();
+        rawItems[0].GetProperty("Ticker").GetString().ShouldBe("BTC/USDT");
+        rawItems[0].GetProperty("Carry").GetDouble().ShouldBe(0.1d);
+        rawItems[0].GetProperty("Volatility").GetDouble().ShouldBe(0.42d);
+        rawItems[1].GetProperty("Ticker").GetString().ShouldBe("ETH/USDT");
+        rawItems[1].GetProperty("Volatility").ValueKind.ShouldBe(JsonValueKind.Null);
+
+        var normalizedItems = payload.RootElement.GetProperty("normalizedFactors").EnumerateArray().ToArray();
+        normalizedItems[0].GetProperty("Carry").GetDouble().ShouldBe(1d);
+        normalizedItems[1].GetProperty("Carry").GetDouble().ShouldBe(-1d);
+
+        var weightsPayload = payload.RootElement.GetProperty("weights");
+        weightsPayload.GetProperty("BTC/USDT").GetDecimal().ShouldBe(0.5m);
+        weightsPayload.GetProperty("ETH/USDT").GetDecimal().ShouldBe(-0.25m);
+
         rebalanceEvents.Select(e => e.Sequence).ShouldBe(Enumerable.Range(1, rebalanceEvents.Count));
     }
 }

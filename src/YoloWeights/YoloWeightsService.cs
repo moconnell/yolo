@@ -41,7 +41,7 @@ public class YoloWeightsService : ICalcWeights
         _logger = logger;
     }
 
-    public async Task<IReadOnlyDictionary<string, decimal>> CalculateWeightsAsync(
+    public async Task<WeightsCalculationResult> CalculateWeightsAsync(
         CancellationToken cancellationToken = default)
     {
         var factorDataFrame = await GetFactorsAsync(cancellationToken);
@@ -57,7 +57,7 @@ public class YoloWeightsService : ICalcWeights
             r => (string)r["Ticker"],
             r => Convert.ToDecimal((double)r["Weight"]));
 
-        return weightsDict;
+        return new WeightsCalculationResult(weightsDict, factorDataFrame, normalizedFactors);
     }
 
     private async Task<FactorDataFrame> GetFactorsAsync(

@@ -23,6 +23,8 @@ public sealed record EffectiveWeightItem(
     decimal? EffectiveWeight,
     decimal? BufferAdjustedTargetWeight,
     decimal? DeltaWeight,
+    IReadOnlyDictionary<string, double?>? RawFactors,
+    IReadOnlyDictionary<string, double?>? NormalizedFactors,
     bool IsInUniverse,
     bool WithinTradeBuffer,
     bool HasTradableMarket);

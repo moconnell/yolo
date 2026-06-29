@@ -273,6 +273,27 @@ public sealed record FactorDataFrame
         }
     }
 
+    public IReadOnlyList<IReadOnlyDictionary<string, object?>> ToRows()
+    {
+        var rows = new List<IReadOnlyDictionary<string, object?>>();
+        for (var rowIndex = 0; rowIndex < _dataFrame.Rows.Count; rowIndex++)
+        {
+            var row = new Dictionary<string, object?>(StringComparer.Ordinal);
+            foreach (var column in _dataFrame.Columns)
+            {
+                var value = column[rowIndex];
+                row[column.Name] = value is double doubleValue &&
+                                   (double.IsNaN(doubleValue) || double.IsInfinity(doubleValue))
+                    ? null
+                    : value;
+            }
+
+            rows.Add(row);
+        }
+
+        return rows;
+    }
+
     public override string ToString()
     {
         if (_dataFrame.Rows.Count == 0)

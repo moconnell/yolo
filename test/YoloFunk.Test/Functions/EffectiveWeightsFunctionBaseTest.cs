@@ -76,7 +76,13 @@ public class EffectiveWeightsFunctionBaseTest
         payload.BufferAdjustedGrossExposure.ShouldBe(0.4m);
         payload.BufferAdjustedNetExposure.ShouldBe(0.4m);
         payload.Weights.ShouldNotBeEmpty();
-        payload.Weights.ShouldContain(x => x.Token == "SOL");
+        var sol = payload.Weights.Single(x => x.Token == "SOL");
+        sol.RawFactors.ShouldNotBeNull();
+        sol.RawFactors["Carry"].ShouldBe(0.2d);
+        sol.RawFactors["Volatility"].ShouldBe(0.4d);
+        sol.NormalizedFactors.ShouldNotBeNull();
+        sol.NormalizedFactors["Carry"].ShouldBe(1d);
+        sol.NormalizedFactors["Volatility"].ShouldBe(0.4d);
     }
 
     [Fact]
@@ -173,11 +179,12 @@ public class EffectiveWeightsFunctionBaseTest
 
         var weights = new Mock<ICalcWeights>();
         weights.Setup(x => x.CalculateWeightsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Dictionary<string, decimal>
-            {
-                ["BTC"] = 0.4m,
-                ["BTC/USDC"] = 0.2m
-            });
+            .ReturnsAsync(WeightsCalculationResult.FromWeights(
+                new Dictionary<string, decimal>
+                {
+                    ["BTC"] = 0.4m,
+                    ["BTC/USDC"] = 0.2m
+                }));
 
         var services = new ServiceCollection();
         services.AddLogging();
@@ -265,10 +272,21 @@ public class EffectiveWeightsFunctionBaseTest
 
         var weights = new Mock<ICalcWeights>();
         weights.Setup(x => x.CalculateWeightsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Dictionary<string, decimal>
-            {
-                ["SOL"] = rawTargetWeight
-            });
+            .ReturnsAsync(new WeightsCalculationResult(
+                new Dictionary<string, decimal>
+                {
+                    ["SOL"] = rawTargetWeight
+                },
+                FactorDataFrame.NewFrom(
+                    ["SOL/USDC"],
+                    DateTime.Today,
+                    (FactorType.Carry, [0.2d]),
+                    (FactorType.Volatility, [0.4d])),
+                FactorDataFrame.NewFrom(
+                    ["SOL/USDC"],
+                    DateTime.Today,
+                    (FactorType.Carry, [1d]),
+                    (FactorType.Volatility, [0.4d]))));
 
         var services = new ServiceCollection();
         services.AddLogging();

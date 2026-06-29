@@ -18,6 +18,8 @@ public class EffectiveWeightsResponseTest
                 EffectiveWeight: 0.25m,
                 BufferAdjustedTargetWeight: 0.24m,
                 DeltaWeight: 0.05m,
+                RawFactors: new Dictionary<string, double?> { ["Carry"] = 0.2d },
+                NormalizedFactors: new Dictionary<string, double?> { ["Carry"] = 1d },
                 IsInUniverse: true,
                 WithinTradeBuffer: false,
                 HasTradableMarket: true)
@@ -53,6 +55,12 @@ public class EffectiveWeightsResponseTest
         response.Weights.Count.ShouldBe(1);
         response.Weights[0].Token.ShouldBe("SOL");
         response.Weights[0].BufferAdjustedTargetWeight.ShouldBe(0.24m);
+        var rawFactors = response.Weights[0].RawFactors;
+        rawFactors.ShouldNotBeNull();
+        rawFactors!["Carry"].ShouldBe(0.2d);
+        var normalizedFactors = response.Weights[0].NormalizedFactors;
+        normalizedFactors.ShouldNotBeNull();
+        normalizedFactors!["Carry"].ShouldBe(1d);
         response.Weights[0].HasTradableMarket.ShouldBeTrue();
     }
 
@@ -69,6 +77,8 @@ public class EffectiveWeightsResponseTest
                 EffectiveWeight: null,
                 BufferAdjustedTargetWeight: null,
                 DeltaWeight: null,
+                RawFactors: null,
+                NormalizedFactors: null,
                 IsInUniverse: false,
                 WithinTradeBuffer: false,
                 HasTradableMarket: false)
@@ -98,6 +108,8 @@ public class EffectiveWeightsResponseTest
         response.BufferAdjustedNetExposure.ShouldBeNull();
         response.Weights.Single().CurrentWeight.ShouldBeNull();
         response.Weights.Single().BufferAdjustedTargetWeight.ShouldBeNull();
+        response.Weights.Single().RawFactors.ShouldBeNull();
+        response.Weights.Single().NormalizedFactors.ShouldBeNull();
         response.Weights.Single().HasTradableMarket.ShouldBeFalse();
     }
 }
