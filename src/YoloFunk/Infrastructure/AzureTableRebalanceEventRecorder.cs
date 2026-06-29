@@ -8,13 +8,15 @@ namespace YoloFunk.Infrastructure;
 public sealed class AzureTableRebalanceEventRecorder(TableServiceClient tableServiceClient) : IRebalanceEventRecorder
 {
     private const string TableName = "rebalanceevents";
+    private readonly TableClient _tableClient = tableServiceClient.GetTableClient(TableName);
+    private readonly SemaphoreSlim _initializationLock = new(1, 1);
+    private volatile bool _initialized;
 
     public async Task RecordAsync(RebalanceEventRecord record, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(record);
 
-        var tableClient = tableServiceClient.GetTableClient(TableName);
-        await tableClient.CreateIfNotExistsAsync(cancellationToken);
+        await EnsureInitializedAsync(cancellationToken);
 
         var partitionKey = SanitizeTableKey($"{record.StrategyName}|{record.RunId}");
         var rowKey = SanitizeTableKey($"{record.TimestampUtc:yyyyMMddHHmmssfffffff}|{record.Sequence:D6}|{record.EventType}");
@@ -36,7 +38,29 @@ public sealed class AzureTableRebalanceEventRecorder(TableServiceClient tableSer
         AddIfNotNull(entity, "ClientOrderId", record.ClientOrderId);
         AddIfNotNull(entity, "OrderId", record.OrderId);
 
-        await tableClient.AddEntityAsync(entity, cancellationToken);
+        await _tableClient.AddEntityAsync(entity, cancellationToken);
+    }
+
+    private async Task EnsureInitializedAsync(CancellationToken cancellationToken)
+    {
+        if (_initialized)
+        {
+            return;
+        }
+
+        await _initializationLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (!_initialized)
+            {
+                await _tableClient.CreateIfNotExistsAsync(cancellationToken);
+                _initialized = true;
+            }
+        }
+        finally
+        {
+            _initializationLock.Release();
+        }
     }
 
     private static void AddIfNotNull(TableEntity entity, string name, string? value)
