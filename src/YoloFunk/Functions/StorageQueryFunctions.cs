@@ -15,65 +15,9 @@ public sealed class StorageQueryFunctions(
     IServiceProvider serviceProvider,
     ILogger<StorageQueryFunctions> logger)
 {
-    private const string TradeExecutionsTableName = "tradeexecutions";
     private const string RebalanceEventsTableName = "rebalanceevents";
     private const string HttpRequestsTableName = "httprequestsindex";
     private const string HttpRequestsContainerName = "http-requests";
-
-    [Function(nameof(GetTradeExecutions))]
-    public async Task<HttpResponseData> GetTradeExecutions(
-        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "storage/trade-executions")]
-        HttpRequestData req,
-        CancellationToken cancellationToken)
-    {
-        if (!TryGetTableServiceClient(req, out var tableServiceClient))
-            return await ServiceUnavailableAsync(req, cancellationToken);
-
-        var query = HttpQueryParameters.Parse(req.Url);
-        var page = query.GetInt32("page", 1, 1, 10_000);
-        var pageSize = query.GetInt32("pageSize", 100, 1, 500);
-        var orderBy = query.GetString("orderBy") ?? "submittedAt";
-        var direction = NormalizeDirection(query.GetString("direction"));
-        var continuationToken = query.GetString("continuationToken");
-
-        try
-        {
-            var pageResult = await QueryTradeExecutionsAsync(
-                tableServiceClient,
-                query,
-                pageSize,
-                continuationToken,
-                cancellationToken);
-            var items = ApplyTradeExecutionSort(pageResult.Items, orderBy, direction);
-
-            return await WritePagedResponseAsync(
-                req,
-                items,
-                page,
-                pageSize,
-                orderBy,
-                direction,
-                cancellationToken,
-                pageResult.NextContinuationToken,
-                skipItems: false);
-        }
-        catch (RequestFailedException ex) when (ex.Status == 404)
-        {
-            return await WritePagedResponseAsync(
-                req,
-                Array.Empty<TradeExecutionQueryItem>(),
-                page,
-                pageSize,
-                orderBy,
-                direction,
-                cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to query trade executions");
-            return await ErrorAsync(req, "Failed to query trade executions", cancellationToken);
-        }
-    }
 
     [Function(nameof(GetRebalanceEvents))]
     public async Task<HttpResponseData> GetRebalanceEvents(
@@ -87,15 +31,31 @@ public sealed class StorageQueryFunctions(
         var query = HttpQueryParameters.Parse(req.Url);
         var page = query.GetInt32("page", 1, 1, 10_000);
         var pageSize = query.GetInt32("pageSize", 100, 1, 500);
-        var orderBy = query.GetString("orderBy") ?? "timestampUtc";
-        var direction = NormalizeDirection(query.GetString("direction"));
+        var orderBy = NormalizeTableOrderBy(query.GetString("orderBy"));
+        var direction = NormalizeTableDirection(query.GetString("direction"));
+        var continuationToken = query.GetString("continuationToken");
+        if (orderBy is null || direction is null)
+            return await InvalidPagedTableSortAsync(req, cancellationToken);
 
         try
         {
-            var items = await QueryRebalanceEventsAsync(tableServiceClient, query, cancellationToken);
-            items = ApplyRebalanceEventSort(items, orderBy, direction);
+            var pageResult = await QueryRebalanceEventsAsync(
+                tableServiceClient,
+                query,
+                pageSize,
+                continuationToken,
+                cancellationToken);
 
-            return await WritePagedResponseAsync(req, items, page, pageSize, orderBy, direction, cancellationToken);
+            return await WritePagedResponseAsync(
+                req,
+                pageResult.Items,
+                page,
+                pageSize,
+                orderBy,
+                direction,
+                cancellationToken,
+                pageResult.NextContinuationToken,
+                skipItems: false);
         }
         catch (RequestFailedException ex) when (ex.Status == 404)
         {
@@ -127,15 +87,31 @@ public sealed class StorageQueryFunctions(
         var query = HttpQueryParameters.Parse(req.Url);
         var page = query.GetInt32("page", 1, 1, 10_000);
         var pageSize = query.GetInt32("pageSize", 100, 1, 500);
-        var orderBy = query.GetString("orderBy") ?? "requestTimeUtc";
-        var direction = NormalizeDirection(query.GetString("direction"));
+        var orderBy = NormalizeTableOrderBy(query.GetString("orderBy"));
+        var direction = NormalizeTableDirection(query.GetString("direction"));
+        var continuationToken = query.GetString("continuationToken");
+        if (orderBy is null || direction is null)
+            return await InvalidPagedTableSortAsync(req, cancellationToken);
 
         try
         {
-            var items = await QueryHttpRequestCapturesAsync(tableServiceClient, query, cancellationToken);
-            items = ApplyHttpRequestCaptureSort(items, orderBy, direction);
+            var pageResult = await QueryHttpRequestCapturesAsync(
+                tableServiceClient,
+                query,
+                pageSize,
+                continuationToken,
+                cancellationToken);
 
-            return await WritePagedResponseAsync(req, items, page, pageSize, orderBy, direction, cancellationToken);
+            return await WritePagedResponseAsync(
+                req,
+                pageResult.Items,
+                page,
+                pageSize,
+                orderBy,
+                direction,
+                cancellationToken,
+                pageResult.NextContinuationToken,
+                skipItems: false);
         }
         catch (RequestFailedException ex) when (ex.Status == 404)
         {
@@ -221,44 +197,11 @@ public sealed class StorageQueryFunctions(
         return blobServiceClient is not null;
     }
 
-    private static async Task<QueryPageResult<TradeExecutionQueryItem>> QueryTradeExecutionsAsync(
+    private static async Task<QueryPageResult<HttpRequestCaptureQueryItem>> QueryHttpRequestCapturesAsync(
         TableServiceClient tableServiceClient,
         HttpQueryParameters query,
         int pageSize,
         string? continuationToken,
-        CancellationToken cancellationToken)
-    {
-        var strategy = query.GetString("strategy");
-        var coin = query.GetString("coin");
-        var runId = query.GetString("runId");
-        var status = query.GetString("status");
-        var from = query.GetDateTimeOffset("from");
-        var to = query.GetDateTimeOffset("to");
-
-        var tableClient = tableServiceClient.GetTableClient(TradeExecutionsTableName);
-        var page = await QueryEntitiesPageAsync(
-            tableClient,
-            BuildPartitionFilter(strategy),
-            pageSize,
-            continuationToken,
-            cancellationToken);
-
-        var items = page.Items
-            .Select(ToTradeExecutionQueryItem)
-            .Where(item => Matches(item.StrategyName, strategy))
-            .Where(item => Matches(item.Coin, coin))
-            .Where(item => Matches(item.RunId, runId))
-            .Where(item => Matches(item.Status, status))
-            .Where(item => !from.HasValue || (item.SubmittedAt ?? item.RecordedAt) >= from.Value)
-            .Where(item => !to.HasValue || (item.SubmittedAt ?? item.RecordedAt) <= to.Value)
-            .ToArray();
-
-        return new QueryPageResult<TradeExecutionQueryItem>(items, page.NextContinuationToken);
-    }
-
-    private static async Task<IReadOnlyList<HttpRequestCaptureQueryItem>> QueryHttpRequestCapturesAsync(
-        TableServiceClient tableServiceClient,
-        HttpQueryParameters query,
         CancellationToken cancellationToken)
     {
         var host = query.GetString("host");
@@ -270,9 +213,14 @@ public sealed class StorageQueryFunctions(
         var to = query.GetDateTimeOffset("to");
 
         var tableClient = tableServiceClient.GetTableClient(HttpRequestsTableName);
-        var entities = await QueryEntitiesAsync(tableClient, BuildPartitionFilter(host), cancellationToken);
+        var page = await QueryEntitiesPageAsync(
+            tableClient,
+            BuildPartitionFilter(host),
+            pageSize,
+            continuationToken,
+            cancellationToken);
 
-        return [.. entities
+        var items = page.Items
             .Select(ToHttpRequestCaptureQueryItem)
             .Where(item => Matches(item.Host, host))
             .Where(item => Contains(item.Endpoint, endpoint))
@@ -280,12 +228,17 @@ public sealed class StorageQueryFunctions(
             .Where(item => !int.TryParse(statusCode, out var expectedStatusCode) || item.StatusCode == expectedStatusCode)
             .Where(item => Matches(item.ContentHash, contentHash))
             .Where(item => !from.HasValue || item.RequestTimeUtc >= from.Value)
-            .Where(item => !to.HasValue || item.RequestTimeUtc <= to.Value)];
+            .Where(item => !to.HasValue || item.RequestTimeUtc <= to.Value)
+            .ToArray();
+
+        return new QueryPageResult<HttpRequestCaptureQueryItem>(items, page.NextContinuationToken);
     }
 
-    private static async Task<IReadOnlyList<RebalanceEventQueryItem>> QueryRebalanceEventsAsync(
+    private static async Task<QueryPageResult<RebalanceEventQueryItem>> QueryRebalanceEventsAsync(
         TableServiceClient tableServiceClient,
         HttpQueryParameters query,
+        int pageSize,
+        string? continuationToken,
         CancellationToken cancellationToken)
     {
         var strategy = query.GetString("strategy");
@@ -301,9 +254,14 @@ public sealed class StorageQueryFunctions(
         var partitionFilter = !string.IsNullOrWhiteSpace(strategy) && !string.IsNullOrWhiteSpace(runId)
             ? BuildPartitionFilter($"{strategy}|{runId}")
             : null;
-        var entities = await QueryEntitiesAsync(tableClient, partitionFilter, cancellationToken);
+        var page = await QueryEntitiesPageAsync(
+            tableClient,
+            partitionFilter,
+            pageSize,
+            continuationToken,
+            cancellationToken);
 
-        return [.. entities
+        var items = page.Items
             .Select(ToRebalanceEventQueryItem)
             .Where(item => Matches(item.StrategyName, strategy))
             .Where(item => Matches(item.RunId, runId))
@@ -312,24 +270,10 @@ public sealed class StorageQueryFunctions(
             .Where(item => Matches(item.Coin, coin))
             .Where(item => Matches(item.ClientOrderId, clientOrderId))
             .Where(item => !from.HasValue || item.TimestampUtc >= from.Value)
-            .Where(item => !to.HasValue || item.TimestampUtc <= to.Value)];
-    }
+            .Where(item => !to.HasValue || item.TimestampUtc <= to.Value)
+            .ToArray();
 
-    private static async Task<IReadOnlyList<TableEntity>> QueryEntitiesAsync(
-        TableClient tableClient,
-        string? filter,
-        CancellationToken cancellationToken)
-    {
-        var entities = new List<TableEntity>();
-        await foreach (var entity in tableClient.QueryAsync<TableEntity>(
-                           filter,
-                           maxPerPage: 1_000,
-                           cancellationToken: cancellationToken))
-        {
-            entities.Add(entity);
-        }
-
-        return entities;
+        return new QueryPageResult<RebalanceEventQueryItem>(items, page.NextContinuationToken);
     }
 
     private static async Task<QueryPageResult<TableEntity>> QueryEntitiesPageAsync(
@@ -359,70 +303,6 @@ public sealed class StorageQueryFunctions(
             : $"PartitionKey eq '{SanitizeTableKey(partitionKey).Replace("'", "''")}'";
     }
 
-    private static IReadOnlyList<TradeExecutionQueryItem> ApplyTradeExecutionSort(
-        IReadOnlyList<TradeExecutionQueryItem> items,
-        string orderBy,
-        string direction)
-    {
-        Func<TradeExecutionQueryItem, object?> key = orderBy.ToLowerInvariant() switch
-        {
-            "coin" => item => item.Coin,
-            "completedat" => item => item.CompletedAt,
-            "recordedat" => item => item.RecordedAt,
-            "runid" => item => item.RunId,
-            "status" => item => item.Status,
-            "strategy" or "strategyname" => item => item.StrategyName,
-            _ => item => item.SubmittedAt
-        };
-
-        return Sort(items, key, direction);
-    }
-
-    private static IReadOnlyList<HttpRequestCaptureQueryItem> ApplyHttpRequestCaptureSort(
-        IReadOnlyList<HttpRequestCaptureQueryItem> items,
-        string orderBy,
-        string direction)
-    {
-        Func<HttpRequestCaptureQueryItem, object?> key = orderBy.ToLowerInvariant() switch
-        {
-            "endpoint" => item => item.Endpoint,
-            "host" => item => item.Host,
-            "method" => item => item.Method,
-            "statuscode" => item => item.StatusCode,
-            _ => item => item.RequestTimeUtc
-        };
-
-        return Sort(items, key, direction);
-    }
-
-    private static IReadOnlyList<RebalanceEventQueryItem> ApplyRebalanceEventSort(
-        IReadOnlyList<RebalanceEventQueryItem> items,
-        string orderBy,
-        string direction)
-    {
-        Func<RebalanceEventQueryItem, object?> key = orderBy.ToLowerInvariant() switch
-        {
-            "eventtype" => item => item.EventType,
-            "level" => item => item.Level,
-            "runid" => item => item.RunId,
-            "sequence" => item => item.Sequence,
-            "strategy" or "strategyname" => item => item.StrategyName,
-            _ => item => item.TimestampUtc
-        };
-
-        return Sort(items, key, direction);
-    }
-
-    private static IReadOnlyList<T> Sort<T>(
-        IReadOnlyList<T> items,
-        Func<T, object?> key,
-        string direction)
-    {
-        return direction == "asc"
-            ? [.. items.OrderBy(key)]
-            : [.. items.OrderByDescending(key)];
-    }
-
     private static async Task<HttpResponseData> WritePagedResponseAsync<T>(
         HttpRequestData req,
         IReadOnlyList<T> items,
@@ -446,45 +326,6 @@ public sealed class StorageQueryFunctions(
             new PagedQueryResponse<T>(pageItems, page, pageSize, items.Count, orderBy, direction, nextContinuationToken),
             cancellationToken);
         return response;
-    }
-
-    private static TradeExecutionQueryItem ToTradeExecutionQueryItem(TableEntity entity)
-    {
-        return new TradeExecutionQueryItem(
-            GetString(entity, "ExecutionId"),
-            GetString(entity, "RunId"),
-            GetString(entity, "StrategyName"),
-            GetNullableString(entity, "WalletAddress"),
-            GetNullableString(entity, "VaultAddress"),
-            GetString(entity, "Coin"),
-            GetString(entity, "Side"),
-            GetNullableString(entity, "TargetPosition"),
-            GetNullableString(entity, "CurrentPosition"),
-            GetNullableString(entity, "IntendedDelta"),
-            GetNullableString(entity, "ArrivalMid"),
-            GetNullableString(entity, "ArrivalBid"),
-            GetNullableString(entity, "ArrivalAsk"),
-            GetNullableString(entity, "SpreadBps"),
-            GetNullableString(entity, "OrderId"),
-            GetString(entity, "OrderType"),
-            GetNullableBool(entity, "PostOnly"),
-            GetNullableBool(entity, "ReduceOnly"),
-            GetNullableString(entity, "LimitPrice"),
-            GetNullableDateTimeOffset(entity, "SubmittedAt"),
-            GetNullableString(entity, "FilledQty"),
-            GetNullableString(entity, "AvgFillPrice"),
-            GetNullableString(entity, "Fees"),
-            GetNullableString(entity, "MakerQty"),
-            GetNullableString(entity, "MakerAvgFillPrice"),
-            GetNullableString(entity, "MakerFees"),
-            GetNullableString(entity, "TakerQty"),
-            GetNullableString(entity, "TakerAvgFillPrice"),
-            GetNullableString(entity, "TakerFees"),
-            GetNullableString(entity, "CancelledQty"),
-            GetNullableDateTimeOffset(entity, "CompletedAt"),
-            GetNullableString(entity, "Status"),
-            GetNullableString(entity, "Error"),
-            GetNullableDateTimeOffset(entity, "RecordedAt"));
     }
 
     private static HttpRequestCaptureQueryItem ToHttpRequestCaptureQueryItem(TableEntity entity)
@@ -528,8 +369,30 @@ public sealed class StorageQueryFunctions(
         string.IsNullOrWhiteSpace(expected) ||
         actual.Contains(expected, StringComparison.OrdinalIgnoreCase);
 
-    private static string NormalizeDirection(string? direction) =>
-        string.Equals(direction, "asc", StringComparison.OrdinalIgnoreCase) ? "asc" : "desc";
+    private static string? NormalizeTableOrderBy(string? orderBy)
+    {
+        if (string.IsNullOrWhiteSpace(orderBy))
+        {
+            return "table";
+        }
+
+        return orderBy.Equals("table", StringComparison.OrdinalIgnoreCase) ||
+               orderBy.Equals("partitionKey", StringComparison.OrdinalIgnoreCase) ||
+               orderBy.Equals("rowKey", StringComparison.OrdinalIgnoreCase)
+            ? "table"
+            : null;
+    }
+
+    private static string? NormalizeTableDirection(string? direction)
+    {
+        if (string.IsNullOrWhiteSpace(direction) ||
+            direction.Equals("asc", StringComparison.OrdinalIgnoreCase))
+        {
+            return "asc";
+        }
+
+        return null;
+    }
 
     private static string SanitizeTableKey(string value)
     {
@@ -576,6 +439,17 @@ public sealed class StorageQueryFunctions(
     {
         var response = req.CreateResponse(HttpStatusCode.InternalServerError);
         await response.WriteAsJsonAsync(new { Error = message }, cancellationToken);
+        return response;
+    }
+
+    private static async Task<HttpResponseData> InvalidPagedTableSortAsync(
+        HttpRequestData req,
+        CancellationToken cancellationToken)
+    {
+        var response = req.CreateResponse(HttpStatusCode.BadRequest);
+        await response.WriteAsJsonAsync(
+            new { Error = "Continuation-token paging supports only table order. Use orderBy=table and direction=asc." },
+            cancellationToken);
         return response;
     }
 

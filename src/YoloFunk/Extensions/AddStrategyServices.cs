@@ -188,7 +188,6 @@ public static class AddStrategyServices
                 sp.GetRequiredKeyedService<IYoloBroker>(strategyKey),
                 sp.GetRequiredKeyedService<YoloConfig>(strategyKey),
                 sp.GetRequiredService<ILogger<RebalanceCommand>>(),
-                sp.GetService<ITradeExecutionRecorder>() ?? NoOpTradeExecutionRecorder.Instance,
                 sp.GetService<IRebalanceEventRecorder>() ?? NoOpRebalanceEventRecorder.Instance,
                 strategyKey);
         });

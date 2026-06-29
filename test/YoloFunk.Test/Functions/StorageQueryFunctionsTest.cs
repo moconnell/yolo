@@ -19,17 +19,6 @@ public class StorageQueryFunctionsTest
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     [Fact]
-    public async Task GetTradeExecutions_WhenTableClientMissing_ShouldReturnServiceUnavailable()
-    {
-        var request = TestHttpRequestData.Create("GET", "http://localhost/api/storage/trade-executions");
-        var sut = new StorageQueryFunctions(request.FunctionContext.InstanceServices, NullLogger<StorageQueryFunctions>.Instance);
-
-        var response = await sut.GetTradeExecutions(request, CancellationToken.None);
-
-        response.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
-    }
-
-    [Fact]
     public async Task GetHttpRequestPayload_WhenBlobClientConfiguredButBlobNameMissing_ShouldReturnBadRequest()
     {
         var blobServiceClient = new Mock<BlobServiceClient>();
@@ -42,90 +31,6 @@ public class StorageQueryFunctionsTest
         var response = await sut.GetHttpRequestPayload(request, CancellationToken.None);
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-    }
-
-    [Fact]
-    public async Task GetTradeExecutions_WhenTableHasRows_ShouldReturnFilteredPageWithContinuationToken()
-    {
-        var tableServiceClient = CreateTableServiceClient(
-            "tradeexecutions",
-            [
-                new TableEntity("yolodaily", "run-1|exec-1")
-                {
-                    ["ExecutionId"] = "exec-1",
-                    ["RunId"] = "run-1",
-                    ["StrategyName"] = "yolodaily",
-                    ["Coin"] = "BTC",
-                    ["Side"] = "Buy",
-                    ["OrderType"] = "Limit",
-                    ["SubmittedAt"] = DateTimeOffset.Parse("2026-06-28T10:00:00+00:00"),
-                    ["RecordedAt"] = DateTimeOffset.Parse("2026-06-28T10:00:01+00:00"),
-                    ["Status"] = "Filled",
-                    ["FilledQty"] = "1.25"
-                },
-                new TableEntity("yolodaily", "run-1|exec-2")
-                {
-                    ["ExecutionId"] = "exec-2",
-                    ["RunId"] = "run-1",
-                    ["StrategyName"] = "yolodaily",
-                    ["Coin"] = "ETH",
-                    ["Side"] = "Sell",
-                    ["OrderType"] = "Market",
-                    ["SubmittedAt"] = DateTimeOffset.Parse("2026-06-28T10:01:00+00:00"),
-                    ["RecordedAt"] = DateTimeOffset.Parse("2026-06-28T10:01:01+00:00"),
-                    ["Status"] = "Created"
-                }
-            ],
-            continuationToken: "next-page");
-        var request = TestHttpRequestData.Create(
-            "GET",
-            "http://localhost/api/storage/trade-executions?strategy=yolodaily&coin=BTC&pageSize=2&from=2026-06-28T09:00:00%2B00:00",
-            services => services.AddSingleton(tableServiceClient));
-        var sut = new StorageQueryFunctions(request.FunctionContext.InstanceServices, NullLogger<StorageQueryFunctions>.Instance);
-
-        var response = await sut.GetTradeExecutions(request, CancellationToken.None);
-
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var payload = await TestHttpRequestData.ReadJsonAsync<PagedQueryResponse<TradeExecutionQueryItem>>(response);
-        payload.ShouldNotBeNull();
-        payload.PageSize.ShouldBe(2);
-        payload.NextContinuationToken.ShouldBe("next-page");
-        payload.Items.Count.ShouldBe(1);
-        payload.Items[0].ExecutionId.ShouldBe("exec-1");
-        payload.Items[0].Coin.ShouldBe("BTC");
-        payload.Items[0].FilledQty.ShouldBe("1.25");
-    }
-
-    [Fact]
-    public async Task GetTradeExecutions_WhenFromDateIsAmbiguous_ShouldIgnoreDateFilter()
-    {
-        var tableServiceClient = CreateTableServiceClient(
-            "tradeexecutions",
-            [
-                new TableEntity("yolodaily", "run-1|exec-1")
-                {
-                    ["ExecutionId"] = "exec-1",
-                    ["RunId"] = "run-1",
-                    ["StrategyName"] = "yolodaily",
-                    ["Coin"] = "BTC",
-                    ["Side"] = "Buy",
-                    ["OrderType"] = "Limit",
-                    ["SubmittedAt"] = DateTimeOffset.Parse("2026-06-28T10:00:00+00:00"),
-                    ["RecordedAt"] = DateTimeOffset.Parse("2026-06-28T10:00:01+00:00")
-                }
-            ]);
-        var request = TestHttpRequestData.Create(
-            "GET",
-            "http://localhost/api/storage/trade-executions?strategy=yolodaily&from=not-a-date",
-            services => services.AddSingleton(tableServiceClient));
-        var sut = new StorageQueryFunctions(request.FunctionContext.InstanceServices, NullLogger<StorageQueryFunctions>.Instance);
-
-        var response = await sut.GetTradeExecutions(request, CancellationToken.None);
-
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var payload = await TestHttpRequestData.ReadJsonAsync<PagedQueryResponse<TradeExecutionQueryItem>>(response);
-        payload.ShouldNotBeNull();
-        payload.Items.Count.ShouldBe(1);
     }
 
     [Fact]
