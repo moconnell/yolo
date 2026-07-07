@@ -331,6 +331,7 @@ public class RebalanceCommand : ICommand
             Summary = summary,
             WalletAddress = accountContext.Address,
             VaultAddress = accountContext.VaultAddress,
+            IsTestnet = accountContext.IsTestnet,
             Coin = coin,
             ClientOrderId = clientOrderId,
             OrderId = orderId,

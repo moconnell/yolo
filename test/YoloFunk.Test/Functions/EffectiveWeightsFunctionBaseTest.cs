@@ -23,7 +23,7 @@ public class EffectiveWeightsFunctionBaseTest
     [Fact]
     public async Task GivenMissingBrokerAddressContext_WhenRun_ShouldReturnInternalServerError()
     {
-        var services = TestHttpRequestData.CreateInstanceServices(new BrokerAccountContext(null, null));
+        var services = TestHttpRequestData.CreateInstanceServices(new BrokerAccountContext(null, null, true));
 
         var request = TestHttpRequestData.Create("GET", "http://localhost/api/rebalance/test/effective-weights", services);
         var sut = new EffectiveWeightsFunctionHarness(request.FunctionContext.InstanceServices, NullLogger<EffectiveWeightsFunctionHarness>.Instance);
@@ -40,7 +40,7 @@ public class EffectiveWeightsFunctionBaseTest
     [Fact]
     public async Task GivenEmptyBrokerAddressContext_WhenRun_ShouldReturnInternalServerError()
     {
-        var services = TestHttpRequestData.CreateInstanceServices(new BrokerAccountContext(string.Empty, "0x1111111111111111111111111111111111111111"));
+        var services = TestHttpRequestData.CreateInstanceServices(new BrokerAccountContext(string.Empty, "0x1111111111111111111111111111111111111111", true));
 
         var request = TestHttpRequestData.Create("GET", "http://localhost/api/rebalance/test/effective-weights", services);
         var sut = new EffectiveWeightsFunctionHarness(request.FunctionContext.InstanceServices, NullLogger<EffectiveWeightsFunctionHarness>.Instance);
@@ -164,7 +164,7 @@ public class EffectiveWeightsFunctionBaseTest
     public async Task GivenDuplicateNormalizedBaseAssets_WhenRun_ShouldReturnBadRequestWithDetails()
     {
         const string strategy = "test";
-        var accountContext = new BrokerAccountContext("0x1111111111111111111111111111111111111111", null);
+        var accountContext = new BrokerAccountContext("0x1111111111111111111111111111111111111111", null, true);
 
         var broker = new Mock<IYoloBroker>();
         broker.Setup(x => x.GetAccountContext()).Returns(accountContext);
@@ -234,7 +234,7 @@ public class EffectiveWeightsFunctionBaseTest
         RebalanceMode rebalanceMode)
     {
         const string strategy = "test";
-        var accountContext = new BrokerAccountContext("0x1111111111111111111111111111111111111111", null);
+        var accountContext = new BrokerAccountContext("0x1111111111111111111111111111111111111111", null, true);
 
         var broker = new Mock<IYoloBroker>();
         broker.Setup(x => x.GetAccountContext()).Returns(accountContext);

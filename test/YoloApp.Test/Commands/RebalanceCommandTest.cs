@@ -107,6 +107,8 @@ public class RebalanceCommandTest
                 It.IsAny<AssetPermissions>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(markets);
+        mockBroker.Setup(x => x.GetAccountContext())
+            .Returns(new BrokerAccountContext("0xwallet", "0xvault", true));
 
         var options = Options.Create(new YoloConfig { BaseAsset = "USDC" });
         var logger = _loggerFactory.CreateLogger<RebalanceCommand>();
@@ -151,6 +153,8 @@ public class RebalanceCommandTest
         var mockOrderManager = new Mock<IOrderManager>();
 
         var mockBroker = new Mock<IYoloBroker>();
+        mockBroker.Setup(x => x.GetAccountContext())
+            .Returns(new BrokerAccountContext("0xwallet", "0xvault", true));
         mockBroker.Setup(x => x.GetOpenOrdersAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(openOrders);
         mockBroker.Setup(x => x.GetPositionsAsync(It.IsAny<CancellationToken>()))
@@ -201,6 +205,8 @@ public class RebalanceCommandTest
         var mockBroker = new Mock<IYoloBroker>();
         mockBroker.Setup(x => x.GetOpenOrdersAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(openOrders);
+        mockBroker.Setup(x => x.GetAccountContext())
+            .Returns(new BrokerAccountContext("0xwallet", "0xvault", true));
 
         var options = Options.Create(new YoloConfig
         {
@@ -242,6 +248,8 @@ public class RebalanceCommandTest
 
         var mockOrderManager = new Mock<IOrderManager>();
         var mockBroker = new Mock<IYoloBroker>();
+        mockBroker.Setup(x => x.GetAccountContext())
+            .Returns(new BrokerAccountContext("0xwallet", "0xvault", true));
         mockBroker.Setup(x => x.GetOpenOrdersAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<long, Order>());
         mockBroker.Setup(x => x.GetPositionsAsync(It.IsAny<CancellationToken>()))
@@ -326,6 +334,8 @@ public class RebalanceCommandTest
         var mockOrderManager = new Mock<IOrderManager>();
 
         var mockBroker = new Mock<IYoloBroker>();
+        mockBroker.Setup(x => x.GetAccountContext())
+            .Returns(new BrokerAccountContext("0xwallet", "0xvault", true));
         mockBroker.Setup(x => x.GetOpenOrdersAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<long, Order>());
         mockBroker.Setup(x => x.GetPositionsAsync(It.IsAny<CancellationToken>()))
@@ -387,6 +397,8 @@ public class RebalanceCommandTest
             .Returns(trades);
 
         var mockBroker = new Mock<IYoloBroker>();
+        mockBroker.Setup(x => x.GetAccountContext())
+            .Returns(new BrokerAccountContext("0xwallet", "0xvault", true));
         mockBroker.Setup(x => x.GetOpenOrdersAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<long, Order>());
         mockBroker.Setup(x => x.GetPositionsAsync(It.IsAny<CancellationToken>()))
@@ -439,6 +451,8 @@ public class RebalanceCommandTest
         var mockTradeFactory = new Mock<ITradeFactory>();
         var mockOrderManager = new Mock<IOrderManager>();
         var mockBroker = new Mock<IYoloBroker>();
+        mockBroker.Setup(x => x.GetAccountContext())
+            .Returns(new BrokerAccountContext("0xwallet", "0xvault", true));
         mockBroker.Setup(x => x.GetOpenOrdersAsync(It.IsAny<CancellationToken>()))
             .ThrowsAsync(new OperationCanceledException());
 
@@ -490,6 +504,8 @@ public class RebalanceCommandTest
             .Throws<SocketException>();
 
         var mockBroker = new Mock<IYoloBroker>();
+        mockBroker.Setup(x => x.GetAccountContext())
+            .Returns(new BrokerAccountContext("0xwallet", "0xvault", true));
         mockBroker.Setup(x => x.GetOpenOrdersAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<long, Order>());
         mockBroker.Setup(x => x.GetPositionsAsync(It.IsAny<CancellationToken>()))
@@ -557,6 +573,8 @@ public class RebalanceCommandTest
             .Returns(channel.Reader.ReadAllAsync());
 
         var mockBroker = new Mock<IYoloBroker>();
+        mockBroker.Setup(x => x.GetAccountContext())
+            .Returns(new BrokerAccountContext("0xwallet", "0xvault", true));
         mockBroker.Setup(x => x.GetOpenOrdersAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<long, Order>());
         mockBroker.Setup(x => x.GetPositionsAsync(It.IsAny<CancellationToken>()))
@@ -651,7 +669,7 @@ public class RebalanceCommandTest
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(markets);
         mockBroker.Setup(x => x.GetAccountContext())
-            .Returns(new BrokerAccountContext("0xwallet", "0xvault"));
+            .Returns(new BrokerAccountContext("0xwallet", "0xvault", true));
 
         var rebalanceEvents = new List<RebalanceEventRecord>();
         var mockEventRecorder = new Mock<IRebalanceEventRecorder>();
@@ -729,7 +747,7 @@ public class RebalanceCommandTest
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(markets);
         mockBroker.Setup(x => x.GetAccountContext())
-            .Returns(new BrokerAccountContext("0xwallet", "0xvault"));
+            .Returns(new BrokerAccountContext("0xwallet", "0xvault", true));
 
         var rebalanceEvents = new List<RebalanceEventRecord>();
         var mockEventRecorder = new Mock<IRebalanceEventRecorder>();
