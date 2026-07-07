@@ -33,6 +33,7 @@ public abstract class EffectiveWeightsFunctionBase
             var accountContext = broker.GetAccountContext();
             var address = accountContext.Address;
             var vaultAddress = accountContext.VaultAddress;
+            var isTestnet = accountContext.IsTestnet;
 
             if (string.IsNullOrWhiteSpace(address))
             {
@@ -76,6 +77,7 @@ public abstract class EffectiveWeightsFunctionBase
                     StrategyKey,
                     address,
                     vaultAddress,
+                    isTestnet,
                     DateTime.UtcNow,
                     nominal,
                     verification.WeightConstraint,

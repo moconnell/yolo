@@ -4,6 +4,7 @@ public sealed record EffectiveWeightsResponse(
     string Strategy,
     string Address,
     string? VaultAddress,
+    bool IsTestnet,
     DateTime GeneratedAtUtc,
     decimal Nominal,
     decimal WeightConstraint,

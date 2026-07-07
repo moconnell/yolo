@@ -37,6 +37,7 @@ public sealed class HyperliquidBroker : IYoloBroker
     private readonly ITickerAliasService _tickerAliasService;
     private readonly string? _address;
     private readonly string? _vaultAddress;
+    private readonly bool _isTestnet;
     private readonly ILogger<HyperliquidBroker> _logger;
 
     public HyperliquidBroker(
@@ -104,6 +105,7 @@ public sealed class HyperliquidBroker : IYoloBroker
         _vaultAddress = vaultAddress.IsValidEthereumAddressHexFormat() && !vaultAddress.IsAnEmptyAddress()
             ? vaultAddress
             : null;
+        _isTestnet = useTestnet;
         _logger = logger;
         _logger.LogInformation(
             "Initialized HyperliquidBroker with address: {Address}, vaultAddress: {VaultAddress}, net: {Net}",
@@ -123,7 +125,7 @@ public sealed class HyperliquidBroker : IYoloBroker
         Dispose(false);
     }
 
-    public BrokerAccountContext GetAccountContext() => new(_address, _vaultAddress);
+    public BrokerAccountContext GetAccountContext() => new(_address, _vaultAddress, _isTestnet);
 
     public async Task<IReadOnlyList<decimal>> GetDailyClosePricesAsync(
         string ticker,

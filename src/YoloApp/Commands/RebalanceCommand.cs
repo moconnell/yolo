@@ -80,7 +80,7 @@ public class RebalanceCommand : ICommand
     {
         _logger.LogInformation("Starting rebalance operation");
         var runId = Guid.NewGuid().ToString("N");
-        var accountContext = _broker.GetAccountContext() ?? new BrokerAccountContext(null, null);
+        var accountContext = _broker.GetAccountContext();
         var eventSequence = 0;
 
         try
