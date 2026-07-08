@@ -148,6 +148,79 @@ public class StorageQueryFunctionsTest
     }
 
     [Fact]
+    public async Task GetRebalanceEvents_WhenFromFilterUsesZuluTimestamp_ShouldFilterEvents()
+    {
+        var tableServiceClient = CreateTableServiceClient(
+            "rebalanceevents",
+            [
+                CreateRebalanceEventEntity("yolodaily", "run-1", 1, "RunStarted", "BTC"),
+                CreateRebalanceEventEntity("yolodaily", "run-1", 2, "TradeProposed", "ETH"),
+                CreateRebalanceEventEntity("yolodaily", "run-1", 3, "RunCompleted", "SOL")
+            ]);
+        var request = TestHttpRequestData.Create(
+            "GET",
+            "http://localhost/api/storage/rebalance-events?strategy=yolodaily&from=2026-06-28T10:02:30Z",
+            services => services.AddSingleton(tableServiceClient));
+        var sut = new StorageQueryFunctions(request.FunctionContext.InstanceServices, NullLogger<StorageQueryFunctions>.Instance);
+
+        var response = await sut.GetRebalanceEvents(request, CancellationToken.None);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var payload = await TestHttpRequestData.ReadJsonAsync<PagedQueryResponse<RebalanceEventQueryItem>>(response);
+        payload.ShouldNotBeNull();
+        payload.Items.Select(item => item.EventType).ShouldBe(["RunCompleted"]);
+    }
+
+    [Fact]
+    public async Task GetRebalanceEvents_WhenDateOnlyRangeProvided_ShouldFilterInclusiveUtcDates()
+    {
+        var tableServiceClient = CreateTableServiceClient(
+            "rebalanceevents",
+            [
+                CreateRebalanceEventEntity(
+                    "unraveldaily",
+                    "run-1",
+                    1,
+                    "BeforeRange",
+                    "BTC",
+                    DateTimeOffset.Parse("2026-06-30T23:59:59+00:00")),
+                CreateRebalanceEventEntity(
+                    "unraveldaily",
+                    "run-1",
+                    2,
+                    "StartOfRange",
+                    "ETH",
+                    DateTimeOffset.Parse("2026-07-01T00:00:00+00:00")),
+                CreateRebalanceEventEntity(
+                    "unraveldaily",
+                    "run-1",
+                    3,
+                    "EndOfRange",
+                    "SOL",
+                    DateTimeOffset.Parse("2026-07-06T23:59:59+00:00")),
+                CreateRebalanceEventEntity(
+                    "unraveldaily",
+                    "run-1",
+                    4,
+                    "AfterRange",
+                    "ADA",
+                    DateTimeOffset.Parse("2026-07-07T00:00:00+00:00"))
+            ]);
+        var request = TestHttpRequestData.Create(
+            "GET",
+            "http://localhost/api/storage/rebalance-events?from=2026-07-01&to=2026-07-06",
+            services => services.AddSingleton(tableServiceClient));
+        var sut = new StorageQueryFunctions(request.FunctionContext.InstanceServices, NullLogger<StorageQueryFunctions>.Instance);
+
+        var response = await sut.GetRebalanceEvents(request, CancellationToken.None);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var payload = await TestHttpRequestData.ReadJsonAsync<PagedQueryResponse<RebalanceEventQueryItem>>(response);
+        payload.ShouldNotBeNull();
+        payload.Items.Select(item => item.EventType).ShouldBe(["StartOfRange", "EndOfRange"]);
+    }
+
+    [Fact]
     public async Task GetRebalanceEvents_WhenRawPagesContainNonMatches_ShouldFillFilteredPage()
     {
         var tableServiceClient = CreateTableServiceClient(
@@ -227,11 +300,26 @@ public class StorageQueryFunctionsTest
         int sequence,
         string eventType,
         string coin) =>
+        CreateRebalanceEventEntity(
+            strategyName,
+            runId,
+            sequence,
+            eventType,
+            coin,
+            DateTimeOffset.Parse("2026-06-28T10:00:00+00:00").AddMinutes(sequence));
+
+    private static TableEntity CreateRebalanceEventEntity(
+        string strategyName,
+        string runId,
+        int sequence,
+        string eventType,
+        string coin,
+        DateTimeOffset timestampUtc) =>
         new($"{strategyName}|{runId}", $"202606281000000000000|{sequence:D6}|{eventType}")
         {
             ["RunId"] = runId,
             ["StrategyName"] = strategyName,
-            ["TimestampUtc"] = DateTimeOffset.Parse("2026-06-28T10:00:00+00:00").AddMinutes(sequence),
+            ["TimestampUtc"] = timestampUtc,
             ["Sequence"] = sequence,
             ["EventType"] = eventType,
             ["Level"] = "Info",
