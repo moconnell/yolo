@@ -97,7 +97,7 @@ public class YoloWeightsServiceTest
         var svc = new YoloWeightsService([mockFactorService.Object], config, logger);
 
         // act
-        var weights = await svc.CalculateWeightsAsync();
+        var weights = (await svc.CalculateWeightsAsync()).Weights;
 
         // assert
         weights.ShouldNotBeNull();
@@ -136,7 +136,7 @@ public class YoloWeightsServiceTest
         var svc = new YoloWeightsService([mockFactorService.Object], config, logger);
 
         // act
-        var weights = await svc.CalculateWeightsAsync();
+        var weights = (await svc.CalculateWeightsAsync()).Weights;
 
         // assert
         weights.ShouldNotBeNull();
@@ -209,7 +209,7 @@ public class YoloWeightsServiceTest
             logger);
 
         // act
-        var weights = await svc.CalculateWeightsAsync();
+        var weights = (await svc.CalculateWeightsAsync()).Weights;
 
         // assert
         weights.ShouldNotBeNull();

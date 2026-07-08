@@ -2,6 +2,7 @@ using Azure.Data.Tables;
 using Azure.Storage.Blobs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using YoloAbstractions.Interfaces;
 using YoloFunk.Infrastructure;
 
 namespace YoloFunk.Extensions;
@@ -24,7 +25,8 @@ public static class AddAzureStorageServices
 
         services.AddSingleton(sp => new BlobServiceClient(connectionString));
         services.AddSingleton(sp => new TableServiceClient(connectionString));
-        services.AddSingleton<RawJsonPersistenceHandler>();
+        services.AddTransient<RawJsonPersistenceHandler>();
+        services.AddSingleton<IRebalanceEventRecorder, AzureTableRebalanceEventRecorder>();
 
         return services;
     }
