@@ -116,7 +116,8 @@ The relevant config elements to include in this case are as follows (note the re
     "ApiKey": "",
     "Factors": [
       "Carry",
-      "Momentum",
+      "InstantaneousMomentum",
+      "MeanReversion",
       "OpenInterestDivergence",
       "RelativeIlliquidity",
       "RetailFlow",
@@ -127,7 +128,8 @@ The relevant config elements to include in this case are as follows (note the re
   "Yolo": {
     "FactorWeights": {
       "Carry": 1,
-      "Momentum": 1,
+      "InstantaneousMomentum": 1,
+      "MeanReversion": 1,
       "OpenInterestDivergence": 1,
       "RelativeIlliquidity": 1,
       "RetailFlow": 1,
