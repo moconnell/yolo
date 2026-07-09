@@ -1,14 +1,20 @@
 # yolo
 
-Automation for the [RobotWealth](https://robotwealth.com) cryptocurrency YOLO strategies
+Automation for the [RobotWealth](https://robotwealth.com) YOLO and [Unravel](https://unravel.finance) cryptocurrency factor strategies
 
 [![Coverage Status](https://coveralls.io/repos/github/moconnell/yolo/badge.svg?branch=master)](https://coveralls.io/github/moconnell/yolo?branch=master)
 
-## YOLO Console - Windows x64 Deployment
+## YoloFunk
 
-There is a pre-built win64 console app in the releases section, which can be scheduled to run daily.
+YoloFunk is an Azure Function App project and now the primary means of invoking rebalance functionality.
 
-## Quick Start
+## YOLO Console - Windows x64 Deployment (DEPRECATED)
+
+This project is no longer actively maintained.
+
+There are a selection of past pre-built win64 console apps in the releases section, which can be scheduled to run daily.
+
+### Quick Start
 
 - download `YoloKonsole.exe`, `appsettings.json` and `./setup-secrets.ps1` and save to a new folder on your computer
 
@@ -28,25 +34,25 @@ There is a pre-built win64 console app in the releases section, which can be sch
    ./YoloKonsole.exe
    ```
 
-## Files Included
+### Files Included
 
 - `YoloKonsole.exe` - Main application
 - `setup-secrets.ps1` - Configure your API keys and addresses securely
 - `appsettings.json` - Application configuration settings
 - `README.md` - This file
 
-## Security Notes
+### Security Notes
 
 - Secrets are stored in `.\secrets` under the install directory with restricted permissions
 - Only your Windows user account can access the secret files
 
-## Requirements
+### Requirements
 
 - Windows 10/11 x64
 - .NET 10 installation required
 - PowerShell 5.1+ (included with Windows)
 
-## Troubleshooting
+### Troubleshooting
 
 If you get execution policy errors:
 
