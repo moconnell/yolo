@@ -133,9 +133,12 @@ The app currently only supports [Hyperliquid](https://hyperliquid.xyz/) - even i
   "Hyperliquid": {
     "Address": "",
     "PrivateKey": "",
-    "UseTestnet": false
+    "UseTestnet": false,
+    "BuilderFeePercentage": 0.0
   },
 ```
+
+`BuilderFeePercentage` is passed through to HyperLiquid.Net's builder-code setting. The repo default is `0.0`, which disables the optional library builder fee; set it explicitly to `0.01` to opt in to the 1 bps fee.
 
 ## Azure Key Vault Signing
 

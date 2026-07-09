@@ -22,6 +22,8 @@ public static class BrokerServiceCollectionExtensions
             services.AddHyperLiquid(options =>
             {
                 options.ApiCredentials = new HyperLiquidCredentials(hyperliquidConfig.Address, hyperliquidConfig.PrivateKey);
+                options.Rest.BuilderFeePercentage = hyperliquidConfig.BuilderFeePercentage;
+                options.Socket.BuilderFeePercentage = hyperliquidConfig.BuilderFeePercentage;
 
                 if (hyperliquidConfig.UseTestnet)
                 {

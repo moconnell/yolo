@@ -59,6 +59,7 @@ public static class AddStrategyServices
             var restClient = new HyperLiquidRestClient(options =>
             {
                 options.ApiCredentials = new HyperLiquidCredentials(hyperliquidConfig.Address, hyperliquidConfig.PrivateKey);
+                options.BuilderFeePercentage = hyperliquidConfig.BuilderFeePercentage;
 
                 if (hyperliquidConfig.UseTestnet)
                 {
@@ -70,6 +71,7 @@ public static class AddStrategyServices
             var socketClient = new HyperLiquidSocketClient(options =>
             {
                 options.ApiCredentials = new HyperLiquidCredentials(hyperliquidConfig.Address, hyperliquidConfig.PrivateKey);
+                options.BuilderFeePercentage = hyperliquidConfig.BuilderFeePercentage;
 
                 if (hyperliquidConfig.UseTestnet)
                 {

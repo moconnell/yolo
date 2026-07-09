@@ -10,11 +10,13 @@
     "Strategies__YoloDaily__Hyperliquid__Address": "0x...",
     "Strategies__YoloDaily__Hyperliquid__PrivateKey": "0x...",
     "Strategies__YoloDaily__Hyperliquid__VaultAddress": "0x...",
+    "Strategies__YoloDaily__Hyperliquid__BuilderFeePercentage": "0.0",
     "Strategies__YoloDaily__RobotWealth__ApiKey": "your-api-key",
     
     "Strategies__UnravelDaily__Hyperliquid__Address": "0x...",
     "Strategies__UnravelDaily__Hyperliquid__PrivateKey": "0x...",
     "Strategies__UnravelDaily__Hyperliquid__VaultAddress": "0x...",
+    "Strategies__UnravelDaily__Hyperliquid__BuilderFeePercentage": "0.0",
     "Strategies__UnravelDaily__Unravel__ApiKey": "your-api-key"
   }
 }

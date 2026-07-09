@@ -6,6 +6,7 @@ public class HyperliquidConfig
     public string? VaultAddress { get; init; }
     public required string PrivateKey { get; init; } = string.Empty;
     public required bool UseTestnet { get; init; }
+    public decimal? BuilderFeePercentage { get; init; } = 0m;
 
     public Dictionary<string, string> Aliases { get; init; } = [];
 }
