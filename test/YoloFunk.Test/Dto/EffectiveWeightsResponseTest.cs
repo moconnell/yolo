@@ -16,7 +16,10 @@ public class EffectiveWeightsResponseTest
                 ConstrainedTargetWeight: 0.3m,
                 CurrentWeight: 0.2m,
                 EffectiveWeight: 0.25m,
+                BufferAdjustedTargetWeight: 0.24m,
                 DeltaWeight: 0.05m,
+                RawFactors: new Dictionary<string, double?> { ["Carry"] = 0.2d },
+                NormalizedFactors: new Dictionary<string, double?> { ["Carry"] = 1d },
                 IsInUniverse: true,
                 WithinTradeBuffer: false,
                 HasTradableMarket: true)
@@ -26,6 +29,7 @@ public class EffectiveWeightsResponseTest
             Strategy: "yolodaily",
             Address: "0xabc",
             VaultAddress: "0xdef",
+            IsTestnet: true,
             GeneratedAtUtc: generatedAt,
             Nominal: 1000m,
             WeightConstraint: 0.8m,
@@ -51,6 +55,13 @@ public class EffectiveWeightsResponseTest
         response.BufferAdjustedNetExposure.ShouldBe(0.24m);
         response.Weights.Count.ShouldBe(1);
         response.Weights[0].Token.ShouldBe("SOL");
+        response.Weights[0].BufferAdjustedTargetWeight.ShouldBe(0.24m);
+        var rawFactors = response.Weights[0].RawFactors;
+        rawFactors.ShouldNotBeNull();
+        rawFactors!["Carry"].ShouldBe(0.2d);
+        var normalizedFactors = response.Weights[0].NormalizedFactors;
+        normalizedFactors.ShouldNotBeNull();
+        normalizedFactors!["Carry"].ShouldBe(1d);
         response.Weights[0].HasTradableMarket.ShouldBeTrue();
     }
 
@@ -65,7 +76,10 @@ public class EffectiveWeightsResponseTest
                 ConstrainedTargetWeight: 0m,
                 CurrentWeight: null,
                 EffectiveWeight: null,
+                BufferAdjustedTargetWeight: null,
                 DeltaWeight: null,
+                RawFactors: null,
+                NormalizedFactors: null,
                 IsInUniverse: false,
                 WithinTradeBuffer: false,
                 HasTradableMarket: false)
@@ -75,6 +89,7 @@ public class EffectiveWeightsResponseTest
             Strategy: "unraveldaily",
             Address: "0xabc",
             VaultAddress: null,
+            IsTestnet: true,
             GeneratedAtUtc: DateTime.UtcNow,
             Nominal: 0m,
             WeightConstraint: 1m,
@@ -94,6 +109,9 @@ public class EffectiveWeightsResponseTest
         response.BufferAdjustedGrossExposure.ShouldBeNull();
         response.BufferAdjustedNetExposure.ShouldBeNull();
         response.Weights.Single().CurrentWeight.ShouldBeNull();
+        response.Weights.Single().BufferAdjustedTargetWeight.ShouldBeNull();
+        response.Weights.Single().RawFactors.ShouldBeNull();
+        response.Weights.Single().NormalizedFactors.ShouldBeNull();
         response.Weights.Single().HasTradableMarket.ShouldBeFalse();
     }
 }

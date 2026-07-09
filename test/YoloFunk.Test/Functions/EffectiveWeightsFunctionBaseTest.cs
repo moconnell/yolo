@@ -23,7 +23,7 @@ public class EffectiveWeightsFunctionBaseTest
     [Fact]
     public async Task GivenMissingBrokerAddressContext_WhenRun_ShouldReturnInternalServerError()
     {
-        var services = TestHttpRequestData.CreateInstanceServices(new BrokerAccountContext(null, null));
+        var services = TestHttpRequestData.CreateInstanceServices(new BrokerAccountContext(null, null, true));
 
         var request = TestHttpRequestData.Create("GET", "http://localhost/api/rebalance/test/effective-weights", services);
         var sut = new EffectiveWeightsFunctionHarness(request.FunctionContext.InstanceServices, NullLogger<EffectiveWeightsFunctionHarness>.Instance);
@@ -40,7 +40,7 @@ public class EffectiveWeightsFunctionBaseTest
     [Fact]
     public async Task GivenEmptyBrokerAddressContext_WhenRun_ShouldReturnInternalServerError()
     {
-        var services = TestHttpRequestData.CreateInstanceServices(new BrokerAccountContext(string.Empty, "0x1111111111111111111111111111111111111111"));
+        var services = TestHttpRequestData.CreateInstanceServices(new BrokerAccountContext(string.Empty, "0x1111111111111111111111111111111111111111", true));
 
         var request = TestHttpRequestData.Create("GET", "http://localhost/api/rebalance/test/effective-weights", services);
         var sut = new EffectiveWeightsFunctionHarness(request.FunctionContext.InstanceServices, NullLogger<EffectiveWeightsFunctionHarness>.Instance);
@@ -76,7 +76,13 @@ public class EffectiveWeightsFunctionBaseTest
         payload.BufferAdjustedGrossExposure.ShouldBe(0.4m);
         payload.BufferAdjustedNetExposure.ShouldBe(0.4m);
         payload.Weights.ShouldNotBeEmpty();
-        payload.Weights.ShouldContain(x => x.Token == "SOL");
+        var sol = payload.Weights.Single(x => x.Token == "SOL");
+        sol.RawFactors.ShouldNotBeNull();
+        sol.RawFactors["Carry"].ShouldBe(0.2d);
+        sol.RawFactors["Volatility"].ShouldBe(0.4d);
+        sol.NormalizedFactors.ShouldNotBeNull();
+        sol.NormalizedFactors["Carry"].ShouldBe(1d);
+        sol.NormalizedFactors["Volatility"].ShouldBe(0.4d);
     }
 
     [Fact]
@@ -102,6 +108,7 @@ public class EffectiveWeightsFunctionBaseTest
         sol.CurrentWeight.ShouldBe(0.396m);
         sol.ConstrainedTargetWeight.ShouldBe(0.4m);
         sol.EffectiveWeight.ShouldBe(0.4m);
+        sol.BufferAdjustedTargetWeight.ShouldBe(0.396m);
         sol.DeltaWeight.ShouldBe(0m);
         sol.WithinTradeBuffer.ShouldBeTrue();
     }
@@ -148,6 +155,7 @@ public class EffectiveWeightsFunctionBaseTest
         sol.CurrentWeight.ShouldBe(0.198m);
         sol.ConstrainedTargetWeight.ShouldBe(0.4m);
         sol.EffectiveWeight.ShouldBe(0.4m);
+        sol.BufferAdjustedTargetWeight.ShouldBe(0.4m);
         sol.DeltaWeight.ShouldBe(0.202m);
         sol.WithinTradeBuffer.ShouldBeFalse();
     }
@@ -156,7 +164,7 @@ public class EffectiveWeightsFunctionBaseTest
     public async Task GivenDuplicateNormalizedBaseAssets_WhenRun_ShouldReturnBadRequestWithDetails()
     {
         const string strategy = "test";
-        var accountContext = new BrokerAccountContext("0x1111111111111111111111111111111111111111", null);
+        var accountContext = new BrokerAccountContext("0x1111111111111111111111111111111111111111", null, true);
 
         var broker = new Mock<IYoloBroker>();
         broker.Setup(x => x.GetAccountContext()).Returns(accountContext);
@@ -171,11 +179,12 @@ public class EffectiveWeightsFunctionBaseTest
 
         var weights = new Mock<ICalcWeights>();
         weights.Setup(x => x.CalculateWeightsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Dictionary<string, decimal>
-            {
-                ["BTC"] = 0.4m,
-                ["BTC/USDC"] = 0.2m
-            });
+            .ReturnsAsync(WeightsCalculationResult.FromWeights(
+                new Dictionary<string, decimal>
+                {
+                    ["BTC"] = 0.4m,
+                    ["BTC/USDC"] = 0.2m
+                }));
 
         var services = new ServiceCollection();
         services.AddLogging();
@@ -225,7 +234,7 @@ public class EffectiveWeightsFunctionBaseTest
         RebalanceMode rebalanceMode)
     {
         const string strategy = "test";
-        var accountContext = new BrokerAccountContext("0x1111111111111111111111111111111111111111", null);
+        var accountContext = new BrokerAccountContext("0x1111111111111111111111111111111111111111", null, true);
 
         var broker = new Mock<IYoloBroker>();
         broker.Setup(x => x.GetAccountContext()).Returns(accountContext);
@@ -263,10 +272,21 @@ public class EffectiveWeightsFunctionBaseTest
 
         var weights = new Mock<ICalcWeights>();
         weights.Setup(x => x.CalculateWeightsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Dictionary<string, decimal>
-            {
-                ["SOL"] = rawTargetWeight
-            });
+            .ReturnsAsync(new WeightsCalculationResult(
+                new Dictionary<string, decimal>
+                {
+                    ["SOL"] = rawTargetWeight
+                },
+                FactorDataFrame.NewFrom(
+                    ["SOL/USDC"],
+                    DateTime.Today,
+                    (FactorType.Carry, [0.2d]),
+                    (FactorType.Volatility, [0.4d])),
+                FactorDataFrame.NewFrom(
+                    ["SOL/USDC"],
+                    DateTime.Today,
+                    (FactorType.Carry, [1d]),
+                    (FactorType.Volatility, [0.4d]))));
 
         var services = new ServiceCollection();
         services.AddLogging();

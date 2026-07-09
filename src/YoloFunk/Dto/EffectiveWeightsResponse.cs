@@ -4,6 +4,7 @@ public sealed record EffectiveWeightsResponse(
     string Strategy,
     string Address,
     string? VaultAddress,
+    bool IsTestnet,
     DateTime GeneratedAtUtc,
     decimal Nominal,
     decimal WeightConstraint,
@@ -21,7 +22,10 @@ public sealed record EffectiveWeightItem(
     decimal ConstrainedTargetWeight,
     decimal? CurrentWeight,
     decimal? EffectiveWeight,
+    decimal? BufferAdjustedTargetWeight,
     decimal? DeltaWeight,
+    IReadOnlyDictionary<string, double?>? RawFactors,
+    IReadOnlyDictionary<string, double?>? NormalizedFactors,
     bool IsInUniverse,
     bool WithinTradeBuffer,
     bool HasTradableMarket);

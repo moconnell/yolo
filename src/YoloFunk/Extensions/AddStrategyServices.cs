@@ -9,6 +9,7 @@ using RobotWealth.Api;
 using RobotWealth.Api.Config;
 using Unravel.Api;
 using Unravel.Api.Config;
+using YoloAbstractions;
 using YoloAbstractions.Config;
 using YoloAbstractions.Exceptions;
 using YoloAbstractions.Interfaces;
@@ -17,6 +18,7 @@ using YoloBroker;
 using YoloBroker.Hyperliquid;
 using YoloBroker.Hyperliquid.Config;
 using YoloBroker.Interface;
+using YoloFunk.Infrastructure;
 using YoloTrades;
 using YoloWeights;
 
@@ -103,11 +105,15 @@ public static class AddStrategyServices
             services.AddKeyedSingleton(rwKey, robotWealthConfig);
 
             // Strategy-specific named HttpClient so we can attach handlers (e.g., raw JSON persistence) per provider.
-            services.AddHttpClient(rwKey, client =>
+            var robotWealthClientBuilder = services.AddHttpClient(rwKey, client =>
             {
                 client.DefaultRequestHeaders.Accept.Clear();
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             });
+            if (IsAzureStorageConfigured(config))
+            {
+                robotWealthClientBuilder.AddHttpMessageHandler<RawJsonPersistenceHandler>();
+            }
 
             services.AddKeyedSingleton<IGetFactors>(rwKey, (sp, key) =>
             {
@@ -132,11 +138,15 @@ public static class AddStrategyServices
             services.AddKeyedSingleton(unKey, unravelConfig);
 
             // Strategy-specific named HttpClient so we can attach handlers (e.g., raw JSON persistence) per provider.
-            services.AddHttpClient(unKey, client =>
+            var unravelClientBuilder = services.AddHttpClient(unKey, client =>
             {
                 client.DefaultRequestHeaders.Accept.Clear();
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             });
+            if (IsAzureStorageConfigured(config))
+            {
+                unravelClientBuilder.AddHttpMessageHandler<RawJsonPersistenceHandler>();
+            }
 
             services.AddKeyedSingleton<IGetFactors>(unKey, (sp, key) =>
             {
@@ -177,9 +187,14 @@ public static class AddStrategyServices
                 sp.GetRequiredKeyedService<IOrderManager>(strategyKey),
                 sp.GetRequiredKeyedService<IYoloBroker>(strategyKey),
                 sp.GetRequiredKeyedService<YoloConfig>(strategyKey),
-                sp.GetRequiredService<ILogger<RebalanceCommand>>());
+                sp.GetRequiredService<ILogger<RebalanceCommand>>(),
+                sp.GetService<IRebalanceEventRecorder>() ?? NoOpRebalanceEventRecorder.Instance,
+                strategyKey);
         });
 
         return services;
     }
+
+    private static bool IsAzureStorageConfigured(IConfiguration config) =>
+        !string.IsNullOrWhiteSpace(config.GetValue<string>("AzureWebJobsStorage"));
 }
