@@ -3,7 +3,7 @@ using CryptoExchange.Net.Objects;
 
 namespace YoloBroker.Hyperliquid;
 
-public record WebCallResultWrapper<T>(
+public record HttpCallResultWrapper<T>(
     bool Success,
     Error? Error,
     HttpStatusCode? ResponseStatusCode,

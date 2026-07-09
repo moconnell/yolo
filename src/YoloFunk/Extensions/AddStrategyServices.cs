@@ -1,4 +1,3 @@
-using CryptoExchange.Net.Authentication;
 using HyperLiquid.Net;
 using HyperLiquid.Net.Clients;
 using System.Net.Http.Headers;
@@ -59,7 +58,7 @@ public static class AddStrategyServices
             // Create strategy-specific HyperLiquid clients
             var restClient = new HyperLiquidRestClient(options =>
             {
-                options.ApiCredentials = new ApiCredentials(hyperliquidConfig.Address, hyperliquidConfig.PrivateKey);
+                options.ApiCredentials = new HyperLiquidCredentials(hyperliquidConfig.Address, hyperliquidConfig.PrivateKey);
 
                 if (hyperliquidConfig.UseTestnet)
                 {
@@ -70,7 +69,7 @@ public static class AddStrategyServices
 
             var socketClient = new HyperLiquidSocketClient(options =>
             {
-                options.ApiCredentials = new ApiCredentials(hyperliquidConfig.Address, hyperliquidConfig.PrivateKey);
+                options.ApiCredentials = new HyperLiquidCredentials(hyperliquidConfig.Address, hyperliquidConfig.PrivateKey);
 
                 if (hyperliquidConfig.UseTestnet)
                 {

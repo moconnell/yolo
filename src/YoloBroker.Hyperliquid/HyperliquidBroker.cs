@@ -189,11 +189,11 @@ public sealed class HyperliquidBroker : IYoloBroker
 
         var spotTask = spotTrades.Count != 0
             ? PlaceSpotOrdersAsync(spotTrades, ct)
-            : Task.FromResult(new WebCallResultWrapper<IReadOnlyList<OrderResult>>(true, null, null, []));
+            : Task.FromResult(new HttpCallResultWrapper<IReadOnlyList<OrderResult>>(true, null, null, []));
 
         var futuresTask = futuresTrades.Count != 0
             ? PlaceFuturesOrdersAsync(futuresTrades, ct)
-            : Task.FromResult(new WebCallResultWrapper<IReadOnlyList<OrderResult>>(true, null, null, []));
+            : Task.FromResult(new HttpCallResultWrapper<IReadOnlyList<OrderResult>>(true, null, null, []));
 
         await Task.WhenAll(spotTask, futuresTask);
 
@@ -282,7 +282,7 @@ public sealed class HyperliquidBroker : IYoloBroker
             subscriptionAddress ?? "(api credential default)");
 
         var subscription = await CallAsync<UpdateSubscription>(
-            () => _hyperliquidSocketClient.FuturesApi.SubscribeToOrderUpdatesAsync(
+            () => _hyperliquidSocketClient.FuturesApi.Trading.SubscribeToOrderUpdatesAsync(
                 subscriptionAddress,
                 HandleOrderStatusUpdates,
                 ct),
@@ -739,7 +739,7 @@ public sealed class HyperliquidBroker : IYoloBroker
         _disposed = true;
     }
 
-    private static async Task CallAsync(Func<Task<WebCallResult>> webCallFunc, string exceptionMessage)
+    private static async Task CallAsync(Func<Task<HttpResult>> webCallFunc, string exceptionMessage)
     {
         var result = await webCallFunc();
 
@@ -749,7 +749,7 @@ public sealed class HyperliquidBroker : IYoloBroker
         }
     }
 
-    private static async Task<T> CallAsync<T>(Func<Task<CallResult<T>>> webCallFunc, string exceptionMessage)
+    private static async Task<T> CallAsync<T>(Func<Task<WebSocketResult<T>>> webCallFunc, string exceptionMessage)
     {
         var result = await webCallFunc();
 
@@ -762,7 +762,7 @@ public sealed class HyperliquidBroker : IYoloBroker
     }
 
     private static async Task<T> GetDataAsync<T>(
-        Func<Task<WebCallResult<T>>> webCallFunc,
+        Func<Task<HttpResult<T>>> webCallFunc,
         string exceptionMessage)
     {
         var result = await webCallFunc();
@@ -775,7 +775,7 @@ public sealed class HyperliquidBroker : IYoloBroker
         return result.Data;
     }
 
-    private async Task<WebCallResultWrapper<OrderResult>> PlaceFuturesOrderAsync(Trade trade, CancellationToken ct)
+    private async Task<HttpCallResultWrapper<OrderResult>> PlaceFuturesOrderAsync(Trade trade, CancellationToken ct)
     {
         var orderPrice = await ResolveOrderPriceAsync(trade, ct);
 
@@ -793,7 +793,7 @@ public sealed class HyperliquidBroker : IYoloBroker
         return Wrap(result);
     }
 
-    private async Task<WebCallResultWrapper<OrderResult>> PlaceSpotOrderAsync(Trade trade, CancellationToken ct)
+    private async Task<HttpCallResultWrapper<OrderResult>> PlaceSpotOrderAsync(Trade trade, CancellationToken ct)
     {
         var orderPrice = await ResolveOrderPriceAsync(trade, ct);
 
@@ -848,7 +848,7 @@ public sealed class HyperliquidBroker : IYoloBroker
         return price.Value;
     }
 
-    private async Task<WebCallResultWrapper<IReadOnlyList<OrderResult>>> PlaceSpotOrdersAsync(
+    private async Task<HttpCallResultWrapper<IReadOnlyList<OrderResult>>> PlaceSpotOrdersAsync(
         IEnumerable<Trade> trades,
         CancellationToken ct)
     {
@@ -871,7 +871,7 @@ public sealed class HyperliquidBroker : IYoloBroker
         return Wrap(result);
     }
 
-    private async Task<WebCallResultWrapper<IReadOnlyList<OrderResult>>> PlaceFuturesOrdersAsync(
+    private async Task<HttpCallResultWrapper<IReadOnlyList<OrderResult>>> PlaceFuturesOrdersAsync(
         IEnumerable<Trade> trades,
         CancellationToken ct)
     {
@@ -894,7 +894,7 @@ public sealed class HyperliquidBroker : IYoloBroker
         return Wrap(result);
     }
 
-    private WebCallResultWrapper<OrderResult> Wrap(WebCallResult<HyperLiquidOrderResult> result)
+    private HttpCallResultWrapper<OrderResult> Wrap(HttpResult<HyperLiquidOrderResult> result)
     {
         _logger.LogDebug(
             "Wrapping result for single order with Success: {Success}, Error: {Error}, ResponseStatusCode: {ResponseStatusCode}, Data: {Data}",
@@ -910,7 +910,7 @@ public sealed class HyperliquidBroker : IYoloBroker
             ToOrderResult(result.Success, result.Error, result.Data));
     }
 
-    private WebCallResultWrapper<IReadOnlyList<OrderResult>> Wrap(WebCallResult<CallResult<HyperLiquidOrderResult>[]> result)
+    private HttpCallResultWrapper<IReadOnlyList<OrderResult>> Wrap(HttpResult<CallResult<HyperLiquidOrderResult>[]> result)
     {
         _logger.LogInformation(
             "Wrapping result for multiple orders with Success: {Success}, Error: {Error}, ResponseStatusCode: {ResponseStatusCode}, DataNull: {DataNull}, DataLength: {DataLength}",

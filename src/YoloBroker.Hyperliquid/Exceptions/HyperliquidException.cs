@@ -15,20 +15,25 @@ public class HyperliquidException : BrokerException
     {
     }
 
-    public HyperliquidException(string message, WebCallResult result)
+    public HyperliquidException(string message, HttpResult result)
         : base($"{message} - {result.Error} ({result.ResponseStatusCode})")
+    {
+    }
+
+    public HyperliquidException(string message, WebSocketResult result)
+        : base($"{message} - {result.Error}")
     {
     }
 
     // public HyperliquidException(
     //     string message,
-    //     IEnumerable<(Trade trade, WebCallResultWrapper result)> tradeResults)
+    //     IEnumerable<(Trade trade, HttpCallResultWrapper result)> tradeResults)
     //     : base($"{message}:{NewLine}{NewLine}{string.Join(NewLine, tradeResults.Select(FormatErrorInfo))}")
     // {
     // }
 
     // private static string FormatErrorInfo(
-    //     (Trade trade, WebCallResultWrapper result) tradeResult)
+    //     (Trade trade, HttpCallResultWrapper result) tradeResult)
     // {
     //     var (trade, result) = tradeResult;
 

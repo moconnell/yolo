@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
-using CryptoExchange.Net.Authentication;
 using CryptoExchange.Net.Objects;
 using HyperLiquid.Net;
 using HyperLiquid.Net.Clients;
@@ -459,7 +458,7 @@ public class HyperliquidBrokerIntegrationTest : IAsyncLifetime
                 privateKey = "0000000000000000000000000000000000000000000000000000000000000000";
         }
 
-        var apiCredentials = new ApiCredentials(address, privateKey);
+        var apiCredentials = new HyperLiquidCredentials(address, privateKey);
 
         var logger = _loggerFactory.CreateLogger<HyperliquidBroker>();
 

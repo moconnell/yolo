@@ -48,18 +48,20 @@ public class HyperliquidBrokerTest
         var mockRestClient = new Mock<IHyperLiquidRestClient>();
         var mockSocketClient = new Mock<IHyperLiquidSocketClient>();
         var mockFuturesApi = new Mock<IHyperLiquidSocketClientFuturesApi>();
+        var mockFuturesTrading = new Mock<IHyperLiquidSocketClientFuturesApiTrading>();
         var updateSubscription = (UpdateSubscription)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(UpdateSubscription));
         string? subscribedAddress = null;
 
         mockSocketClient.Setup(x => x.FuturesApi).Returns(mockFuturesApi.Object);
-        mockFuturesApi
+        mockFuturesApi.Setup(x => x.Trading).Returns(mockFuturesTrading.Object);
+        mockFuturesTrading
             .Setup(x => x.SubscribeToOrderUpdatesAsync(
                 It.IsAny<string?>(),
                 It.IsAny<Action<DataEvent<HyperLiquidOrderStatus[]>>>(),
                 It.IsAny<CancellationToken>()))
             .Callback<string?, Action<DataEvent<HyperLiquidOrderStatus[]>>, CancellationToken>((addr, _, _) =>
                 subscribedAddress = addr)
-            .ReturnsAsync(new CallResult<UpdateSubscription>(updateSubscription));
+            .ReturnsAsync(WebSocketResult.Ok("HyperLiquid", 1, TimeSpan.Zero, 1, string.Empty, updateSubscription));
 
         var broker = new HyperliquidBroker(
             mockRestClient.Object,
@@ -82,7 +84,7 @@ public class HyperliquidBrokerTest
 
         // assert
         subscribedAddress.ShouldBe(vaultAddress);
-        mockFuturesApi.Verify(
+        mockFuturesTrading.Verify(
             x => x.SubscribeToOrderUpdatesAsync(
                 vaultAddress,
                 It.IsAny<Action<DataEvent<HyperLiquidOrderStatus[]>>>(),
@@ -267,7 +269,7 @@ public class HyperliquidBrokerTest
                 It.IsAny<DateTime>(),
                 It.IsAny<DateTime>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(WebCallResult(klines));
+            .ReturnsAsync(HttpResult(klines));
 
         var broker = GetBrokerWithMockedClient(mockRestClient.Object);
 
@@ -312,7 +314,7 @@ public class HyperliquidBrokerTest
                 It.IsAny<DateTime>(),
                 It.IsAny<DateTime>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(WebCallResult(klines));
+            .ReturnsAsync(HttpResult(klines));
 
         var aliases = new Dictionary<string, string> { { "BTC", "BTC-PERP" } };
         var broker = GetBrokerWithMockedClient(mockRestClient.Object, aliases);
@@ -434,7 +436,7 @@ public class HyperliquidBrokerTest
                 null,
                 null,
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(WebCallResult(orderResult));
+            .ReturnsAsync(HttpResult(orderResult));
 
         var broker = GetBrokerWithMockedClient(mockRestClient.Object);
 
@@ -490,7 +492,7 @@ public class HyperliquidBrokerTest
                 null,
                 null,
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(WebCallResult(orderResult));
+            .ReturnsAsync(HttpResult(orderResult));
 
         var broker = GetBrokerWithMockedClient(mockRestClient.Object);
 
@@ -545,7 +547,7 @@ public class HyperliquidBrokerTest
                 null,
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(
-                WebCallResult<HyperLiquidOrderResult>(
+                HttpResult<HyperLiquidOrderResult>(
                     null,
                     HttpStatusCode.BadRequest,
                     error));
@@ -585,14 +587,14 @@ public class HyperliquidBrokerTest
 
         var orderResults = new[]
         {
-            new CallResult<HyperLiquidOrderResult>(
+            CallResult.Ok(
                 new HyperLiquidOrderResult
                 {
                     OrderId = 111,
                     Status = HlOrderStatus.Filled,
                     FilledQuantity = 0.5m
                 }),
-            new CallResult<HyperLiquidOrderResult>(
+            CallResult.Ok(
                 new HyperLiquidOrderResult
                 {
                     OrderId = 222,
@@ -608,7 +610,7 @@ public class HyperliquidBrokerTest
                 null,
                 null,
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(WebCallResult(orderResults));
+            .ReturnsAsync(HttpResult(orderResults));
 
         var broker = GetBrokerWithMockedClient(mockRestClient.Object);
 
@@ -646,14 +648,14 @@ public class HyperliquidBrokerTest
 
         var orderResults = new[]
         {
-            new CallResult<HyperLiquidOrderResult>(
+            CallResult.Ok(
                 new HyperLiquidOrderResult
                 {
                     OrderId = 333,
                     Status = HlOrderStatus.Open,
                     FilledQuantity = 0m
                 }),
-            new CallResult<HyperLiquidOrderResult>(
+            CallResult.Ok(
                 new HyperLiquidOrderResult
                 {
                     OrderId = 444,
@@ -669,7 +671,7 @@ public class HyperliquidBrokerTest
                 null,
                 null,
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(WebCallResult(orderResults));
+            .ReturnsAsync(HttpResult(orderResults));
 
         var broker = GetBrokerWithMockedClient(mockRestClient.Object);
 
@@ -711,7 +713,7 @@ public class HyperliquidBrokerTest
 
         var spotOrderResults = new[]
         {
-            new CallResult<HyperLiquidOrderResult>(
+            CallResult.Ok(
                 new HyperLiquidOrderResult
                 {
                     OrderId = 555,
@@ -722,7 +724,7 @@ public class HyperliquidBrokerTest
 
         var futuresOrderResults = new[]
         {
-            new CallResult<HyperLiquidOrderResult>(
+            CallResult.Ok(
                 new HyperLiquidOrderResult
                 {
                     OrderId = 666,
@@ -738,7 +740,7 @@ public class HyperliquidBrokerTest
                 null,
                 null,
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(WebCallResult(spotOrderResults));
+            .ReturnsAsync(HttpResult(spotOrderResults));
 
         mockFuturesTrading
             .Setup(x => x.PlaceMultipleOrdersAsync(
@@ -747,7 +749,7 @@ public class HyperliquidBrokerTest
                 null,
                 null,
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(WebCallResult(futuresOrderResults));
+            .ReturnsAsync(HttpResult(futuresOrderResults));
 
         var broker = GetBrokerWithMockedClient(mockRestClient.Object);
 
@@ -786,14 +788,14 @@ public class HyperliquidBrokerTest
 
         var orderResults = new[]
         {
-            new CallResult<HyperLiquidOrderResult>(
+            CallResult.Ok(
                 new HyperLiquidOrderResult
                 {
                     OrderId = 777,
                     Status = HlOrderStatus.Open,
                     FilledQuantity = 0m
                 }),
-            new CallResult<HyperLiquidOrderResult>(
+            CallResult.Fail<HyperLiquidOrderResult>(
                 new TestError(
                     "ServerError.InvalidQuantity",
                     new ErrorInfo(ErrorType.SystemError, "Order must have minimum value of $10.")
@@ -810,7 +812,7 @@ public class HyperliquidBrokerTest
                 null,
                 null,
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(WebCallResult(orderResults));
+            .ReturnsAsync(HttpResult(orderResults));
 
         var broker = GetBrokerWithMockedClient(mockRestClient.Object);
 
@@ -875,7 +877,7 @@ public class HyperliquidBrokerTest
 
         mockFuturesTrading
             .Setup(x => x.GetOpenOrdersExtendedAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(WebCallResult(hlOrders));
+            .ReturnsAsync(HttpResult(hlOrders));
 
         var broker = GetBrokerWithMockedClient(mockRestClient.Object);
 
@@ -906,7 +908,7 @@ public class HyperliquidBrokerTest
 
         mockFuturesTrading
             .Setup(x => x.GetOpenOrdersExtendedAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(WebCallResult(Array.Empty<HyperLiquidOrder>()));
+            .ReturnsAsync(HttpResult(Array.Empty<HyperLiquidOrder>()));
 
         var broker = GetBrokerWithMockedClient(mockRestClient.Object);
 
@@ -932,7 +934,7 @@ public class HyperliquidBrokerTest
         mockFuturesTrading
             .Setup(x => x.GetOpenOrdersExtendedAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(
-                WebCallResult<HyperLiquidOrder[]>(
+                HttpResult<HyperLiquidOrder[]>(
                     null,
                     HttpStatusCode.InternalServerError,
                     error));
@@ -977,7 +979,7 @@ public class HyperliquidBrokerTest
                 null,
                 null,
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(WebCallResult());
+            .ReturnsAsync(HttpResult());
 
         var broker = GetBrokerWithMockedClient(mockRestClient.Object);
 
@@ -1020,7 +1022,7 @@ public class HyperliquidBrokerTest
                 null,
                 null,
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(WebCallResult());
+            .ReturnsAsync(HttpResult());
 
         var broker = GetBrokerWithMockedClient(mockRestClient.Object);
 
@@ -1077,8 +1079,9 @@ public class HyperliquidBrokerTest
                 null,
                 null,
                 null,
+                null,
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(WebCallResult());
+            .ReturnsAsync(HttpResult());
 
         var broker = GetBrokerWithMockedClient(mockRestClient.Object);
 
@@ -1095,6 +1098,7 @@ public class HyperliquidBrokerTest
                 It.IsAny<HyperLiquid.Net.Enums.OrderType>(),
                 order.Amount,
                 order.LimitPrice!.Value,
+                null,
                 null,
                 null,
                 null,
@@ -1127,42 +1131,79 @@ public class HyperliquidBrokerTest
             logger);
     }
 
-    private static WebCallResult WebCallResult(
+    private static HttpResult HttpResult(
         HttpStatusCode httpStatusCode = HttpStatusCode.OK,
         Error? error = null) =>
-        new(
-            httpStatusCode,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            error);
+        error is null
+            ? CryptoExchange.Net.Objects.HttpResult.Ok(
+                string.Empty,
+                httpStatusCode,
+                new Version(1, 1),
+                null!,
+                TimeSpan.Zero,
+                null,
+                string.Empty,
+                0,
+                string.Empty,
+                string.Empty,
+                HttpMethod.Get,
+                null!,
+                ResultDataSource.Server,
+                true)
+            : CryptoExchange.Net.Objects.HttpResult.Fail(
+                string.Empty,
+                httpStatusCode,
+                new Version(1, 1),
+                null!,
+                TimeSpan.Zero,
+                null,
+                string.Empty,
+                0,
+                string.Empty,
+                string.Empty,
+                HttpMethod.Get,
+                null!,
+                ResultDataSource.Server,
+                error,
+                false);
 
 
-    private static WebCallResult<T> WebCallResult<T>(
+    private static HttpResult<T> HttpResult<T>(
         T? result,
         HttpStatusCode httpStatusCode = HttpStatusCode.OK,
         Error? error = null) =>
-        new(
-            httpStatusCode,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            ResultDataSource.Server,
-            result,
-            error);
+        error is null
+            ? CryptoExchange.Net.Objects.HttpResult.Ok(
+                string.Empty,
+                httpStatusCode,
+                new Version(1, 1),
+                null!,
+                TimeSpan.Zero,
+                null,
+                string.Empty,
+                0,
+                string.Empty,
+                string.Empty,
+                HttpMethod.Get,
+                null!,
+                ResultDataSource.Server,
+                result!)
+            : CryptoExchange.Net.Objects.HttpResult.Fail(
+                string.Empty,
+                httpStatusCode,
+                new Version(1, 1),
+                null!,
+                TimeSpan.Zero,
+                null,
+                string.Empty,
+                0,
+                string.Empty,
+                string.Empty,
+                HttpMethod.Get,
+                null!,
+                ResultDataSource.Server,
+                error,
+                result);
 
     private class TestError(string? errorCode, ErrorInfo errorInfo, Exception? exception)
         : Error(
