@@ -211,6 +211,34 @@ SP_JSON=$(az ad sp create-for-rbac \
 
 echo "✅ Service Principal created"
 
+# Allow GitHub Actions to grant and remove Key Vault RBAC assignments for Function App managed identities.
+# The workflow itself grants only Key Vault Secrets User to each Function App identity.
+KEYVAULT_ID=$(az keyvault show --name $KEYVAULT_NAME --query id --output tsv)
+SP_OBJECT_ID=$(az ad sp list --display-name "$SP_NAME" --query "[0].id" --output tsv)
+
+if [ -z "$SP_OBJECT_ID" ]; then
+    echo "❌ Could not resolve service principal object id for $SP_NAME"
+    exit 1
+fi
+
+EXISTING_UAA_ASSIGNMENT=$(az role assignment list \
+  --assignee "$SP_OBJECT_ID" \
+  --role "User Access Administrator" \
+  --scope "$KEYVAULT_ID" \
+  --query "[0].id" \
+  --output tsv)
+
+if [ -z "$EXISTING_UAA_ASSIGNMENT" ]; then
+    az role assignment create \
+      --assignee-object-id "$SP_OBJECT_ID" \
+      --assignee-principal-type ServicePrincipal \
+      --role "User Access Administrator" \
+      --scope "$KEYVAULT_ID" \
+      >/dev/null
+fi
+
+echo "✅ Service Principal can manage Key Vault role assignments"
+
 # Save to file
 mkdir -p .github/secrets
 echo "$SP_JSON" > .github/secrets/AZURE_CREDENTIALS.json
