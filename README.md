@@ -4,9 +4,21 @@ Automation for the [RobotWealth](https://robotwealth.com) YOLO and [Unravel](htt
 
 [![Coverage Status](https://coveralls.io/repos/github/moconnell/yolo/badge.svg?branch=master)](https://coveralls.io/github/moconnell/yolo?branch=master)
 
-## YoloFunk
+## YoloFunk - Azure Function App
 
 YoloFunk is an Azure Function App project and now the primary means of invoking rebalance functionality.
+
+### Endpoints
+
+- `POST /api/rebalance/yolodaily` - Execute YOLO strategy rebalance
+- `POST /api/rebalance/unraveldaily` - Execute Unravel strategy rebalance
+- `GET /api/rebalance/yolodaily/status` - Get YOLO rebalance orchestration status
+- `GET /api/rebalance/unraveldaily/status` - Get Unravel rebalance orchestration status
+- `GET /api/rebalance/yolodaily/effective-weights` - Calculate and return effective YOLO rebalance weights
+- `GET /api/rebalance/unraveldaily/effective-weights` - Calculate and return effective Unravel rebalance weights
+- `GET /api/storage/rebalance-events` - Query persisted rebalance telemetry events; supports `strategy`, `runId`, `eventType`, `level`, `coin`, `clientOrderId`, `from`, `to`, `pageSize`, and `continuationToken`
+- `GET /api/storage/http-requests` - Query captured upstream HTTP request metadata; supports `host`, `endpoint`, `method`, `statusCode`, `contentHash`, `from`, `to`, `pageSize`, and `continuationToken`
+- `GET /api/storage/http-requests/payload?blobName=...` - Fetch the raw persisted HTTP response/request payload for a captured HTTP request
 
 ## YOLO Console - Windows x64 Deployment (DEPRECATED)
 
@@ -146,22 +158,6 @@ The app currently only supports [Hyperliquid](https://hyperliquid.xyz/) - even i
 
 `BuilderFeePercentage` is passed through to HyperLiquid.Net's builder-code setting. The repo default is `0.0`, which disables the optional library builder fee; set it explicitly to `0.01` to opt in to the 1 bps fee.
 
-## Azure Key Vault Signing
-
-The app also now supports signing via a private key stored in an [Azure Key Vault](https://azure.microsoft.com/products/key-vault) - in this case omit `Hyperliquid` config for `PrivateKey` detailed above, as it will be ignored even if present.
-
-```JSON
-  "AzureVault": {
-    "VaultUri": "",
-    "KeyName": "",
-    "ExpectedAddress": ""  // optional verification
-  },
-```
-
-The key must be created in Azure Key Vault as EC (elliptic curve) and P256K in order to be compatible with Ethereum wallet signing (see: [Key types, algorithms, and operations](https://learn.microsoft.com/en-us/azure/key-vault/keys/about-keys-details)).
-
-You will need to install [Azure Command-Line Interface](https://learn.microsoft.com/cli/azure/) and [authenticate](https://learn.microsoft.com/cli/azure/authenticate-azure-cli) on the host machine in order to facilitate this.
-
 ### Logging/PathFormat
 
 This determines where the application will write logs to. Windows paths using `\` must be escaped as `\\` as below. The substitution token `{Date}` included in the path means that a new file will be written each day. You can omit this if you would prefer to have a single file.
@@ -219,52 +215,6 @@ Possible values:
 ```JSON
 Center  // (default)
 Edge
-```
-
-## Azure Functions - Effective Weights Verification
-
-The function app exposes verification endpoints that calculate and return effective rebalance weights using each strategy's configured Hyperliquid account context.
-
-Routes:
-
-- `GET /api/rebalance/yolodaily/effective-weights`
-- `GET /api/rebalance/unraveldaily/effective-weights`
-
-The account context is taken from:
-
-- `Strategies.<Strategy>.Hyperliquid.Address`
-- `Strategies.<Strategy>.Hyperliquid.VaultAddress`
-
-Notes:
-
-- Endpoints use `AuthorizationLevel.Function`.
-- Callers cannot override `address` or `vault` via query parameters.
-- Response includes both raw target and constrained/effective weights to validate rebalance behavior.
-
-Example response shape:
-
-```json
-{
-  "strategy": "yolodaily",
-  "address": "0x...",
-  "vaultAddress": "0x...",
-  "generatedAtUtc": "2026-02-23T12:34:56Z",
-  "nominal": 100000.0,
-  "weightConstraint": 0.85,
-  "weights": [
-    {
-      "token": "BTC",
-      "rawTargetWeight": 0.12,
-      "constrainedTargetWeight": 0.102,
-      "currentWeight": 0.09,
-      "effectiveWeight": 0.102,
-      "deltaWeight": 0.012,
-      "isInUniverse": true,
-      "withinTradeBuffer": false,
-      "hasTradableMarket": true
-    }
-  ]
-}
 ```
 
 ### Yolo/SpreadSplit
