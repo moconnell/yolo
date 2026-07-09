@@ -63,19 +63,9 @@ public static class AddStrategyServices
 
             services.AddKeyedSingleton<IUserTradeSource>(strategyKey, (sp, key) =>
             {
-                var restClient = new HyperLiquidRestClient(options =>
-                {
-                    options.ApiCredentials = new HyperLiquidCredentials(hyperliquidConfig.Address, hyperliquidConfig.PrivateKey);
-                    options.BuilderFeePercentage = hyperliquidConfig.BuilderFeePercentage;
-
-                    if (hyperliquidConfig.UseTestnet)
-                    {
-                        options.Environment = HyperLiquidEnvironment.Testnet;
-                        options.OutputOriginalData = true;
-                    }
-                });
-
-                return new HyperliquidUserTradeSource(restClient, hyperliquidConfig);
+                return new HyperliquidUserTradeSource(
+                    CreateHyperLiquidRestClient(hyperliquidConfig),
+                    hyperliquidConfig);
             });
 
             services.AddKeyedSingleton<IUserTradeIngestionService>(strategyKey, (sp, key) =>
@@ -99,17 +89,7 @@ public static class AddStrategyServices
         services.AddKeyedSingleton<IYoloBroker>(strategyKey, (sp, key) =>
         {
             // Create strategy-specific HyperLiquid clients
-            var restClient = new HyperLiquidRestClient(options =>
-            {
-                options.ApiCredentials = new HyperLiquidCredentials(hyperliquidConfig.Address, hyperliquidConfig.PrivateKey);
-                options.BuilderFeePercentage = hyperliquidConfig.BuilderFeePercentage;
-
-                if (hyperliquidConfig.UseTestnet)
-                {
-                    options.Environment = HyperLiquidEnvironment.Testnet;
-                    options.OutputOriginalData = true;
-                }
-            });
+            var restClient = CreateHyperLiquidRestClient(hyperliquidConfig);
 
             var socketClient = new HyperLiquidSocketClient(options =>
             {
@@ -241,4 +221,19 @@ public static class AddStrategyServices
 
     private static bool IsAzureStorageConfigured(IConfiguration config) =>
         !string.IsNullOrWhiteSpace(config.GetValue<string>("AzureWebJobsStorage"));
+
+    private static HyperLiquidRestClient CreateHyperLiquidRestClient(HyperliquidConfig hyperliquidConfig)
+    {
+        return new HyperLiquidRestClient(options =>
+        {
+            options.ApiCredentials = new HyperLiquidCredentials(hyperliquidConfig.Address, hyperliquidConfig.PrivateKey);
+            options.BuilderFeePercentage = hyperliquidConfig.BuilderFeePercentage;
+
+            if (hyperliquidConfig.UseTestnet)
+            {
+                options.Environment = HyperLiquidEnvironment.Testnet;
+                options.OutputOriginalData = true;
+            }
+        });
+    }
 }

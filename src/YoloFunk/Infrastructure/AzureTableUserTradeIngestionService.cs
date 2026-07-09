@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Azure;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
@@ -18,50 +20,61 @@ public sealed class AzureTableUserTradeIngestionService(
     private readonly TableClient _tradesTable = tableServiceClient.GetTableClient(TradesTableName);
     private readonly TableClient _stateTable = tableServiceClient.GetTableClient(StateTableName);
     private readonly SemaphoreSlim _initializationLock = new(1, 1);
+    private readonly SemaphoreSlim _ingestionLock = new(1, 1);
     private volatile bool _initialized;
 
     public async Task<UserTradeIngestionResult> IngestAsync(CancellationToken cancellationToken = default)
     {
-        await EnsureInitializedAsync(cancellationToken);
-
-        var nowUtc = DateTimeOffset.UtcNow;
-        var startUtc = await GetNextStartUtcAsync(cancellationToken);
-        if (startUtc >= nowUtc)
+        if (!await _ingestionLock.WaitAsync(0, cancellationToken))
         {
-            return new UserTradeIngestionResult(context.StrategyName, startUtc, nowUtc, 0, 0);
+            logger.LogInformation(
+                "Skipping {Exchange} user trade ingestion for {Strategy}; ingestion is already running",
+                context.Exchange,
+                context.StrategyName);
+            var skippedAtUtc = DateTimeOffset.UtcNow;
+            return new UserTradeIngestionResult(context.StrategyName, skippedAtUtc, skippedAtUtc, 0, 0);
         }
 
-        var totalTrades = 0;
-        var windowCount = 0;
-        var windowSize = TimeSpan.FromDays(Math.Max(1, options.WindowDays));
-
-        for (var windowStart = startUtc; windowStart < nowUtc; windowStart += windowSize)
+        try
         {
-            var windowEnd = Min(windowStart + windowSize, nowUtc);
-            var trades = await tradeSource.GetUserTradesByTimeAsync(windowStart, windowEnd, cancellationToken);
+            await EnsureInitializedAsync(cancellationToken);
 
-            foreach (var trade in trades)
+            var nowUtc = DateTimeOffset.UtcNow;
+            var startUtc = await GetNextStartUtcAsync(cancellationToken);
+            if (startUtc >= nowUtc)
             {
-                await _tradesTable.UpsertEntityAsync(
-                    ToEntity(trade),
-                    TableUpdateMode.Replace,
-                    cancellationToken);
+                return new UserTradeIngestionResult(context.StrategyName, startUtc, nowUtc, 0, 0);
             }
 
-            totalTrades += trades.Count;
-            windowCount++;
+            var totalTrades = 0;
+            var windowCount = 0;
+            var windowSize = TimeSpan.FromDays(Math.Max(1, options.WindowDays));
 
-            logger.LogInformation(
-                "Ingested {TradeCount} {Exchange} user trades for {Strategy} from {StartUtc} to {EndUtc}",
-                trades.Count,
-                context.Exchange,
-                context.StrategyName,
-                windowStart,
-                windowEnd);
+            for (var windowStart = startUtc; windowStart < nowUtc; windowStart += windowSize)
+            {
+                var windowEnd = Min(windowStart + windowSize, nowUtc);
+                var trades = await tradeSource.GetUserTradesByTimeAsync(windowStart, windowEnd, cancellationToken);
+                await UpsertTradesAsync(trades, cancellationToken);
+
+                totalTrades += trades.Count;
+                windowCount++;
+
+                logger.LogInformation(
+                    "Ingested {TradeCount} {Exchange} user trades for {Strategy} from {StartUtc} to {EndUtc}",
+                    trades.Count,
+                    context.Exchange,
+                    context.StrategyName,
+                    windowStart,
+                    windowEnd);
+            }
+
+            await SaveStateAsync(nowUtc, cancellationToken);
+            return new UserTradeIngestionResult(context.StrategyName, startUtc, nowUtc, windowCount, totalTrades);
         }
-
-        await SaveStateAsync(nowUtc, cancellationToken);
-        return new UserTradeIngestionResult(context.StrategyName, startUtc, nowUtc, windowCount, totalTrades);
+        finally
+        {
+            _ingestionLock.Release();
+        }
     }
 
     private async Task<DateTimeOffset> GetNextStartUtcAsync(CancellationToken cancellationToken)
@@ -138,6 +151,29 @@ public sealed class AzureTableUserTradeIngestionService(
         return entity;
     }
 
+    private async Task UpsertTradesAsync(
+        IReadOnlyCollection<UserTradeRecord> trades,
+        CancellationToken cancellationToken)
+    {
+        if (trades.Count == 0)
+        {
+            return;
+        }
+
+        var entities = trades.Select(ToEntity);
+        foreach (var partition in entities.GroupBy(entity => entity.PartitionKey))
+        {
+            foreach (var batch in partition.Chunk(100))
+            {
+                var actions = batch
+                    .Select(entity => new TableTransactionAction(TableTransactionActionType.UpsertReplace, entity))
+                    .ToArray();
+
+                await _tradesTable.SubmitTransactionAsync(actions, cancellationToken);
+            }
+        }
+    }
+
     private string GetTradePartitionKey()
     {
         var addressKey = string.IsNullOrWhiteSpace(context.VaultAddress)
@@ -155,9 +191,15 @@ public sealed class AzureTableUserTradeIngestionService(
             ?? trade.ClientOrderId
             ?? trade.OrderId?.ToString(System.Globalization.CultureInfo.InvariantCulture)
             ?? trade.Hash
-            ?? $"{trade.ExchangeSymbol}|{trade.Price}|{trade.Quantity}";
+            ?? $"{trade.ExchangeSymbol}|{trade.Price}|{trade.Quantity}|{BuildRawJsonHash(trade.RawJson)}";
 
         return SanitizeTableKey($"{trade.TimestampUtc:yyyyMMddHHmmssfffffff}|{identity}");
+    }
+
+    private static string BuildRawJsonHash(string rawJson)
+    {
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(rawJson));
+        return Convert.ToHexString(hash[..8]).ToLowerInvariant();
     }
 
     private async Task EnsureInitializedAsync(CancellationToken cancellationToken)

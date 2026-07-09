@@ -42,6 +42,10 @@ public abstract class ManualTradeIngestionFunctionBase(
             await response.WriteAsJsonAsync(result, cancellationToken);
             return response;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error running manual trade ingestion for {Strategy}", StrategyKey);

@@ -19,16 +19,25 @@ public sealed class AzureTableUserTradeIngestionServiceTest
             capturedTrades,
             capturedStates,
             stateEntity: null);
-        var trade = CreateTrade(DateTimeOffset.Parse("2026-07-09T10:15:00+00:00"), tradeId: 123);
+        var tradeTimestamp = DateTimeOffset.UtcNow.AddMinutes(-5);
+        var trade = CreateTrade(tradeTimestamp, tradeId: 123);
         var source = new FakeTradeSource([trade]);
-        var sut = CreateSut(tableServiceClient, source);
+        var sut = CreateSut(
+            tableServiceClient,
+            source,
+            new TradeIngestionOptions
+            {
+                StartUtc = tradeTimestamp.AddMinutes(-5),
+                WindowDays = 1,
+                OverlapDays = 2
+            });
 
         var result = await sut.IngestAsync(CancellationToken.None);
 
         result.TradeCount.ShouldBe(1);
         capturedTrades.Count.ShouldBeGreaterThanOrEqualTo(1);
         capturedTrades[0].PartitionKey.ShouldBe("yolodaily|Hyperliquid|testnet|0xvault");
-        capturedTrades[0].RowKey.ShouldBe("202607091015000000000|123");
+        capturedTrades[0].RowKey.ShouldBe($"{tradeTimestamp:yyyyMMddHHmmssfffffff}|123");
         capturedTrades[0]["StrategyName"].ShouldBe("yolodaily");
         capturedTrades[0]["Exchange"].ShouldBe("Hyperliquid");
         capturedTrades[0]["ExchangeSymbol"].ShouldBe("BTC");
@@ -134,6 +143,15 @@ public sealed class AzureTableUserTradeIngestionServiceTest
                 It.IsAny<CancellationToken>()))
             .Callback<TableEntity, TableUpdateMode, CancellationToken>((entity, _, _) => capturedEntities.Add(entity))
             .ReturnsAsync(Mock.Of<Response>());
+        tableClient
+            .Setup(x => x.SubmitTransactionAsync(
+                It.IsAny<IEnumerable<TableTransactionAction>>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<IEnumerable<TableTransactionAction>, CancellationToken>((actions, _) =>
+            {
+                capturedEntities.AddRange(actions.Select(action => (TableEntity)action.Entity));
+            })
+            .ReturnsAsync(Response.FromValue<IReadOnlyList<Response>>([], Mock.Of<Response>()));
 
         return tableClient;
     }
@@ -173,7 +191,11 @@ public sealed class AzureTableUserTradeIngestionServiceTest
             CancellationToken cancellationToken = default)
         {
             Requests.Add((startUtc, endUtc));
-            return Task.FromResult(trades);
+            var windowTrades = trades
+                .Where(trade => trade.TimestampUtc >= startUtc && trade.TimestampUtc <= endUtc)
+                .ToArray();
+
+            return Task.FromResult<IReadOnlyCollection<UserTradeRecord>>(windowTrades);
         }
     }
 }

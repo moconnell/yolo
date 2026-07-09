@@ -73,9 +73,13 @@ public sealed class HyperliquidUserTradeSource(
 
     private static DateTimeOffset ToUtc(DateTime timestamp)
     {
-        var utc = timestamp.Kind == DateTimeKind.Utc
-            ? timestamp
-            : DateTime.SpecifyKind(timestamp, DateTimeKind.Utc);
+        var utc = timestamp.Kind switch
+        {
+            DateTimeKind.Utc => timestamp,
+            DateTimeKind.Local => timestamp.ToUniversalTime(),
+            DateTimeKind.Unspecified => DateTime.SpecifyKind(timestamp, DateTimeKind.Utc),
+            _ => timestamp
+        };
 
         return new DateTimeOffset(utc);
     }
