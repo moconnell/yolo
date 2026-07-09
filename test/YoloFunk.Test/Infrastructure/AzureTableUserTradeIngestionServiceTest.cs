@@ -75,6 +75,34 @@ public sealed class AzureTableUserTradeIngestionServiceTest
         source.Requests[0].StartUtc.ShouldBe(DateTimeOffset.Parse("2026-07-07T00:00:00+00:00"));
     }
 
+    [Fact]
+    public async Task IngestAsync_WhenSourceHasNoStableTradeIdentifiers_ShouldUseRawJsonHashInRowKey()
+    {
+        var capturedTrades = new List<TableEntity>();
+        var capturedStates = new List<TableEntity>();
+        var tableServiceClient = CreateTableServiceClient(capturedTrades, capturedStates, stateEntity: null);
+        var timestampUtc = DateTimeOffset.UtcNow.AddMinutes(-5);
+        var source = new FakeTradeSource(
+        [
+            CreateTrade(timestampUtc, null, rawJson: "{\"fill\":1}", includeStableIds: false),
+            CreateTrade(timestampUtc, null, rawJson: "{\"fill\":2}", includeStableIds: false)
+        ]);
+        var sut = CreateSut(
+            tableServiceClient,
+            source,
+            new TradeIngestionOptions
+            {
+                StartUtc = timestampUtc.AddMinutes(-1),
+                WindowDays = 1,
+                OverlapDays = 0
+            });
+
+        await sut.IngestAsync(CancellationToken.None);
+
+        capturedTrades.Count.ShouldBe(2);
+        capturedTrades.Select(entity => entity.RowKey).Distinct().Count().ShouldBe(2);
+    }
+
     private static AzureTableUserTradeIngestionService CreateSut(
         TableServiceClient tableServiceClient,
         IUserTradeSource source,
@@ -156,7 +184,11 @@ public sealed class AzureTableUserTradeIngestionServiceTest
         return tableClient;
     }
 
-    private static UserTradeRecord CreateTrade(DateTimeOffset timestampUtc, long tradeId) =>
+    private static UserTradeRecord CreateTrade(
+        DateTimeOffset timestampUtc,
+        long? tradeId,
+        string rawJson = "{}",
+        bool includeStableIds = true) =>
         new(
             Exchange: Exchange.Hyperliquid,
             ClosedPnl: "0",
@@ -165,8 +197,8 @@ public sealed class AzureTableUserTradeIngestionServiceTest
             SymbolType: "Future",
             Crossed: true,
             Direction: "Open Long",
-            Hash: "0xhash",
-            OrderId: 456,
+            Hash: includeStableIds ? "0xhash" : null,
+            OrderId: includeStableIds ? 456 : null,
             Price: "100000",
             OrderSide: "Buy",
             StartPosition: "0",
@@ -178,8 +210,8 @@ public sealed class AzureTableUserTradeIngestionServiceTest
             TradeId: tradeId,
             LiquidationJson: null,
             TwapId: null,
-            ClientOrderId: $"client-{tradeId}",
-            RawJson: "{}");
+            ClientOrderId: tradeId.HasValue ? $"client-{tradeId}" : null,
+            RawJson: rawJson);
 
     private sealed class FakeTradeSource(IReadOnlyCollection<UserTradeRecord> trades) : IUserTradeSource
     {
