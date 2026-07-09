@@ -11,9 +11,14 @@ on:
         description: "Environment to cleanup (pr-{number}, feat-{name}, or dev)"
         required: true
         type: string
+      principal_id:
+        description: "Optional managed identity principal/object id to remove from Key Vault if the app was already deleted"
+        required: false
+        type: string
 
 env:
-  AZURE_RESOURCE_GROUP: "ResourceGroup1"
+  AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP || 'ResourceGroup1' }}
+  AZURE_KEYVAULT_NAME: ${{ vars.AZURE_KEYVAULT_NAME || 'YOLO' }}
 
 jobs:
   cleanup:
@@ -26,8 +31,10 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             ENV="${{ github.event.inputs.environment }}"
+            PRINCIPAL_ID="${{ github.event.inputs.principal_id }}"
           elif [ "${{ github.event_name }}" = "pull_request" ]; then
             ENV="pr-${{ github.event.pull_request.number }}"
+            PRINCIPAL_ID=""
           else
             echo "Unknown event type"
             exit 1
@@ -41,6 +48,7 @@ jobs:
 
           echo "environment=$ENV" >> $GITHUB_OUTPUT
           echo "function-app-name=yolo-funk-$ENV" >> $GITHUB_OUTPUT
+          echo "principal_id=$PRINCIPAL_ID" >> $GITHUB_OUTPUT
 
       - name: Azure Login
         uses: azure/login@v2
@@ -51,6 +59,47 @@ jobs:
         run: |
           FUNCTION_APP_NAME="${{ steps.set-env.outputs.function-app-name }}"
           ENV="${{ steps.set-env.outputs.environment }}"
+          INPUT_PRINCIPAL_ID="${{ steps.set-env.outputs.principal_id }}"
+
+          remove_keyvault_assignment() {
+            local principal_id="$1"
+
+            if [ -z "$principal_id" ] || [ "$principal_id" = "null" ]; then
+              echo "No managed identity principal id available for Key Vault role cleanup"
+              return 0
+            fi
+
+            if [ -z "${{ env.AZURE_KEYVAULT_NAME }}" ]; then
+              echo "No Key Vault configured, skipping role assignment cleanup"
+              return 0
+            fi
+
+            KEYVAULT_ID=$(az keyvault show \
+              --name "${{ env.AZURE_KEYVAULT_NAME }}" \
+              --query id \
+              --output tsv 2>/dev/null || true)
+
+            if [ -z "$KEYVAULT_ID" ]; then
+              echo "Key Vault ${{ env.AZURE_KEYVAULT_NAME }} not found, skipping role assignment cleanup"
+              return 0
+            fi
+
+            ASSIGNMENT_IDS=$(az role assignment list \
+              --scope "$KEYVAULT_ID" \
+              --role "Key Vault Secrets User" \
+              --query "[?principalId=='$principal_id'].id" \
+              --output tsv)
+
+            if [ -z "$ASSIGNMENT_IDS" ]; then
+              echo "No Key Vault Secrets User assignment found for principal $principal_id"
+              return 0
+            fi
+
+            for assignment_id in $ASSIGNMENT_IDS; do
+              echo "Deleting Key Vault role assignment: $assignment_id"
+              az role assignment delete --ids "$assignment_id"
+            done
+          }
 
           # Check if Function App exists
           if az functionapp show \
@@ -65,6 +114,12 @@ jobs:
               --name $FUNCTION_APP_NAME \
               --query 'appServicePlanId' \
               --output tsv)
+
+            PRINCIPAL_ID=$(az functionapp show \
+              --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+              --name $FUNCTION_APP_NAME \
+              --query 'identity.principalId' \
+              --output tsv)
             
             # Extract plan name from resource ID (format: /subscriptions/.../serverfarms/PLAN_NAME)
             if [ -n "$PLAN_ID" ]; then
@@ -74,6 +129,9 @@ jobs:
             fi
             
             echo "App Service Plan: $PLAN_NAME"
+
+            # Delete Key Vault permission before deleting the system-assigned identity.
+            remove_keyvault_assignment "$PRINCIPAL_ID"
             
             # Delete Function App
             az functionapp delete \
@@ -107,6 +165,7 @@ jobs:
             echo "✅ Cleanup complete for $FUNCTION_APP_NAME"
           else
             echo "Function App $FUNCTION_APP_NAME not found, skipping cleanup"
+            remove_keyvault_assignment "$INPUT_PRINCIPAL_ID"
           fi
 
       - name: Comment on PR

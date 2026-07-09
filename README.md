@@ -1,14 +1,32 @@
 # yolo
 
-Automation for the [RobotWealth](https://robotwealth.com) cryptocurrency YOLO strategies
+Automation for the [RobotWealth](https://robotwealth.com) YOLO and [Unravel](https://unravel.finance) cryptocurrency factor strategies
 
 [![Coverage Status](https://coveralls.io/repos/github/moconnell/yolo/badge.svg?branch=master)](https://coveralls.io/github/moconnell/yolo?branch=master)
 
-## YOLO Console - Windows x64 Deployment
+## YoloFunk - Azure Function App
 
-There is a pre-built win64 console app in the releases section, which can be scheduled to run daily.
+YoloFunk is an Azure Function App project and now the primary means of invoking rebalance functionality.
 
-## Quick Start
+### Endpoints
+
+- `POST /api/rebalance/yolodaily` - Execute YOLO strategy rebalance
+- `POST /api/rebalance/unraveldaily` - Execute Unravel strategy rebalance
+- `GET /api/rebalance/yolodaily/status` - Get YOLO rebalance orchestration status
+- `GET /api/rebalance/unraveldaily/status` - Get Unravel rebalance orchestration status
+- `GET /api/rebalance/yolodaily/effective-weights` - Calculate and return effective YOLO rebalance weights
+- `GET /api/rebalance/unraveldaily/effective-weights` - Calculate and return effective Unravel rebalance weights
+- `GET /api/storage/rebalance-events` - Query persisted rebalance telemetry events; supports `strategy`, `runId`, `eventType`, `level`, `coin`, `clientOrderId`, `from`, `to`, `pageSize`, and `continuationToken`
+- `GET /api/storage/http-requests` - Query captured upstream HTTP request metadata; supports `host`, `endpoint`, `method`, `statusCode`, `contentHash`, `from`, `to`, `pageSize`, and `continuationToken`
+- `GET /api/storage/http-requests/payload?blobName=...` - Fetch the raw persisted HTTP response/request payload for a captured HTTP request
+
+## YOLO Console - Windows x64 Deployment (DEPRECATED)
+
+This project is no longer actively maintained.
+
+There are a selection of past pre-built win64 console apps in the releases section, which can be scheduled to run daily.
+
+### Quick Start
 
 - download `YoloKonsole.exe`, `appsettings.json` and `./setup-secrets.ps1` and save to a new folder on your computer
 
@@ -28,25 +46,25 @@ There is a pre-built win64 console app in the releases section, which can be sch
    ./YoloKonsole.exe
    ```
 
-## Files Included
+### Files Included
 
 - `YoloKonsole.exe` - Main application
 - `setup-secrets.ps1` - Configure your API keys and addresses securely
 - `appsettings.json` - Application configuration settings
 - `README.md` - This file
 
-## Security Notes
+### Security Notes
 
 - Secrets are stored in `.\secrets` under the install directory with restricted permissions
 - Only your Windows user account can access the secret files
 
-## Requirements
+### Requirements
 
 - Windows 10/11 x64
 - .NET 10 installation required
 - PowerShell 5.1+ (included with Windows)
 
-## Troubleshooting
+### Troubleshooting
 
 If you get execution policy errors:
 
@@ -89,7 +107,17 @@ The relevant config elements to include in this case are as follows (note the re
 ```JSON
 {
   "Hyperliquid": {
+    "Address": "",
+    "PrivateKey": "",
+    "VaultAddress": null,
+    "UseTestnet": true,
+    "BuilderFeePercentage": 0.0,
     "Aliases": {
+      "BONK": "kBONK",
+      "FLOKI": "kFLOKI",
+      "LUNC": "kLUNC",
+      "NEIRO": "kNEIRO",
+      "PEPE": "kPEPE",
       "SHIB": "kSHIB"
     }
   },
@@ -98,7 +126,8 @@ The relevant config elements to include in this case are as follows (note the re
     "ApiKey": "",
     "Factors": [
       "Carry",
-      "Momentum",
+      "InstantaneousMomentum",
+      "MeanReversion",
       "OpenInterestDivergence",
       "RelativeIlliquidity",
       "RetailFlow",
@@ -109,7 +138,8 @@ The relevant config elements to include in this case are as follows (note the re
   "Yolo": {
     "FactorWeights": {
       "Carry": 1,
-      "Momentum": 1,
+      "InstantaneousMomentum": 1,
+      "MeanReversion": 1,
       "OpenInterestDivergence": 1,
       "RelativeIlliquidity": 1,
       "RetailFlow": 1,
@@ -133,25 +163,12 @@ The app currently only supports [Hyperliquid](https://hyperliquid.xyz/) - even i
   "Hyperliquid": {
     "Address": "",
     "PrivateKey": "",
-    "UseTestnet": false
+    "UseTestnet": false,
+    "BuilderFeePercentage": 0.0
   },
 ```
 
-## Azure Key Vault Signing
-
-The app also now supports signing via a private key stored in an [Azure Key Vault](https://azure.microsoft.com/products/key-vault) - in this case omit `Hyperliquid` config for `PrivateKey` detailed above, as it will be ignored even if present.
-
-```JSON
-  "AzureVault": {
-    "VaultUri": "",
-    "KeyName": "",
-    "ExpectedAddress": ""  // optional verification
-  },
-```
-
-The key must be created in Azure Key Vault as EC (elliptic curve) and P256K in order to be compatible with Ethereum wallet signing (see: [Key types, algorithms, and operations](https://learn.microsoft.com/en-us/azure/key-vault/keys/about-keys-details)).
-
-You will need to install [Azure Command-Line Interface](https://learn.microsoft.com/cli/azure/) and [authenticate](https://learn.microsoft.com/cli/azure/authenticate-azure-cli) on the host machine in order to facilitate this.
+`BuilderFeePercentage` is passed through to HyperLiquid.Net's builder-code setting. The repo default is `0.0`, which disables the optional library builder fee; set it explicitly to `0.01` to opt in to the 1 bps fee.
 
 ### Logging/PathFormat
 
@@ -210,52 +227,6 @@ Possible values:
 ```JSON
 Center  // (default)
 Edge
-```
-
-## Azure Functions - Effective Weights Verification
-
-The function app exposes verification endpoints that calculate and return effective rebalance weights using each strategy's configured Hyperliquid account context.
-
-Routes:
-
-- `GET /api/rebalance/yolodaily/effective-weights`
-- `GET /api/rebalance/unraveldaily/effective-weights`
-
-The account context is taken from:
-
-- `Strategies.<Strategy>.Hyperliquid.Address`
-- `Strategies.<Strategy>.Hyperliquid.VaultAddress`
-
-Notes:
-
-- Endpoints use `AuthorizationLevel.Function`.
-- Callers cannot override `address` or `vault` via query parameters.
-- Response includes both raw target and constrained/effective weights to validate rebalance behavior.
-
-Example response shape:
-
-```json
-{
-  "strategy": "yolodaily",
-  "address": "0x...",
-  "vaultAddress": "0x...",
-  "generatedAtUtc": "2026-02-23T12:34:56Z",
-  "nominal": 100000.0,
-  "weightConstraint": 0.85,
-  "weights": [
-    {
-      "token": "BTC",
-      "rawTargetWeight": 0.12,
-      "constrainedTargetWeight": 0.102,
-      "currentWeight": 0.09,
-      "effectiveWeight": 0.102,
-      "deltaWeight": 0.012,
-      "isInUniverse": true,
-      "withinTradeBuffer": false,
-      "hasTradableMarket": true
-    }
-  ]
-}
 ```
 
 ### Yolo/SpreadSplit
