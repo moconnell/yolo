@@ -107,7 +107,17 @@ The relevant config elements to include in this case are as follows (note the re
 ```JSON
 {
   "Hyperliquid": {
+    "Address": "",
+    "PrivateKey": "",
+    "VaultAddress": null,
+    "UseTestnet": true,
+    "BuilderFeePercentage": 0.0,
     "Aliases": {
+      "BONK": "kBONK",
+      "FLOKI": "kFLOKI",
+      "LUNC": "kLUNC",
+      "NEIRO": "kNEIRO",
+      "PEPE": "kPEPE",
       "SHIB": "kSHIB"
     }
   },
