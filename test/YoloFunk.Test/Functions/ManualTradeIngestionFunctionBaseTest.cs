@@ -4,6 +4,8 @@ using System.Text.Json;
 using Azure.Core.Serialization;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
+using Microsoft.DurableTask;
+using Microsoft.DurableTask.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using YoloFunk.Dto;
@@ -17,18 +19,23 @@ public sealed class ManualTradeIngestionFunctionBaseTest
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     [Fact]
-    public async Task GivenRegisteredService_WhenYoloRun_ShouldReturnOkAndIngestionResult()
+    public async Task GivenRegisteredService_WhenYoloRun_ShouldReturnAcceptedAndScheduledPayload()
     {
         var ingestionService = new Mock<IUserTradeIngestionService>();
-        ingestionService
-            .Setup(x => x.IngestAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new UserTradeIngestionResult(
-                "yolodaily",
-                DateTimeOffset.Parse("2026-07-01T00:00:00+00:00"),
-                DateTimeOffset.Parse("2026-07-09T00:00:00+00:00"),
-                8,
-                13));
-
+        var durableClient = new Mock<DurableTaskClient>("test-client");
+        durableClient
+            .Setup(x => x.GetInstanceAsync(
+                It.IsAny<string>(),
+                false,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((OrchestrationMetadata?)null);
+        durableClient
+            .Setup(x => x.ScheduleNewOrchestrationInstanceAsync(
+                TradeIngestionDurableWorkflow.OrchestratorName,
+                It.IsAny<TradeIngestionRequest>(),
+                It.IsAny<StartOrchestrationOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync("trade-ingestion-yolodaily");
         var services = CreateServices(services =>
             services.AddKeyedSingleton("yolodaily", ingestionService.Object));
         var request = TestHttpRequestData.Create("POST", services);
@@ -36,14 +43,17 @@ public sealed class ManualTradeIngestionFunctionBaseTest
             services,
             Mock.Of<ILogger<YoloDailyManualTradeIngestion>>());
 
-        var response = await sut.Run(request, CancellationToken.None);
+        var response = await sut.Run(request, durableClient.Object, CancellationToken.None);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var payload = await TestHttpRequestData.ReadJsonAsync<UserTradeIngestionResult>(response);
+        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        var payload = await TestHttpRequestData.ReadJsonAsync<TradeIngestionStartResponse>(response);
         payload.ShouldNotBeNull();
-        payload.StrategyName.ShouldBe("yolodaily");
-        payload.WindowCount.ShouldBe(8);
-        payload.TradeCount.ShouldBe(13);
+        payload.Strategy.ShouldBe("yolodaily");
+        payload.InstanceId.ShouldBe("trade-ingestion-yolodaily");
+        payload.Started.ShouldBeTrue();
+        payload.RuntimeStatus.ShouldBe("Scheduled");
+
+        ingestionService.Verify(x => x.IngestAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -51,11 +61,12 @@ public sealed class ManualTradeIngestionFunctionBaseTest
     {
         var services = CreateServices();
         var request = TestHttpRequestData.Create("POST", services);
+        var durableClient = new Mock<DurableTaskClient>("test-client");
         var sut = new UnravelDailyManualTradeIngestion(
             services,
             Mock.Of<ILogger<UnravelDailyManualTradeIngestion>>());
 
-        var response = await sut.Run(request, CancellationToken.None);
+        var response = await sut.Run(request, durableClient.Object, CancellationToken.None);
 
         response.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
         var payload = await TestHttpRequestData.ReadJsonAsync<RebalanceErrorResponse>(response);
@@ -65,13 +76,21 @@ public sealed class ManualTradeIngestionFunctionBaseTest
     }
 
     [Fact]
-    public async Task GivenServiceThrows_WhenRun_ShouldReturnInternalServerError()
+    public async Task GivenExistingRunningInstance_WhenRun_ShouldReturnOkAndRunningPayload()
     {
         var ingestionService = new Mock<IUserTradeIngestionService>();
-        ingestionService
-            .Setup(x => x.IngestAsync(It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new InvalidOperationException("boom"));
-
+        var durableClient = new Mock<DurableTaskClient>("test-client");
+        durableClient
+            .Setup(x => x.GetInstanceAsync(
+                "trade-ingestion-yolodaily",
+                false,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new OrchestrationMetadata(
+                "trade-ingestion-yolodaily",
+                TradeIngestionDurableWorkflow.OrchestratorName)
+            {
+                RuntimeStatus = OrchestrationRuntimeStatus.Running
+            });
         var services = CreateServices(services =>
             services.AddKeyedSingleton("yolodaily", ingestionService.Object));
         var request = TestHttpRequestData.Create("POST", services);
@@ -79,13 +98,111 @@ public sealed class ManualTradeIngestionFunctionBaseTest
             services,
             Mock.Of<ILogger<YoloDailyManualTradeIngestion>>());
 
-        var response = await sut.Run(request, CancellationToken.None);
+        var response = await sut.Run(request, durableClient.Object, CancellationToken.None);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var payload = await TestHttpRequestData.ReadJsonAsync<TradeIngestionStartResponse>(response);
+        payload.ShouldNotBeNull();
+        payload.Strategy.ShouldBe("yolodaily");
+        payload.Started.ShouldBeFalse();
+        payload.RuntimeStatus.ShouldBe(OrchestrationRuntimeStatus.Running.ToString());
+
+        durableClient.Verify(
+            x => x.ScheduleNewOrchestrationInstanceAsync(
+                It.IsAny<TaskName>(),
+                It.IsAny<TradeIngestionRequest>(),
+                It.IsAny<StartOrchestrationOptions>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task GivenClientThrows_WhenRun_ShouldReturnInternalServerError()
+    {
+        var ingestionService = new Mock<IUserTradeIngestionService>();
+        var durableClient = new Mock<DurableTaskClient>("test-client");
+        durableClient
+            .Setup(x => x.GetInstanceAsync(
+                It.IsAny<string>(),
+                false,
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("boom"));
+        var services = CreateServices(services =>
+            services.AddKeyedSingleton("yolodaily", ingestionService.Object));
+        var request = TestHttpRequestData.Create("POST", services);
+        var sut = new YoloDailyManualTradeIngestion(
+            services,
+            Mock.Of<ILogger<YoloDailyManualTradeIngestion>>());
+
+        var response = await sut.Run(request, durableClient.Object, CancellationToken.None);
 
         response.StatusCode.ShouldBe(HttpStatusCode.InternalServerError);
         var payload = await TestHttpRequestData.ReadJsonAsync<RebalanceErrorResponse>(response);
         payload.ShouldNotBeNull();
         payload.Strategy.ShouldBe("yolodaily");
-        payload.Error.ShouldBe("Failed to run trade ingestion");
+        payload.Error.ShouldBe("Failed to start trade ingestion");
+    }
+
+    [Fact]
+    public async Task GivenExistingStatus_WhenStatus_ShouldReturnOkAndStatusPayload()
+    {
+        var services = CreateServices();
+        var createdAt = DateTimeOffset.UtcNow.AddMinutes(-10);
+        var updatedAt = DateTimeOffset.UtcNow;
+        var durableClient = new Mock<DurableTaskClient>("test-client");
+        durableClient
+            .Setup(x => x.GetInstanceAsync(
+                "trade-ingestion-unraveldaily",
+                false,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new OrchestrationMetadata(
+                "trade-ingestion-unraveldaily",
+                TradeIngestionDurableWorkflow.OrchestratorName)
+            {
+                RuntimeStatus = OrchestrationRuntimeStatus.Completed,
+                CreatedAt = createdAt,
+                LastUpdatedAt = updatedAt
+            });
+        var request = TestHttpRequestData.Create("GET", services);
+        var sut = new UnravelDailyManualTradeIngestion(
+            services,
+            Mock.Of<ILogger<UnravelDailyManualTradeIngestion>>());
+
+        var response = await sut.Status(request, durableClient.Object, CancellationToken.None);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var payload = await TestHttpRequestData.ReadJsonAsync<TradeIngestionStatusResponse>(response);
+        payload.ShouldNotBeNull();
+        payload.Strategy.ShouldBe("unraveldaily");
+        payload.InstanceId.ShouldBe("trade-ingestion-unraveldaily");
+        payload.RuntimeStatus.ShouldBe(OrchestrationRuntimeStatus.Completed.ToString());
+        payload.CreatedAt.ShouldBe(createdAt);
+        payload.LastUpdatedAt.ShouldBe(updatedAt);
+    }
+
+    [Fact]
+    public async Task GivenNoStatusInstance_WhenStatus_ShouldReturnNotFound()
+    {
+        var services = CreateServices();
+        var durableClient = new Mock<DurableTaskClient>("test-client");
+        durableClient
+            .Setup(x => x.GetInstanceAsync(
+                "trade-ingestion-yolodaily",
+                false,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((OrchestrationMetadata?)null);
+        var request = TestHttpRequestData.Create("GET", services);
+        var sut = new YoloDailyManualTradeIngestion(
+            services,
+            Mock.Of<ILogger<YoloDailyManualTradeIngestion>>());
+
+        var response = await sut.Status(request, durableClient.Object, CancellationToken.None);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        var payload = await TestHttpRequestData.ReadJsonAsync<RebalanceErrorResponse>(response);
+        payload.ShouldNotBeNull();
+        payload.Strategy.ShouldBe("yolodaily");
+        payload.Error.ShouldBe("No orchestration found");
     }
 
     private static IServiceProvider CreateServices(Action<IServiceCollection>? configureServices = null)

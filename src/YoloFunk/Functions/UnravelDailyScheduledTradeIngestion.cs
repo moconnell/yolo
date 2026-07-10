@@ -1,4 +1,5 @@
 using Microsoft.Azure.Functions.Worker;
+using Microsoft.DurableTask.Client;
 using Microsoft.Extensions.Logging;
 
 namespace YoloFunk.Functions;
@@ -16,9 +17,10 @@ public sealed class UnravelDailyScheduledTradeIngestion(
     public async Task Run(
         [TimerTrigger("%Strategies:UnravelDaily:TradeIngestion:Schedule%")]
         TimerInfo timer,
+        [DurableClient] DurableTaskClient durableClient,
         CancellationToken cancellationToken)
     {
-        await RunTradeIngestionAsync(cancellationToken);
+        await RunTradeIngestionAsync(durableClient, cancellationToken);
         LogNextSchedule(timer.ScheduleStatus?.Next);
     }
 }
