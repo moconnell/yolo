@@ -40,14 +40,14 @@ public sealed class TimerTradeIngestionFunctionBaseTest
     }
 
     [Fact]
-    public async Task GivenRegisteredService_WhenYoloDailyRun_ShouldIngest()
+    public async Task GivenRegisteredService_WhenYoloDailyScheduledRun_ShouldIngest()
     {
         var ingestionService = CreateIngestionService();
         var services = CreateServices(services =>
             services.AddKeyedSingleton("yolodaily", ingestionService.Object));
-        var sut = new YoloDailyTradeIngestion(
+        var sut = new YoloDailyScheduledTradeIngestion(
             services,
-            NullLogger<YoloDailyTradeIngestion>.Instance);
+            NullLogger<YoloDailyScheduledTradeIngestion>.Instance);
 
         await sut.Run(new TimerInfo(), CancellationToken.None);
 
@@ -55,14 +55,14 @@ public sealed class TimerTradeIngestionFunctionBaseTest
     }
 
     [Fact]
-    public async Task GivenRegisteredService_WhenUnravelDailyRun_ShouldIngest()
+    public async Task GivenRegisteredService_WhenUnravelDailyScheduledRun_ShouldIngest()
     {
         var ingestionService = CreateIngestionService();
         var services = CreateServices(services =>
             services.AddKeyedSingleton("unraveldaily", ingestionService.Object));
-        var sut = new UnravelDailyTradeIngestion(
+        var sut = new UnravelDailyScheduledTradeIngestion(
             services,
-            NullLogger<UnravelDailyTradeIngestion>.Instance);
+            NullLogger<UnravelDailyScheduledTradeIngestion>.Instance);
 
         await sut.Run(new TimerInfo(), CancellationToken.None);
 
