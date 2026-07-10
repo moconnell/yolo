@@ -13,18 +13,83 @@ public sealed class TradeIngestionDurableWorkflow(
     ILogger<TradeIngestionDurableWorkflow> logger)
 {
     public const string OrchestratorName = nameof(RunTradeIngestionOrchestrator);
-    public const string ActivityName = nameof(RunTradeIngestionActivity);
+    public const string PlanActivityName = nameof(PlanTradeIngestionActivity);
+    public const string WindowActivityName = nameof(RunTradeIngestionWindowActivity);
+    public const string CompleteActivityName = nameof(CompleteTradeIngestionActivity);
 
     [Function(OrchestratorName)]
     public static async Task RunTradeIngestionOrchestrator([OrchestrationTrigger] TaskOrchestrationContext context)
     {
         var input = context.GetInput<TradeIngestionRequest>() ?? throw new InvalidOperationException("Missing orchestration input.");
-        _ = await context.CallActivityAsync<TradeIngestionActivityResult>(ActivityName, input);
+        var plan = await context.CallActivityAsync<UserTradeIngestionPlan>(
+            PlanActivityName,
+            new TradeIngestionPlanActivityRequest(
+                input.StrategyKey,
+                input.Trigger,
+                input.RequestedAtUtc,
+                context.CurrentUtcDateTime));
+
+        var tradeCount = 0;
+        foreach (var window in plan.Windows)
+        {
+            var windowResult = await context.CallActivityAsync<UserTradeIngestionWindowResult>(
+                WindowActivityName,
+                new TradeIngestionWindowActivityRequest(
+                    input.StrategyKey,
+                    window.StartUtc,
+                    window.EndUtc));
+
+            tradeCount += windowResult.TradeCount;
+        }
+
+        _ = await context.CallActivityAsync<UserTradeIngestionResult>(
+            CompleteActivityName,
+            new TradeIngestionCompleteActivityRequest(
+                input.StrategyKey,
+                plan.StartUtc,
+                plan.EndUtc,
+                plan.Windows.Count,
+                tradeCount));
     }
 
-    [Function(ActivityName)]
-    public async Task<TradeIngestionActivityResult> RunTradeIngestionActivity(
-        [ActivityTrigger] TradeIngestionRequest request,
+    [Function(PlanActivityName)]
+    public async Task<UserTradeIngestionPlan> PlanTradeIngestionActivity(
+        [ActivityTrigger] TradeIngestionPlanActivityRequest request,
+        CancellationToken cancellationToken)
+    {
+        var ingestionService = serviceProvider.GetRequiredKeyedService<IUserTradeIngestionService>(request.StrategyKey);
+
+        logger.LogInformation(
+            "Planning durable trade ingestion for strategy {Strategy} (trigger: {Trigger}, requestedAtUtc: {RequestedAtUtc}, endUtc: {EndUtc})",
+            request.StrategyKey,
+            request.Trigger,
+            request.RequestedAtUtc,
+            request.EndUtc);
+
+        return await ingestionService.PlanAsync(request.EndUtc, cancellationToken);
+    }
+
+    [Function(WindowActivityName)]
+    public async Task<UserTradeIngestionWindowResult> RunTradeIngestionWindowActivity(
+        [ActivityTrigger] TradeIngestionWindowActivityRequest request,
+        CancellationToken cancellationToken)
+    {
+        var ingestionService = serviceProvider.GetRequiredKeyedService<IUserTradeIngestionService>(request.StrategyKey);
+
+        logger.LogInformation(
+            "Executing durable trade ingestion window for strategy {Strategy} from {StartUtc} to {EndUtc}",
+            request.StrategyKey,
+            request.StartUtc,
+            request.EndUtc);
+
+        return await ingestionService.IngestWindowAsync(
+            new UserTradeIngestionWindow(request.StartUtc, request.EndUtc),
+            cancellationToken);
+    }
+
+    [Function(CompleteActivityName)]
+    public async Task<UserTradeIngestionResult> CompleteTradeIngestionActivity(
+        [ActivityTrigger] TradeIngestionCompleteActivityRequest request,
         CancellationToken cancellationToken)
     {
         try
@@ -32,23 +97,28 @@ public sealed class TradeIngestionDurableWorkflow(
             var ingestionService = serviceProvider.GetRequiredKeyedService<IUserTradeIngestionService>(request.StrategyKey);
 
             logger.LogInformation(
-                "Executing durable trade ingestion activity for strategy {Strategy} (trigger: {Trigger}, requestedAtUtc: {RequestedAtUtc})",
+                "Completing durable trade ingestion for strategy {Strategy}: {TradeCount} trade(s) across {WindowCount} window(s), {StartUtc} to {EndUtc}",
                 request.StrategyKey,
-                request.Trigger,
-                request.RequestedAtUtc);
+                request.TradeCount,
+                request.WindowCount,
+                request.StartUtc,
+                request.EndUtc);
 
-            var result = await ingestionService.IngestAsync(cancellationToken);
-            return new TradeIngestionActivityResult(true, result, null);
+            return await ingestionService.CompleteAsync(
+                request.StartUtc,
+                request.EndUtc,
+                request.WindowCount,
+                request.TradeCount,
+                cancellationToken);
         }
         catch (Exception ex)
         {
             logger.LogError(
                 ex,
-                "Durable trade ingestion activity failed for strategy {Strategy} (trigger: {Trigger})",
-                request.StrategyKey,
-                request.Trigger);
+                "Durable trade ingestion completion failed for strategy {Strategy}",
+                request.StrategyKey);
 
-            return new TradeIngestionActivityResult(false, null, ex.Message);
+            throw;
         }
     }
 

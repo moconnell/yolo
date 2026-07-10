@@ -37,44 +37,87 @@ public sealed class AzureTableUserTradeIngestionService(
 
         try
         {
-            await EnsureInitializedAsync(cancellationToken);
-
             var nowUtc = DateTimeOffset.UtcNow;
-            var startUtc = await GetNextStartUtcAsync(cancellationToken);
-            if (startUtc >= nowUtc)
-            {
-                return new UserTradeIngestionResult(context.StrategyName, startUtc, nowUtc, 0, 0);
-            }
-
+            var plan = await PlanAsync(nowUtc, cancellationToken);
             var totalTrades = 0;
-            var windowCount = 0;
-            var windowSize = TimeSpan.FromDays(Math.Max(1, options.WindowDays));
-
-            for (var windowStart = startUtc; windowStart < nowUtc; windowStart += windowSize)
+            foreach (var window in plan.Windows)
             {
-                var windowEnd = Min(windowStart + windowSize, nowUtc);
-                var trades = await tradeSource.GetUserTradesByTimeAsync(windowStart, windowEnd, cancellationToken);
-                await UpsertTradesAsync(trades, cancellationToken);
-
-                totalTrades += trades.Count;
-                windowCount++;
-
-                logger.LogInformation(
-                    "Ingested {TradeCount} {Exchange} user trades for {Strategy} from {StartUtc} to {EndUtc}",
-                    trades.Count,
-                    context.Exchange,
-                    context.StrategyName,
-                    windowStart,
-                    windowEnd);
+                var result = await IngestWindowAsync(window, cancellationToken);
+                totalTrades += result.TradeCount;
             }
 
-            await SaveStateAsync(nowUtc, cancellationToken);
-            return new UserTradeIngestionResult(context.StrategyName, startUtc, nowUtc, windowCount, totalTrades);
+            return await CompleteAsync(
+                plan.StartUtc,
+                plan.EndUtc,
+                plan.Windows.Count,
+                totalTrades,
+                cancellationToken);
         }
         finally
         {
             _ingestionLock.Release();
         }
+    }
+
+    public async Task<UserTradeIngestionPlan> PlanAsync(
+        DateTimeOffset endUtc,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+
+        var startUtc = await GetNextStartUtcAsync(cancellationToken);
+        if (startUtc >= endUtc)
+        {
+            return new UserTradeIngestionPlan(context.StrategyName, startUtc, endUtc, []);
+        }
+
+        var windows = new List<UserTradeIngestionWindow>();
+        var windowSize = TimeSpan.FromDays(Math.Max(1, options.WindowDays));
+
+        for (var windowStart = startUtc; windowStart < endUtc; windowStart += windowSize)
+        {
+            var windowEnd = Min(windowStart + windowSize, endUtc);
+            windows.Add(new UserTradeIngestionWindow(windowStart, windowEnd));
+        }
+
+        return new UserTradeIngestionPlan(context.StrategyName, startUtc, endUtc, windows);
+    }
+
+    public async Task<UserTradeIngestionWindowResult> IngestWindowAsync(
+        UserTradeIngestionWindow window,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+
+        var trades = await tradeSource.GetUserTradesByTimeAsync(window.StartUtc, window.EndUtc, cancellationToken);
+        await UpsertTradesAsync(trades, cancellationToken);
+
+        logger.LogInformation(
+            "Ingested {TradeCount} {Exchange} user trades for {Strategy} from {StartUtc} to {EndUtc}",
+            trades.Count,
+            context.Exchange,
+            context.StrategyName,
+            window.StartUtc,
+            window.EndUtc);
+
+        return new UserTradeIngestionWindowResult(window.StartUtc, window.EndUtc, trades.Count);
+    }
+
+    public async Task<UserTradeIngestionResult> CompleteAsync(
+        DateTimeOffset startUtc,
+        DateTimeOffset endUtc,
+        int windowCount,
+        int tradeCount,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+
+        if (startUtc < endUtc)
+        {
+            await SaveStateAsync(endUtc, cancellationToken);
+        }
+
+        return new UserTradeIngestionResult(context.StrategyName, startUtc, endUtc, windowCount, tradeCount);
     }
 
     private async Task<DateTimeOffset> GetNextStartUtcAsync(CancellationToken cancellationToken)
