@@ -1,0 +1,25 @@
+namespace YoloAbstractions;
+
+public sealed record UserTradeRecord(
+    Exchange Exchange,
+    string? ClosedPnl,
+    string ExchangeSymbol,
+    string? Symbol,
+    string? SymbolType,
+    bool Crossed,
+    string? Direction,
+    string? Hash,
+    long? OrderId,
+    string Price,
+    string? OrderSide,
+    string? StartPosition,
+    string Quantity,
+    DateTimeOffset TimestampUtc,
+    string Fee,
+    string? FeeToken,
+    string? BuilderFee,
+    long? TradeId,
+    string? LiquidationJson,
+    long? TwapId,
+    string? ClientOrderId,
+    string RawJson);

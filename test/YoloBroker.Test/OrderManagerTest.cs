@@ -239,6 +239,57 @@ public class OrderManagerTest
     }
 
     [Fact]
+    public async Task ManageOrdersAsync_WhenOldOrderCancelArrivesAfterReplacement_ShouldKeepManagingReplacement()
+    {
+        var updatesChannel = Channel.CreateUnbounded<BrokerOrderEvent>();
+        var trade = CreateLimitTrade(clientOrderId: "c3stale", amount: 8m, limitPrice: 50m);
+        var firstOpenOrder = CreateOrder(id: 10051, clientId: "c3stale", status: OrderStatus.Open, amount: 8m, filled: 0m);
+        var oldCanceledOrder = firstOpenOrder with { OrderStatus = OrderStatus.Canceled };
+        var replacementTrade = trade with { LimitPrice = 49m, OrderType = OrderType.Limit };
+        var replacementOpenOrder = CreateOrder(id: 10052, clientId: "c3stale", status: OrderStatus.Open, amount: 8m, filled: 0m);
+        var marketFilledOrder = CreateOrder(id: 10053, clientId: "c3stale", status: OrderStatus.Filled, amount: 8m, filled: 8m);
+
+        var broker = new Mock<IYoloBroker>();
+        broker.Setup(x => x.SubscribeOrderUpdatesAsync(It.IsAny<CancellationToken>()))
+            .Returns(updatesChannel.Reader.ReadAllAsync);
+        broker.Setup(x => x.PlaceTradesAsync(It.IsAny<IEnumerable<Trade>>(), It.IsAny<CancellationToken>()))
+            .Returns((IEnumerable<Trade> _, CancellationToken _) =>
+                ToAsyncEnumerable(new TradeResult(trade, Success: true, Order: firstOpenOrder)));
+        broker.Setup(x => x.CancelOrderAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
+            .Returns(async (Order order, CancellationToken ct) =>
+            {
+                if (order.Id == firstOpenOrder.Id)
+                {
+                    await updatesChannel.Writer.WriteAsync(new BrokerOrderEvent(trade.ClientOrderId!, oldCanceledOrder, Success: true), ct);
+                }
+            });
+        var placedReplacements = new List<Trade>();
+        broker.Setup(x => x.PlaceTradeAsync(It.IsAny<Trade>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Trade replacement, CancellationToken _) =>
+            {
+                placedReplacements.Add(replacement);
+
+                return replacement.OrderType == OrderType.Market
+                    ? new TradeResult(replacement, Success: true, Order: marketFilledOrder)
+                    : new TradeResult(replacement, Success: true, Order: replacementOpenOrder);
+            });
+
+        var sut = CreateSut(broker.Object);
+        var settings = new OrderManagementSettings(
+            UnfilledOrderTimeout: TimeSpan.FromMilliseconds(20),
+            MaxRepriceRetries: 1);
+
+        var updates = await CollectUpdatesAsync(sut.ManageOrdersAsync([trade], settings, CreateAdvisor(replacementTrade)));
+
+        updates.ShouldContain(x => x.Type == OrderUpdateType.Created && x.Order != null && x.Order.Id == firstOpenOrder.Id);
+        updates.ShouldContain(x => x.Type == OrderUpdateType.Created && x.Order != null && x.Order.Id == replacementOpenOrder.Id);
+        updates.ShouldContain(x => x.Type == OrderUpdateType.MarketOrderPlaced && x.Order != null && x.Order.Id == marketFilledOrder.Id);
+        placedReplacements.Count.ShouldBe(2);
+        placedReplacements[0].OrderType.ShouldBe(OrderType.Limit);
+        placedReplacements[1].OrderType.ShouldBe(OrderType.Market);
+    }
+
+    [Fact]
     public async Task ManageOrdersAsync_WhenInitialTradeIsMarket_ShouldEmitMarketOrderPlacedAndComplete()
     {
         var trade = new Trade(

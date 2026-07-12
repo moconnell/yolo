@@ -248,6 +248,87 @@ public class StorageQueryFunctionsTest
         payload.NextContinuationToken.ShouldBe("token-4");
     }
 
+    [Fact]
+    public async Task GetUserTrades_WhenTableHasRows_ShouldReturnFilteredTrades()
+    {
+        var tableServiceClient = CreateTableServiceClient(
+            "usertrades",
+            [
+                CreateUserTradeEntity(
+                    "yolodaily",
+                    "Hyperliquid",
+                    "testnet",
+                    "0xwallet",
+                    "0xvault",
+                    "BTC",
+                    "BTC",
+                    "client-1",
+                    123,
+                    456,
+                    DateTimeOffset.Parse("2026-07-09T10:15:00+00:00")),
+                CreateUserTradeEntity(
+                    "unraveldaily",
+                    "Hyperliquid",
+                    "testnet",
+                    "0xwallet",
+                    "0xvault",
+                    "ETH",
+                    "ETH",
+                    "client-2",
+                    124,
+                    457,
+                    DateTimeOffset.Parse("2026-07-09T11:15:00+00:00"))
+            ]);
+        var request = TestHttpRequestData.Create(
+            "GET",
+            "http://localhost/api/storage/user-trades?strategy=yolodaily&exchange=Hyperliquid&network=testnet&vaultAddress=0xvault&symbol=BTC&clientOrderId=client-1&tradeId=456&from=2026-07-09T10:00:00Z&to=2026-07-09T10:30:00Z",
+            services => services.AddSingleton(tableServiceClient));
+        var sut = new StorageQueryFunctions(request.FunctionContext.InstanceServices, NullLogger<StorageQueryFunctions>.Instance);
+
+        var response = await sut.GetUserTrades(request, CancellationToken.None);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var payload = await TestHttpRequestData.ReadJsonAsync<PagedQueryResponse<UserTradeQueryItem>>(response);
+        payload.ShouldNotBeNull();
+        payload.Items.Count.ShouldBe(1);
+        payload.Items[0].StrategyName.ShouldBe("yolodaily");
+        payload.Items[0].Exchange.ShouldBe("Hyperliquid");
+        payload.Items[0].Network.ShouldBe("testnet");
+        payload.Items[0].Symbol.ShouldBe("BTC");
+        payload.Items[0].ClientOrderId.ShouldBe("client-1");
+        payload.Items[0].OrderId.ShouldBe(123);
+        payload.Items[0].TradeId.ShouldBe(456);
+        payload.Items[0].RawJson.ShouldBe("{\"tid\":456}");
+    }
+
+    [Fact]
+    public async Task GetUserTrades_WhenRawPagesContainNonMatches_ShouldFillFilteredPage()
+    {
+        var tableServiceClient = CreateTableServiceClient(
+            "usertrades",
+            [
+                CreateUserTradeEntity("yolodaily", "Hyperliquid", "testnet", "0xwallet", null, "BTC", "BTC", "client-1", 1, 101),
+                CreateUserTradeEntity("yolodaily", "Hyperliquid", "testnet", "0xwallet", null, "ETH", "ETH", "client-2", 2, 102),
+                CreateUserTradeEntity("yolodaily", "Hyperliquid", "testnet", "0xwallet", null, "BTC", "BTC", "client-3", 3, 103),
+                CreateUserTradeEntity("unraveldaily", "Hyperliquid", "testnet", "0xwallet", null, "BTC", "BTC", "client-4", 4, 104)
+            ],
+            continuationTokens: ["token-1", "token-2", "token-3", "token-4"]);
+        var request = TestHttpRequestData.Create(
+            "GET",
+            "http://localhost/api/storage/user-trades?strategy=yolodaily&symbol=BTC&pageSize=2",
+            services => services.AddSingleton(tableServiceClient));
+        var sut = new StorageQueryFunctions(request.FunctionContext.InstanceServices, NullLogger<StorageQueryFunctions>.Instance);
+
+        var response = await sut.GetUserTrades(request, CancellationToken.None);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var payload = await TestHttpRequestData.ReadJsonAsync<PagedQueryResponse<UserTradeQueryItem>>(response);
+        payload.ShouldNotBeNull();
+        payload.Items.Select(item => item.ClientOrderId).ShouldBe(["client-1", "client-3"]);
+        payload.TotalCount.ShouldBe(2);
+        payload.NextContinuationToken.ShouldBe("token-3");
+    }
+
     private static TableServiceClient CreateTableServiceClient(
         string tableName,
         IReadOnlyList<TableEntity> entities,
@@ -293,6 +374,57 @@ public class StorageQueryFunctionsTest
             ["RequestTimeUtc"] = DateTimeOffset.Parse("2026-06-28T10:00:00+00:00"),
             ["QueryParametersJson"] = "{}"
         };
+
+    private static TableEntity CreateUserTradeEntity(
+        string strategyName,
+        string exchange,
+        string network,
+        string address,
+        string? vaultAddress,
+        string symbol,
+        string exchangeSymbol,
+        string clientOrderId,
+        long orderId,
+        long tradeId,
+        DateTimeOffset? timestampUtc = null)
+    {
+        var effectiveTimestamp = timestampUtc ?? DateTimeOffset.Parse("2026-07-09T10:00:00+00:00").AddMinutes(tradeId);
+        var partitionAddress = vaultAddress ?? address;
+        var entity = new TableEntity(
+            $"{strategyName}|{exchange}|{network}|{partitionAddress}",
+            $"{effectiveTimestamp:yyyyMMddHHmmssfffffff}|{tradeId}")
+        {
+            ["StrategyName"] = strategyName,
+            ["Exchange"] = exchange,
+            ["Network"] = network,
+            ["Address"] = address,
+            ["TimestampUtc"] = effectiveTimestamp,
+            ["ExchangeSymbol"] = exchangeSymbol,
+            ["Symbol"] = symbol,
+            ["SymbolType"] = "Future",
+            ["Direction"] = "OpenLong",
+            ["Hash"] = $"hash-{tradeId}",
+            ["OrderId"] = orderId,
+            ["Price"] = "100000",
+            ["OrderSide"] = "Buy",
+            ["StartPosition"] = "0",
+            ["Quantity"] = "0.01",
+            ["Fee"] = "0.1",
+            ["FeeToken"] = "USDC",
+            ["ClosedPnl"] = "0",
+            ["Crossed"] = true,
+            ["TradeId"] = tradeId,
+            ["ClientOrderId"] = clientOrderId,
+            ["RawJson"] = $"{{\"tid\":{tradeId}}}"
+        };
+
+        if (!string.IsNullOrWhiteSpace(vaultAddress))
+        {
+            entity["VaultAddress"] = vaultAddress;
+        }
+
+        return entity;
+    }
 
     private static TableEntity CreateRebalanceEventEntity(
         string strategyName,

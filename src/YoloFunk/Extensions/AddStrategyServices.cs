@@ -1,3 +1,4 @@
+using Azure.Data.Tables;
 using HyperLiquid.Net;
 using HyperLiquid.Net.Clients;
 using System.Net.Http.Headers;
@@ -16,6 +17,7 @@ using YoloApp.Commands;
 using YoloBroker;
 using YoloBroker.Hyperliquid;
 using YoloBroker.Hyperliquid.Config;
+using YoloBroker.Hyperliquid.UserTrades;
 using YoloBroker.Interface;
 using YoloFunk.Infrastructure;
 using YoloTrades;
@@ -53,20 +55,41 @@ public static class AddStrategyServices
 
         var throwOnMissingData = !hyperliquidConfig.UseTestnet;
 
+        if (IsAzureStorageConfigured(config))
+        {
+            var tradeIngestionOptions = strategyConfig
+                .GetSection("TradeIngestion")
+                .Get<TradeIngestionOptions>() ?? new TradeIngestionOptions();
+
+            services.AddKeyedSingleton<IUserTradeSource>(strategyKey, (sp, key) =>
+            {
+                return new HyperliquidUserTradeSource(
+                    CreateHyperLiquidRestClient(hyperliquidConfig),
+                    hyperliquidConfig);
+            });
+
+            services.AddKeyedSingleton<IUserTradeIngestionService>(strategyKey, (sp, key) =>
+            {
+                var ingestionContext = new UserTradeIngestionContext(
+                    strategyKey,
+                    Exchange.Hyperliquid,
+                    hyperliquidConfig.UseTestnet ? "testnet" : "mainnet",
+                    hyperliquidConfig.Address,
+                    hyperliquidConfig.VaultAddress);
+
+                return new AzureTableUserTradeIngestionService(
+                    ingestionContext,
+                    tradeIngestionOptions,
+                    sp.GetRequiredKeyedService<IUserTradeSource>(strategyKey),
+                    sp.GetRequiredService<TableServiceClient>(),
+                    sp.GetRequiredService<ILogger<AzureTableUserTradeIngestionService>>());
+            });
+        }
+
         services.AddKeyedSingleton<IYoloBroker>(strategyKey, (sp, key) =>
         {
             // Create strategy-specific HyperLiquid clients
-            var restClient = new HyperLiquidRestClient(options =>
-            {
-                options.ApiCredentials = new HyperLiquidCredentials(hyperliquidConfig.Address, hyperliquidConfig.PrivateKey);
-                options.BuilderFeePercentage = hyperliquidConfig.BuilderFeePercentage;
-
-                if (hyperliquidConfig.UseTestnet)
-                {
-                    options.Environment = HyperLiquidEnvironment.Testnet;
-                    options.OutputOriginalData = true;
-                }
-            });
+            var restClient = CreateHyperLiquidRestClient(hyperliquidConfig);
 
             var socketClient = new HyperLiquidSocketClient(options =>
             {
@@ -198,4 +221,19 @@ public static class AddStrategyServices
 
     private static bool IsAzureStorageConfigured(IConfiguration config) =>
         !string.IsNullOrWhiteSpace(config.GetValue<string>("AzureWebJobsStorage"));
+
+    private static HyperLiquidRestClient CreateHyperLiquidRestClient(HyperliquidConfig hyperliquidConfig)
+    {
+        return new HyperLiquidRestClient(options =>
+        {
+            options.ApiCredentials = new HyperLiquidCredentials(hyperliquidConfig.Address, hyperliquidConfig.PrivateKey);
+            options.BuilderFeePercentage = hyperliquidConfig.BuilderFeePercentage;
+
+            if (hyperliquidConfig.UseTestnet)
+            {
+                options.Environment = HyperLiquidEnvironment.Testnet;
+                options.OutputOriginalData = true;
+            }
+        });
+    }
 }

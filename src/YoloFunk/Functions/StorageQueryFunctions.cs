@@ -17,6 +17,7 @@ public sealed class StorageQueryFunctions(
 {
     private const string RebalanceEventsTableName = "rebalanceevents";
     private const string HttpRequestsTableName = "httprequestsindex";
+    private const string UserTradesTableName = "usertrades";
     private const string HttpRequestsContainerName = "http-requests";
 
     [Function(nameof(GetRebalanceEvents))]
@@ -177,6 +178,62 @@ public sealed class StorageQueryFunctions(
         }
     }
 
+    [Function(nameof(GetUserTrades))]
+    public async Task<HttpResponseData> GetUserTrades(
+        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "storage/user-trades")]
+        HttpRequestData req,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetTableServiceClient(req, out var tableServiceClient))
+            return await ServiceUnavailableAsync(req, cancellationToken);
+
+        var query = HttpQueryParameters.Parse(req.Url);
+        var page = query.GetInt32("page", 1, 1, 10_000);
+        var pageSize = query.GetInt32("pageSize", 100, 1, 500);
+        var orderBy = NormalizeTableOrderBy(query.GetString("orderBy"));
+        var direction = NormalizeTableDirection(query.GetString("direction"));
+        var continuationToken = query.GetString("continuationToken");
+        if (orderBy is null || direction is null)
+            return await InvalidPagedTableSortAsync(req, cancellationToken);
+
+        try
+        {
+            var pageResult = await QueryUserTradesAsync(
+                tableServiceClient,
+                query,
+                pageSize,
+                continuationToken,
+                cancellationToken);
+
+            return await WritePagedResponseAsync(
+                req,
+                pageResult.Items,
+                page,
+                pageSize,
+                orderBy,
+                direction,
+                cancellationToken,
+                pageResult.NextContinuationToken,
+                skipItems: false);
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            return await WritePagedResponseAsync(
+                req,
+                Array.Empty<UserTradeQueryItem>(),
+                page,
+                pageSize,
+                orderBy,
+                direction,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to query user trades");
+            return await ErrorAsync(req, "Failed to query user trades", cancellationToken);
+        }
+    }
+
     private bool TryGetTableServiceClient(
         HttpRequestData req,
         out TableServiceClient tableServiceClient)
@@ -261,6 +318,58 @@ public sealed class StorageQueryFunctions(
                     Matches(item.Level, level) &&
                     Matches(item.Coin, coin) &&
                     Matches(item.ClientOrderId, clientOrderId) &&
+                    (!from.HasValue || item.TimestampUtc >= from.Value) &&
+                    (!to.HasValue || item.TimestampUtc <= to.Value),
+            cancellationToken);
+    }
+
+    private static async Task<QueryPageResult<UserTradeQueryItem>> QueryUserTradesAsync(
+        TableServiceClient tableServiceClient,
+        HttpQueryParameters query,
+        int pageSize,
+        string? continuationToken,
+        CancellationToken cancellationToken)
+    {
+        var strategy = query.GetString("strategy");
+        var exchange = query.GetString("exchange");
+        var network = query.GetString("network");
+        var address = query.GetString("address");
+        var vaultAddress = query.GetString("vaultAddress");
+        var symbol = query.GetString("symbol");
+        var exchangeSymbol = query.GetString("exchangeSymbol");
+        var clientOrderId = query.GetString("clientOrderId");
+        var orderId = query.GetString("orderId");
+        var tradeId = query.GetString("tradeId");
+        var hash = query.GetString("hash");
+        var from = query.GetDateTimeOffset("from");
+        var to = query.GetDateTimeOffset("to");
+
+        var partitionAddress = !string.IsNullOrWhiteSpace(vaultAddress) ? vaultAddress : address;
+        var partitionFilter = !string.IsNullOrWhiteSpace(strategy) &&
+                              !string.IsNullOrWhiteSpace(exchange) &&
+                              !string.IsNullOrWhiteSpace(network) &&
+                              !string.IsNullOrWhiteSpace(partitionAddress)
+            ? BuildPartitionFilter($"{strategy}|{exchange}|{network}|{partitionAddress}")
+            : null;
+
+        var tableClient = tableServiceClient.GetTableClient(UserTradesTableName);
+        return await QueryFilteredEntitiesPageAsync(
+            tableClient,
+            partitionFilter,
+            pageSize,
+            continuationToken,
+            ToUserTradeQueryItem,
+            item => Matches(item.StrategyName, strategy) &&
+                    Matches(item.Exchange, exchange) &&
+                    Matches(item.Network, network) &&
+                    Matches(item.Address, address) &&
+                    Matches(item.VaultAddress, vaultAddress) &&
+                    Matches(item.Symbol, symbol) &&
+                    Matches(item.ExchangeSymbol, exchangeSymbol) &&
+                    Matches(item.ClientOrderId, clientOrderId) &&
+                    Matches(item.Hash, hash) &&
+                    (!long.TryParse(orderId, out var expectedOrderId) || item.OrderId == expectedOrderId) &&
+                    (!long.TryParse(tradeId, out var expectedTradeId) || item.TradeId == expectedTradeId) &&
                     (!from.HasValue || item.TimestampUtc >= from.Value) &&
                     (!to.HasValue || item.TimestampUtc <= to.Value),
             cancellationToken);
@@ -368,6 +477,39 @@ public sealed class StorageQueryFunctions(
             GetString(entity, "PayloadJson"));
     }
 
+    private static UserTradeQueryItem ToUserTradeQueryItem(TableEntity entity)
+    {
+        return new UserTradeQueryItem(
+            entity.PartitionKey,
+            entity.RowKey,
+            GetString(entity, "StrategyName"),
+            GetString(entity, "Exchange"),
+            GetString(entity, "Network"),
+            GetString(entity, "Address"),
+            GetNullableString(entity, "VaultAddress"),
+            GetDateTimeOffset(entity, "TimestampUtc"),
+            GetString(entity, "ExchangeSymbol"),
+            GetNullableString(entity, "Symbol"),
+            GetNullableString(entity, "SymbolType"),
+            GetNullableString(entity, "Direction"),
+            GetNullableString(entity, "Hash"),
+            GetNullableInt64(entity, "OrderId"),
+            GetString(entity, "Price"),
+            GetNullableString(entity, "OrderSide"),
+            GetNullableString(entity, "StartPosition"),
+            GetString(entity, "Quantity"),
+            GetString(entity, "Fee"),
+            GetNullableString(entity, "FeeToken"),
+            GetNullableString(entity, "BuilderFee"),
+            GetNullableString(entity, "ClosedPnl"),
+            GetNullableBool(entity, "Crossed") ?? false,
+            GetNullableInt64(entity, "TradeId"),
+            GetNullableInt64(entity, "TwapId"),
+            GetNullableString(entity, "ClientOrderId"),
+            GetNullableString(entity, "LiquidationJson"),
+            GetString(entity, "RawJson"));
+    }
+
     private static bool Matches(string? actual, string? expected) =>
         string.IsNullOrWhiteSpace(expected) ||
         string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase);
@@ -418,6 +560,19 @@ public sealed class StorageQueryFunctions(
 
     private static int GetInt32(TableEntity entity, string property) =>
         entity.TryGetValue(property, out var value) && value is int parsed ? parsed : 0;
+
+    private static long? GetNullableInt64(TableEntity entity, string property)
+    {
+        if (!entity.TryGetValue(property, out var value))
+            return null;
+
+        return value switch
+        {
+            long parsed => parsed,
+            int parsed => parsed,
+            _ => null
+        };
+    }
 
     private static bool? GetNullableBool(TableEntity entity, string property) =>
         entity.TryGetValue(property, out var value) && value is bool parsed ? parsed : null;
