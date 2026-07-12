@@ -66,7 +66,15 @@ public sealed class TradeIngestionDurableWorkflow(
             request.RequestedAtUtc,
             request.EndUtc);
 
-        return await ingestionService.PlanAsync(request.EndUtc, cancellationToken);
+        var plan = await ingestionService.PlanAsync(request.EndUtc, cancellationToken);
+        logger.LogInformation(
+            "Planned durable trade ingestion for strategy {Strategy}: {WindowCount} window(s), {StartUtc} to {EndUtc}",
+            request.StrategyKey,
+            plan.Windows.Count,
+            plan.StartUtc,
+            plan.EndUtc);
+
+        return plan;
     }
 
     [Function(WindowActivityName)]
@@ -82,9 +90,18 @@ public sealed class TradeIngestionDurableWorkflow(
             request.StartUtc,
             request.EndUtc);
 
-        return await ingestionService.IngestWindowAsync(
+        var result = await ingestionService.IngestWindowAsync(
             new UserTradeIngestionWindow(request.StartUtc, request.EndUtc),
             cancellationToken);
+
+        logger.LogInformation(
+            "Completed durable trade ingestion window for strategy {Strategy}: {TradeCount} trade(s), {StartUtc} to {EndUtc}",
+            request.StrategyKey,
+            result.TradeCount,
+            result.StartUtc,
+            result.EndUtc);
+
+        return result;
     }
 
     [Function(CompleteActivityName)]
@@ -104,12 +121,22 @@ public sealed class TradeIngestionDurableWorkflow(
                 request.StartUtc,
                 request.EndUtc);
 
-            return await ingestionService.CompleteAsync(
+            var result = await ingestionService.CompleteAsync(
                 request.StartUtc,
                 request.EndUtc,
                 request.WindowCount,
                 request.TradeCount,
                 cancellationToken);
+
+            logger.LogInformation(
+                "Completed durable trade ingestion for strategy {Strategy}: {TradeCount} trade(s) across {WindowCount} window(s), {StartUtc} to {EndUtc}",
+                request.StrategyKey,
+                result.TradeCount,
+                result.WindowCount,
+                result.StartUtc,
+                result.EndUtc);
+
+            return result;
         }
         catch (Exception ex)
         {
