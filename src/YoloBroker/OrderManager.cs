@@ -131,6 +131,17 @@ public sealed class OrderManager : IOrderManager
             if (order == null)
                 return null;
 
+            if (tracker.CurrentOrder is { } currentOrder && order.Id != currentOrder.Id)
+            {
+                _logger.LogInformation(
+                    "Ignoring stale order update for ClientOrderId {ClientOrderId}: received OrderId={OrderId}, current OrderId={CurrentOrderId}, Status={Status}",
+                    evt.ClientOrderId,
+                    order.Id,
+                    currentOrder.Id,
+                    order.OrderStatus);
+                return null;
+            }
+
             tracker.AddOrder(order);
 
             if (tracker.IsCompleted())
