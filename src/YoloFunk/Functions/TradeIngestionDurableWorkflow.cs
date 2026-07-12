@@ -21,13 +21,15 @@ public sealed class TradeIngestionDurableWorkflow(
     public static async Task RunTradeIngestionOrchestrator([OrchestrationTrigger] TaskOrchestrationContext context)
     {
         var input = context.GetInput<TradeIngestionRequest>() ?? throw new InvalidOperationException("Missing orchestration input.");
+        var retryOptions = CreateActivityRetryOptions();
         var plan = await context.CallActivityAsync<UserTradeIngestionPlan>(
             PlanActivityName,
             new TradeIngestionPlanActivityRequest(
                 input.StrategyKey,
                 input.Trigger,
                 input.RequestedAtUtc,
-                context.CurrentUtcDateTime));
+                context.CurrentUtcDateTime),
+            retryOptions);
 
         var tradeCount = 0;
         foreach (var window in plan.Windows)
@@ -37,7 +39,8 @@ public sealed class TradeIngestionDurableWorkflow(
                 new TradeIngestionWindowActivityRequest(
                     input.StrategyKey,
                     window.StartUtc,
-                    window.EndUtc));
+                    window.EndUtc),
+                retryOptions);
 
             tradeCount += windowResult.TradeCount;
         }
@@ -49,7 +52,18 @@ public sealed class TradeIngestionDurableWorkflow(
                 plan.StartUtc,
                 plan.EndUtc,
                 plan.Windows.Count,
-                tradeCount));
+                tradeCount),
+            retryOptions);
+    }
+
+    private static TaskOptions CreateActivityRetryOptions()
+    {
+        return TaskOptions.FromRetryPolicy(new RetryPolicy(
+            maxNumberOfAttempts: 5,
+            firstRetryInterval: TimeSpan.FromSeconds(5),
+            backoffCoefficient: 2,
+            maxRetryInterval: TimeSpan.FromMinutes(1),
+            retryTimeout: TimeSpan.FromMinutes(5)));
     }
 
     [Function(PlanActivityName)]
