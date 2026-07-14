@@ -93,19 +93,19 @@ Only secrets for local Azure Functions development:
 
 **Note:** Double-underscore `__` syntax is required for Azure Functions local CLI.
 
-### Azure App Settings (Production)
+### Azure App Settings
 
-Only override secrets - all other config comes from appsettings.json in deployment:
+Only override secrets; all other config comes from `appsettings.json`. Development and production use separate Key Vaults with identical secret names:
 
 ```bash
 az functionapp config appsettings set \
   --name yolo-funk-prod \
-  --resource-group ResourceGroup1 \
+  --resource-group <production-resource-group> \
   --settings \
-    "Strategies__YoloDaily__Hyperliquid__Address=@Microsoft.KeyVault(VaultName=YOLO;SecretName=hyperliquid-prod-agent-address)" \
-    "Strategies__YoloDaily__Hyperliquid__PrivateKey=@Microsoft.KeyVault(VaultName=YOLO;SecretName=hyperliquid-prod-agent-privatekey)" \
-    "Strategies__YoloDaily__Hyperliquid__VaultAddress=@Microsoft.KeyVault(VaultName=YOLO;SecretName=hyperliquid-prod-vault-yolodaily)" \
-    "Strategies__YoloDaily__RobotWealth__ApiKey=@Microsoft.KeyVault(VaultName=YOLO;SecretName=robotwealth-api-key)"
+    "Strategies__YoloDaily__Hyperliquid__Address=@Microsoft.KeyVault(VaultName=<production-vault>;SecretName=hyperliquid-agent-address)" \
+    "Strategies__YoloDaily__Hyperliquid__PrivateKey=@Microsoft.KeyVault(VaultName=<production-vault>;SecretName=hyperliquid-agent-privatekey)" \
+    "Strategies__YoloDaily__Hyperliquid__VaultAddress=@Microsoft.KeyVault(VaultName=<production-vault>;SecretName=hyperliquid-vault-yolodaily)" \
+    "Strategies__YoloDaily__RobotWealth__ApiKey=@Microsoft.KeyVault(VaultName=<production-vault>;SecretName=robotwealth-api-key)"
 ```
 
 ## Configuration Merge Order

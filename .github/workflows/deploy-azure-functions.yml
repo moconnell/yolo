@@ -8,24 +8,10 @@ on:
     branches:
       - master
       - develop
-    paths:
-      - "Directory.*.props"
-      - "Yolo.slnx"
-      - "src/YoloFunk/**"
-      - ".azure/**"
-      - ".github/workflows/deploy-azure-functions.yml"
-  pull_request:
-    types: [opened, synchronize, reopened]
-    paths:
-      - "Directory.*.props"
-      - "Yolo.slnx"
-      - "src/YoloFunk/**"
-      - ".azure/**"
-      - ".github/workflows/deploy-azure-functions.yml"
   workflow_dispatch:
     inputs:
       environment:
-        description: "Environment to deploy to"
+        description: Environment to redeploy
         required: true
         type: choice
         options:
@@ -34,256 +20,110 @@ on:
 
 env:
   DOTNET_VERSION: "10.0.x"
-  FUNCTION_PROJECT: "src/YoloFunk/YoloFunk.csproj"
-  AZURE_KEYVAULT_NAME: ${{ vars.AZURE_KEYVAULT_NAME || 'YOLO' }}
+  FUNCTION_PROJECT: src/YoloFunk/YoloFunk.csproj
 
 jobs:
-  determine-environment:
+  select-environment:
     runs-on: ubuntu-latest
     outputs:
-      environment: ${{ steps.set-env.outputs.environment }}
-      function-app-name: ${{ steps.set-env.outputs.function-app-name }}
-      hyperliquid-network: ${{ steps.set-env.outputs.hyperliquid-network }}
-      deploy: ${{ steps.set-env.outputs.deploy }}
+      environment: ${{ steps.select.outputs.environment }}
+      github-environment: ${{ steps.select.outputs.github-environment }}
+      hyperliquid-network: ${{ steps.select.outputs.hyperliquid-network }}
     steps:
-      - name: Determine environment
-        id: set-env
+      - name: Select and validate environment
+        id: select
+        shell: bash
         run: |
-          # Manual dispatch takes precedence
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            ENV="${{ github.event.inputs.environment }}"
-            echo "environment=$ENV" >> $GITHUB_OUTPUT
-            echo "function-app-name=yolo-funk-$ENV" >> $GITHUB_OUTPUT
-            if [ "$ENV" = "prod" ]; then
-              echo "hyperliquid-network=mainnet" >> $GITHUB_OUTPUT
-            else
-              echo "hyperliquid-network=testnet" >> $GITHUB_OUTPUT
-            fi
-            echo "deploy=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          # Pull requests create ephemeral environments
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            # Skip deployment for Dependabot PRs (they don't have access to secrets)
-            if [ "${{ github.actor }}" = "dependabot[bot]" ]; then
-              echo "Skipping deployment for Dependabot PR"
-              echo "deploy=false" >> $GITHUB_OUTPUT
-              exit 0
-            fi
-            
-            ENV="pr-${{ github.event.pull_request.number }}"
-            echo "environment=$ENV" >> $GITHUB_OUTPUT
-            echo "function-app-name=yolo-funk-$ENV" >> $GITHUB_OUTPUT
-            echo "hyperliquid-network=testnet" >> $GITHUB_OUTPUT
-            echo "deploy=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          # Branch-based deployment
-          if [ "${{ github.ref }}" = "refs/heads/master" ]; then
-            echo "environment=prod" >> $GITHUB_OUTPUT
-            echo "function-app-name=yolo-funk-prod" >> $GITHUB_OUTPUT
-            echo "hyperliquid-network=mainnet" >> $GITHUB_OUTPUT
-            echo "deploy=true" >> $GITHUB_OUTPUT
-          elif [ "${{ github.ref }}" = "refs/heads/develop" ]; then
-            echo "environment=dev" >> $GITHUB_OUTPUT
-            echo "function-app-name=yolo-funk-dev" >> $GITHUB_OUTPUT
-            echo "hyperliquid-network=testnet" >> $GITHUB_OUTPUT
-            echo "deploy=true" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.ref }}" == refs/heads/feat* ]]; then
-            # Extract branch name and sanitize for Azure naming
-            # Handles both feat/* and feature/* patterns
-            BRANCH_NAME=$(echo "${{ github.ref }}" | sed 's/refs\/heads\/feat[^\/]*\///' | sed 's/[^a-zA-Z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | cut -c1-20 | sed 's/-$//')
-            ENV="feat-$BRANCH_NAME"
-            echo "environment=$ENV" >> $GITHUB_OUTPUT
-            echo "function-app-name=yolo-funk-$ENV" >> $GITHUB_OUTPUT
-            echo "hyperliquid-network=testnet" >> $GITHUB_OUTPUT
-            echo "deploy=true" >> $GITHUB_OUTPUT
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            ENVIRONMENT="${{ inputs.environment }}"
+          elif [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
+            ENVIRONMENT="prod"
+          elif [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+            ENVIRONMENT="dev"
           else
-            echo "deploy=false" >> $GITHUB_OUTPUT
-          fi
-
-  provision-infrastructure:
-    needs: determine-environment
-    if: needs.determine-environment.outputs.deploy == 'true'
-    runs-on: ubuntu-latest
-    environment: ${{ needs.determine-environment.outputs.environment == 'prod' && 'production' || 'development' }}
-    outputs:
-      function-app-name: ${{ steps.deploy-infra.outputs.functionAppName }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Verify GitHub Service Principal Can Manage Key Vault Role Assignments
-        if: env.AZURE_KEYVAULT_NAME != ''
-        run: |
-          ROLE_ASSIGNMENT_ADMIN_ROLE="User Access Administrator"
-
-          # Get the service principal's object ID from the logged-in account.
-          SP_OBJECT_ID=$(az ad sp show --id $(az account show --query user.name -o tsv) --query id -o tsv)
-
-          KEYVAULT_ID=$(az keyvault show \
-            --name "${{ env.AZURE_KEYVAULT_NAME }}" \
-            --query id \
-            --output tsv)
-
-          ROLE_ASSIGNMENT_ADMIN=$(az role assignment list \
-            --assignee "$SP_OBJECT_ID" \
-            --scope "$KEYVAULT_ID" \
-            --include-inherited \
-            --query "[?roleDefinitionName=='$ROLE_ASSIGNMENT_ADMIN_ROLE' || roleDefinitionName=='Owner'].id | [0]" \
-            --output tsv)
-
-          if [ -z "$ROLE_ASSIGNMENT_ADMIN" ]; then
-            echo "❌ The GitHub Actions Azure service principal ($SP_OBJECT_ID) cannot manage role assignments on Key Vault ${{ env.AZURE_KEYVAULT_NAME }}."
-            echo "Grant it '$ROLE_ASSIGNMENT_ADMIN_ROLE' at Key Vault scope, or Owner at an inherited scope, then rerun this workflow."
-            echo ""
-            echo "Example:"
-            echo "az role assignment create --assignee-object-id $SP_OBJECT_ID --assignee-principal-type ServicePrincipal --role '$ROLE_ASSIGNMENT_ADMIN_ROLE' --scope '$KEYVAULT_ID'"
+            echo "Unsupported deployment ref: ${{ github.ref }}"
             exit 1
           fi
 
-          echo "✅ GitHub Actions service principal can manage Key Vault role assignments"
-
-      - name: Ensure Resource Group exists
-        run: |
-          az group create \
-            --name ${{ vars.AZURE_RESOURCE_GROUP }} \
-            --location ${{ vars.AZURE_LOCATION }} \
-            --tags Environment=${{ needs.determine-environment.outputs.environment }} ManagedBy=GitHub
-
-      - name: Deploy shared Application Insights (if not exists)
-        run: |
-          if ! az monitor app-insights component show \
-            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
-            --app yolo-funk-insights 2>/dev/null; then
-            az deployment group create \
-              --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
-              --template-file .azure/app-insights.bicep \
-              --parameters location=${{ vars.AZURE_LOCATION }}
+          if [[ "$ENVIRONMENT" == "prod" ]]; then
+            EXPECTED_REF="refs/heads/master"
+            GITHUB_ENVIRONMENT="production"
+            NETWORK="mainnet"
+          else
+            EXPECTED_REF="refs/heads/develop"
+            GITHUB_ENVIRONMENT="development"
+            NETWORK="testnet"
           fi
 
-      - name: Deploy Function App Infrastructure
-        id: deploy-infra
-        run: |
-          # Set Key Vault name if configured
-          KEYVAULT_PARAM=""
-          if [ -n "${{ env.AZURE_KEYVAULT_NAME }}" ]; then
-            KEYVAULT_PARAM="keyVaultName=${{ env.AZURE_KEYVAULT_NAME }}"
-          fi
-
-          OUTPUT=$(az deployment group create \
-            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
-            --template-file .azure/function-app.bicep \
-            --parameters \
-              environmentName=${{ needs.determine-environment.outputs.environment }} \
-              location=${{ vars.AZURE_LOCATION }} \
-              hyperliquidNetwork=${{ needs.determine-environment.outputs.hyperliquid-network }} \
-              $KEYVAULT_PARAM \
-            --query 'properties.outputs' \
-            --output json)
-
-          FUNCTION_APP_NAME=$(echo $OUTPUT | jq -r '.functionAppName.value')
-          PRINCIPAL_ID=$(echo $OUTPUT | jq -r '.principalId.value')
-
-          echo "functionAppName=$FUNCTION_APP_NAME" >> $GITHUB_OUTPUT
-          echo "principalId=$PRINCIPAL_ID" >> $GITHUB_OUTPUT
-          echo "Deployed: $FUNCTION_APP_NAME"
-
-      - name: Grant Key Vault Access
-        if: env.AZURE_KEYVAULT_NAME != ''
-        run: |
-          PRINCIPAL_ID="${{ steps.deploy-infra.outputs.principalId }}"
-          ROLE_NAME="Key Vault Secrets User"
-
-          if [ -z "$PRINCIPAL_ID" ] || [ "$PRINCIPAL_ID" = "null" ]; then
-            echo "❌ Function App managed identity principalId was not returned by infrastructure deployment"
+          if [[ "${{ github.ref }}" != "$EXPECTED_REF" ]]; then
+            echo "Ref ${{ github.ref }} cannot deploy environment $ENVIRONMENT; select $EXPECTED_REF."
             exit 1
           fi
 
-          # Get the Key Vault resource ID
-          KEYVAULT_ID=$(az keyvault show \
-            --name "${{ env.AZURE_KEYVAULT_NAME }}" \
-            --query id \
-            --output tsv)
+          echo "environment=$ENVIRONMENT" >> "$GITHUB_OUTPUT"
+          echo "github-environment=$GITHUB_ENVIRONMENT" >> "$GITHUB_OUTPUT"
+          echo "hyperliquid-network=$NETWORK" >> "$GITHUB_OUTPUT"
 
-          EXISTING_ASSIGNMENT=$(az role assignment list \
-            --scope "$KEYVAULT_ID" \
-            --role "$ROLE_NAME" \
-            --query "[?principalId=='$PRINCIPAL_ID'].id | [0]" \
-            --output tsv)
-
-          if [ -n "$EXISTING_ASSIGNMENT" ]; then
-            echo "✅ $ROLE_NAME already assigned to $PRINCIPAL_ID on ${{ env.AZURE_KEYVAULT_NAME }}"
-            exit 0
-          fi
-
-          # Grant Key Vault Secrets User role to the function app's managed identity.
-          # Newly-created system-assigned identities can take a short time to propagate.
-          for attempt in {1..12}; do
-            if CREATE_OUTPUT=$(az role assignment create \
-              --assignee-object-id "$PRINCIPAL_ID" \
-              --assignee-principal-type ServicePrincipal \
-              --role "$ROLE_NAME" \
-              --scope "$KEYVAULT_ID" 2>&1); then
-              echo "✅ Granted $ROLE_NAME to $PRINCIPAL_ID on ${{ env.AZURE_KEYVAULT_NAME }}"
-              exit 0
-            fi
-
-            echo "$CREATE_OUTPUT"
-
-            if echo "$CREATE_OUTPUT" | grep -q "AuthorizationFailed"; then
-              echo "❌ The GitHub Actions Azure service principal cannot create role assignments at Key Vault scope."
-              echo "Grant it 'User Access Administrator' at Key Vault scope, or Owner at an inherited scope, then rerun this workflow."
-              exit 1
-            fi
-
-            echo "Role assignment attempt $attempt failed; waiting for managed identity propagation..."
-            sleep 10
-          done
-
-          echo "❌ Failed to grant $ROLE_NAME to $PRINCIPAL_ID on ${{ env.AZURE_KEYVAULT_NAME }}"
-          exit 1
-
-      - name: Deploy Alert Rules (production only)
-        if: needs.determine-environment.outputs.environment == 'prod' && vars.ALERT_EMAIL != ''
-        run: |
-          echo "Deploying alert rules for production..."
-          az deployment group create \
-            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
-            --template-file .azure/alert-rules.bicep \
-            --name "alert-rules-$(date +%s)" \
-            --parameters \
-              functionAppName=${{ steps.deploy-infra.outputs.functionAppName }} \
-              alertEmail=${{ vars.ALERT_EMAIL }} \
-              location=${{ vars.AZURE_LOCATION }}
-
-  build-and-deploy:
-    permissions:
-      contents: read
-      pull-requests: write
-    needs: [determine-environment, provision-infrastructure]
-    if: needs.determine-environment.outputs.deploy == 'true'
+  deploy:
+    needs: select-environment
     runs-on: ubuntu-latest
-    environment: ${{ needs.determine-environment.outputs.environment == 'prod' && 'production' || 'development' }}
+    environment: ${{ needs.select-environment.outputs.github-environment }}
     env:
+      DEPLOYMENT_ENVIRONMENT: ${{ needs.select-environment.outputs.environment }}
+      HYPERLIQUID_NETWORK: ${{ needs.select-environment.outputs.hyperliquid-network }}
       PUBLISH_DIR: ${{ github.workspace }}/publish
     steps:
-      - name: Checkout code
+      - name: Checkout exact deployment commit
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Verify deployment commit
+        shell: bash
+        run: |
+          CHECKED_OUT_SHA=$(git rev-parse HEAD)
+          if [[ "$CHECKED_OUT_SHA" != "${{ github.sha }}" ]]; then
+            echo "Checked out $CHECKED_OUT_SHA, expected ${{ github.sha }}"
+            exit 1
+          fi
+          echo "Deploying $CHECKED_OUT_SHA to $DEPLOYMENT_ENVIRONMENT"
+
+      - name: Verify production promotion source
+        if: env.DEPLOYMENT_ENVIRONMENT == 'prod'
+        shell: bash
+        run: |
+          if ! SECOND_PARENT=$(git rev-parse "${{ github.sha }}^2" 2>/dev/null); then
+            echo "Production commits must be merge commits from a develop release PR."
+            exit 1
+          fi
+
+          git fetch origin develop
+          if ! git merge-base --is-ancestor "$SECOND_PARENT" origin/develop; then
+            echo "The production merge commit's source is not part of develop."
+            exit 1
+          fi
+
+      - name: Validate environment configuration
+        shell: bash
+        run: |
+          for variable in AZURE_RESOURCE_GROUP AZURE_LOCATION AZURE_KEYVAULT_NAME; do
+            if [[ -z "${!variable}" ]]; then
+              echo "Missing GitHub environment variable: $variable"
+              exit 1
+            fi
+          done
+        env:
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+          AZURE_KEYVAULT_NAME: ${{ vars.AZURE_KEYVAULT_NAME }}
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Restore dependencies
+      - name: Restore
         run: dotnet restore ${{ env.FUNCTION_PROJECT }}
 
       - name: Build
@@ -293,83 +133,155 @@ jobs:
         run: dotnet publish ${{ env.FUNCTION_PROJECT }} --configuration Release --no-build --output ${{ env.PUBLISH_DIR }}
 
       - name: Verify publish output
+        shell: bash
         run: |
-          echo "Publish folder: ${{ env.PUBLISH_DIR }}"
-          ls -la ${{ env.PUBLISH_DIR }}
-          echo "----"
-          # Key files expected for Azure Functions (.NET isolated)
-          test -f ${{ env.PUBLISH_DIR }}/host.json || (echo "❌ host.json missing from publish output" && exit 1)
-          # At least one assembly/executable should exist
-          if ! ls ${{ env.PUBLISH_DIR }}/*.dll 1>/dev/null 2>&1 && ! ls ${{ env.PUBLISH_DIR }}/*.exe 1>/dev/null 2>&1 ; then
-            echo "❌ No binaries (*.dll/*.exe) found in publish output" && exit 1
-          fi
-          # Helpful for .NET isolated
-          if [ -f ${{ env.PUBLISH_DIR }}/functions.metadata ]; then
-            echo "✅ functions.metadata present"
-          else
-            echo "⚠️ functions.metadata not found (may indicate missing Worker.Sdk analyzer)"
-          fi
-          if [ -f ${{ env.PUBLISH_DIR }}/worker.config.json ]; then
-            echo "✅ worker.config.json present"
-          else
-            echo "⚠️ worker.config.json not found"
-          fi
+          test -f "$PUBLISH_DIR/host.json"
+          test -f "$PUBLISH_DIR/functions.metadata"
+          test -f "$PUBLISH_DIR/worker.config.json"
 
-      - name: Azure Login
+      - name: Azure login
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Deploy to Azure Functions
-        uses: Azure/functions-action@v1
-        with:
-          app-name: ${{ needs.provision-infrastructure.outputs.function-app-name }}
-          package: ${{ env.PUBLISH_DIR }}
-
-      - name: Get Function App URL
-        id: get-url
+      - name: Ensure resource group exists
         run: |
-          FUNCTION_URL=$(az functionapp show \
-            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
-            --name ${{ needs.provision-infrastructure.outputs.function-app-name }} \
-            --query 'defaultHostName' \
+          az group create \
+            --name "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --location "${{ vars.AZURE_LOCATION }}" \
+            --tags Environment="$DEPLOYMENT_ENVIRONMENT" ManagedBy=GitHub
+
+      - name: Deploy environment Key Vault
+        run: |
+          az deployment group create \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --template-file .azure/key-vault.bicep \
+            --parameters \
+              keyVaultName="${{ vars.AZURE_KEYVAULT_NAME }}" \
+              environmentName="$DEPLOYMENT_ENVIRONMENT" \
+              location="${{ vars.AZURE_LOCATION }}"
+
+      - name: Verify Key Vault role-assignment permissions
+        shell: bash
+        run: |
+          KEYVAULT_ID=$(az keyvault show \
+            --name "${{ vars.AZURE_KEYVAULT_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --query id --output tsv)
+
+          SP_CLIENT_ID=$(az account show --query user.name --output tsv)
+          SP_OBJECT_ID=$(az ad sp show --id "$SP_CLIENT_ID" --query id --output tsv)
+          ROLE=$(az role assignment list \
+            --assignee "$SP_OBJECT_ID" \
+            --scope "$KEYVAULT_ID" \
+            --include-inherited \
+            --query "[?roleDefinitionName=='User Access Administrator' || roleDefinitionName=='Owner'].id | [0]" \
             --output tsv)
-          echo "function-url=https://$FUNCTION_URL" >> $GITHUB_OUTPUT
-          echo "Function App URL: https://$FUNCTION_URL"
 
-      - name: Smoke Test - Health Check
-        run: |
-          sleep 30  # Wait for Function App to warm up
-          FUNCTION_URL="${{ steps.get-url.outputs.function-url }}"
-
-          # Try to get function list (admin endpoint)
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$FUNCTION_URL/admin/functions")
-
-          if [ "$STATUS" = "401" ] || [ "$STATUS" = "200" ]; then
-            echo "✅ Function App is responding (HTTP $STATUS)"
-          else
-            echo "❌ Function App health check failed (HTTP $STATUS)"
+          if [[ -z "$ROLE" ]]; then
+            echo "The deployment identity cannot manage role assignments on this environment's Key Vault."
             exit 1
           fi
 
-      - name: Comment PR with deployment URL
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: `### 🚀 Deployed to Azure Functions\n\n**Environment:** \`${{ needs.determine-environment.outputs.environment }}\`\n**Function App:** \`${{ needs.provision-infrastructure.outputs.function-app-name }}\`\n**URL:** ${{ steps.get-url.outputs.function-url }}\n**Network:** \`${{ needs.determine-environment.outputs.hyperliquid-network }}\`\n\n_This environment will be automatically cleaned up when the PR is closed._`
-            })
-
-      - name: Summary
+      - name: Deploy environment monitoring
         run: |
-          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment:** ${{ needs.determine-environment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Function App:** ${{ needs.provision-infrastructure.outputs.function-app-name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **URL:** ${{ steps.get-url.outputs.function-url }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Network:** ${{ needs.determine-environment.outputs.hyperliquid-network }}" >> $GITHUB_STEP_SUMMARY
+          az deployment group create \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --template-file .azure/app-insights.bicep \
+            --parameters location="${{ vars.AZURE_LOCATION }}" environmentName="$DEPLOYMENT_ENVIRONMENT"
+
+      - name: Deploy Function App infrastructure
+        id: infrastructure
+        shell: bash
+        run: |
+          OUTPUT=$(az deployment group create \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --template-file .azure/function-app.bicep \
+            --parameters \
+              environmentName="$DEPLOYMENT_ENVIRONMENT" \
+              location="${{ vars.AZURE_LOCATION }}" \
+              hyperliquidNetwork="$HYPERLIQUID_NETWORK" \
+              keyVaultName="${{ vars.AZURE_KEYVAULT_NAME }}" \
+            --query properties.outputs \
+            --output json)
+
+          echo "function-app-name=$(jq -r '.functionAppName.value' <<< "$OUTPUT")" >> "$GITHUB_OUTPUT"
+          echo "principal-id=$(jq -r '.principalId.value' <<< "$OUTPUT")" >> "$GITHUB_OUTPUT"
+
+      - name: Grant Function App access to its Key Vault
+        shell: bash
+        run: |
+          KEYVAULT_ID=$(az keyvault show \
+            --name "${{ vars.AZURE_KEYVAULT_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --query id --output tsv)
+          PRINCIPAL_ID="${{ steps.infrastructure.outputs.principal-id }}"
+          EXISTING=$(az role assignment list \
+            --scope "$KEYVAULT_ID" \
+            --role "Key Vault Secrets User" \
+            --query "[?principalId=='$PRINCIPAL_ID'].id | [0]" \
+            --output tsv)
+
+          if [[ -n "$EXISTING" ]]; then
+            exit 0
+          fi
+
+          for attempt in {1..12}; do
+            if az role assignment create \
+              --assignee-object-id "$PRINCIPAL_ID" \
+              --assignee-principal-type ServicePrincipal \
+              --role "Key Vault Secrets User" \
+              --scope "$KEYVAULT_ID"; then
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1
+
+      - name: Deploy production alert rules
+        if: env.DEPLOYMENT_ENVIRONMENT == 'prod' && vars.ALERT_EMAIL != ''
+        run: |
+          az deployment group create \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --template-file .azure/alert-rules.bicep \
+            --parameters \
+              functionAppName="${{ steps.infrastructure.outputs.function-app-name }}" \
+              alertEmail="${{ vars.ALERT_EMAIL }}" \
+              location="${{ vars.AZURE_LOCATION }}"
+
+      - name: Deploy application
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ steps.infrastructure.outputs.function-app-name }}
+          package: ${{ env.PUBLISH_DIR }}
+
+      - name: Smoke test
+        id: smoke-test
+        shell: bash
+        run: |
+          HOSTNAME=$(az functionapp show \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ steps.infrastructure.outputs.function-app-name }}" \
+            --query defaultHostName --output tsv)
+
+          for attempt in {1..12}; do
+            STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" "https://$HOSTNAME/admin/functions")
+            if [[ "$STATUS" == "200" || "$STATUS" == "401" ]]; then
+              echo "url=https://$HOSTNAME" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1
+
+      - name: Deployment summary
+        shell: bash
+        run: |
+          {
+            echo "## Deployment complete"
+            echo "- Environment: $DEPLOYMENT_ENVIRONMENT"
+            echo "- Commit: ${{ github.sha }}"
+            echo "- Function App: ${{ steps.infrastructure.outputs.function-app-name }}"
+            echo "- URL: ${{ steps.smoke-test.outputs.url }}"
+            echo "- Hyperliquid network: $HYPERLIQUID_NETWORK"
+          } >> "$GITHUB_STEP_SUMMARY"
