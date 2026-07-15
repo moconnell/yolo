@@ -2,6 +2,8 @@
 
 Development and production have separate Key Vaults. Both vaults use the same secret names; the selected GitHub environment determines which vault is referenced.
 
+The vault data-plane endpoint intentionally remains publicly reachable because GitHub-hosted runners and operator workstations do not have stable egress IP addresses. Public reachability does not grant access: Entra authentication and vault-scoped Azure RBAC are required. If private endpoints or static-egress runners are introduced later, change `publicNetworkAccess` and `networkAcls` together and provide operators an approved private access path before disabling public access.
+
 ## Required secrets
 
 Populate each vault with:

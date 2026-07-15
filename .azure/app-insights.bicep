@@ -2,6 +2,10 @@
 param location string = resourceGroup().location
 
 @description('Environment name (dev or prod)')
+@allowed([
+  'dev'
+  'prod'
+])
 param environmentName string
 
 @description('Tags to apply to resources')

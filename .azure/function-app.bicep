@@ -1,4 +1,8 @@
 @description('Environment name (dev or prod)')
+@allowed([
+  'dev'
+  'prod'
+])
 param environmentName string
 
 @description('Location for all resources')

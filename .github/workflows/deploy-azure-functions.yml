@@ -33,15 +33,19 @@ jobs:
       - name: Select and validate environment
         id: select
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REQUESTED_ENVIRONMENT: ${{ inputs.environment }}
+          GIT_REF: ${{ github.ref }}
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            ENVIRONMENT="${{ inputs.environment }}"
-          elif [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            ENVIRONMENT="$REQUESTED_ENVIRONMENT"
+          elif [[ "$GIT_REF" == "refs/heads/master" ]]; then
             ENVIRONMENT="prod"
-          elif [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+          elif [[ "$GIT_REF" == "refs/heads/develop" ]]; then
             ENVIRONMENT="dev"
           else
-            echo "Unsupported deployment ref: ${{ github.ref }}"
+            echo "Unsupported deployment ref: $GIT_REF"
             exit 1
           fi
 
@@ -55,8 +59,8 @@ jobs:
             NETWORK="testnet"
           fi
 
-          if [[ "${{ github.ref }}" != "$EXPECTED_REF" ]]; then
-            echo "Ref ${{ github.ref }} cannot deploy environment $ENVIRONMENT; select $EXPECTED_REF."
+          if [[ "$GIT_REF" != "$EXPECTED_REF" ]]; then
+            echo "Ref $GIT_REF cannot deploy environment $ENVIRONMENT; select $EXPECTED_REF."
             exit 1
           fi
 
@@ -71,7 +75,12 @@ jobs:
     env:
       DEPLOYMENT_ENVIRONMENT: ${{ needs.select-environment.outputs.environment }}
       HYPERLIQUID_NETWORK: ${{ needs.select-environment.outputs.hyperliquid-network }}
+      DEPLOYMENT_SHA: ${{ github.sha }}
       PUBLISH_DIR: ${{ github.workspace }}/publish
+      AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+      AZURE_KEYVAULT_NAME: ${{ vars.AZURE_KEYVAULT_NAME }}
+      ALERT_EMAIL: ${{ vars.ALERT_EMAIL }}
     steps:
       - name: Checkout exact deployment commit
         uses: actions/checkout@v4
@@ -83,8 +92,8 @@ jobs:
         shell: bash
         run: |
           CHECKED_OUT_SHA=$(git rev-parse HEAD)
-          if [[ "$CHECKED_OUT_SHA" != "${{ github.sha }}" ]]; then
-            echo "Checked out $CHECKED_OUT_SHA, expected ${{ github.sha }}"
+          if [[ "$CHECKED_OUT_SHA" != "$DEPLOYMENT_SHA" ]]; then
+            echo "Checked out $CHECKED_OUT_SHA, expected $DEPLOYMENT_SHA"
             exit 1
           fi
           echo "Deploying $CHECKED_OUT_SHA to $DEPLOYMENT_ENVIRONMENT"
@@ -93,7 +102,7 @@ jobs:
         if: env.DEPLOYMENT_ENVIRONMENT == 'prod'
         shell: bash
         run: |
-          if ! SECOND_PARENT=$(git rev-parse "${{ github.sha }}^2" 2>/dev/null); then
+          if ! SECOND_PARENT=$(git rev-parse "$DEPLOYMENT_SHA^2" 2>/dev/null); then
             echo "Production commits must be merge commits from a develop release PR."
             exit 1
           fi
@@ -113,10 +122,6 @@ jobs:
               exit 1
             fi
           done
-        env:
-          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
-          AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
-          AZURE_KEYVAULT_NAME: ${{ vars.AZURE_KEYVAULT_NAME }}
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
@@ -147,26 +152,26 @@ jobs:
       - name: Ensure resource group exists
         run: |
           az group create \
-            --name "${{ vars.AZURE_RESOURCE_GROUP }}" \
-            --location "${{ vars.AZURE_LOCATION }}" \
+            --name "$AZURE_RESOURCE_GROUP" \
+            --location "$AZURE_LOCATION" \
             --tags Environment="$DEPLOYMENT_ENVIRONMENT" ManagedBy=GitHub
 
       - name: Deploy environment Key Vault
         run: |
           az deployment group create \
-            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
             --template-file .azure/key-vault.bicep \
             --parameters \
-              keyVaultName="${{ vars.AZURE_KEYVAULT_NAME }}" \
+              keyVaultName="$AZURE_KEYVAULT_NAME" \
               environmentName="$DEPLOYMENT_ENVIRONMENT" \
-              location="${{ vars.AZURE_LOCATION }}"
+              location="$AZURE_LOCATION"
 
       - name: Verify Key Vault role-assignment permissions
         shell: bash
         run: |
           KEYVAULT_ID=$(az keyvault show \
-            --name "${{ vars.AZURE_KEYVAULT_NAME }}" \
-            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --name "$AZURE_KEYVAULT_NAME" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
             --query id --output tsv)
 
           SP_CLIENT_ID=$(az account show --query user.name --output tsv)
@@ -186,22 +191,22 @@ jobs:
       - name: Deploy environment monitoring
         run: |
           az deployment group create \
-            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
             --template-file .azure/app-insights.bicep \
-            --parameters location="${{ vars.AZURE_LOCATION }}" environmentName="$DEPLOYMENT_ENVIRONMENT"
+            --parameters location="$AZURE_LOCATION" environmentName="$DEPLOYMENT_ENVIRONMENT"
 
       - name: Deploy Function App infrastructure
         id: infrastructure
         shell: bash
         run: |
           OUTPUT=$(az deployment group create \
-            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
             --template-file .azure/function-app.bicep \
             --parameters \
               environmentName="$DEPLOYMENT_ENVIRONMENT" \
-              location="${{ vars.AZURE_LOCATION }}" \
+              location="$AZURE_LOCATION" \
               hyperliquidNetwork="$HYPERLIQUID_NETWORK" \
-              keyVaultName="${{ vars.AZURE_KEYVAULT_NAME }}" \
+              keyVaultName="$AZURE_KEYVAULT_NAME" \
             --query properties.outputs \
             --output json)
 
@@ -210,12 +215,13 @@ jobs:
 
       - name: Grant Function App access to its Key Vault
         shell: bash
+        env:
+          PRINCIPAL_ID: ${{ steps.infrastructure.outputs.principal-id }}
         run: |
           KEYVAULT_ID=$(az keyvault show \
-            --name "${{ vars.AZURE_KEYVAULT_NAME }}" \
-            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --name "$AZURE_KEYVAULT_NAME" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
             --query id --output tsv)
-          PRINCIPAL_ID="${{ steps.infrastructure.outputs.principal-id }}"
           EXISTING=$(az role assignment list \
             --scope "$KEYVAULT_ID" \
             --role "Key Vault Secrets User" \
@@ -240,14 +246,16 @@ jobs:
 
       - name: Deploy production alert rules
         if: env.DEPLOYMENT_ENVIRONMENT == 'prod' && vars.ALERT_EMAIL != ''
+        env:
+          FUNCTION_APP_NAME: ${{ steps.infrastructure.outputs.function-app-name }}
         run: |
           az deployment group create \
-            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
             --template-file .azure/alert-rules.bicep \
             --parameters \
-              functionAppName="${{ steps.infrastructure.outputs.function-app-name }}" \
-              alertEmail="${{ vars.ALERT_EMAIL }}" \
-              location="${{ vars.AZURE_LOCATION }}"
+              functionAppName="$FUNCTION_APP_NAME" \
+              alertEmail="$ALERT_EMAIL" \
+              location="$AZURE_LOCATION"
 
       - name: Deploy application
         uses: Azure/functions-action@v1
@@ -258,10 +266,12 @@ jobs:
       - name: Smoke test
         id: smoke-test
         shell: bash
+        env:
+          FUNCTION_APP_NAME: ${{ steps.infrastructure.outputs.function-app-name }}
         run: |
           HOSTNAME=$(az functionapp show \
-            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
-            --name "${{ steps.infrastructure.outputs.function-app-name }}" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$FUNCTION_APP_NAME" \
             --query defaultHostName --output tsv)
 
           for attempt in {1..12}; do
@@ -276,12 +286,15 @@ jobs:
 
       - name: Deployment summary
         shell: bash
+        env:
+          FUNCTION_APP_NAME: ${{ steps.infrastructure.outputs.function-app-name }}
+          FUNCTION_APP_URL: ${{ steps.smoke-test.outputs.url }}
         run: |
           {
             echo "## Deployment complete"
             echo "- Environment: $DEPLOYMENT_ENVIRONMENT"
-            echo "- Commit: ${{ github.sha }}"
-            echo "- Function App: ${{ steps.infrastructure.outputs.function-app-name }}"
-            echo "- URL: ${{ steps.smoke-test.outputs.url }}"
+            echo "- Commit: $DEPLOYMENT_SHA"
+            echo "- Function App: $FUNCTION_APP_NAME"
+            echo "- URL: $FUNCTION_APP_URL"
             echo "- Hyperliquid network: $HYPERLIQUID_NETWORK"
           } >> "$GITHUB_STEP_SUMMARY"
