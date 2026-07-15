@@ -1,318 +1,62 @@
 # Deployment Guide
 
-This document describes how to deploy the YOLO trading application to Azure Functions using automated CI/CD pipelines.
+YOLO uses two long-lived Azure environments. Pull requests run CI only and never receive Azure credentials or create Azure resources.
 
-## Table of Contents
+| Environment | Source branch | Function App | Hyperliquid | Deployment |
+| --- | --- | --- | --- | --- |
+| Development | `develop` | `yolo-funk-dev` | Testnet | Automatic after merge |
+| Production | `master` | `yolo-funk-prod` | Mainnet | Starts after release merge; requires approval |
 
-1. [Overview](#overview)
-2. [Environments](#environments)
-3. [Prerequisites](#prerequisites)
-4. [Initial Setup](#initial-setup)
-5. [Configuration](#configuration)
-6. [Deployment Process](#deployment-process)
-7. [Monitoring](#monitoring)
+## GitHub setup
 
-## Overview
+Create GitHub environments named `development` and `production`. Configure each with environment-scoped values so credentials and resource names cannot cross environments:
 
-The YOLO trading application uses a GitOps approach with automated deployments:
+- Secret: `AZURE_CREDENTIALS`
+- Variables: `AZURE_RESOURCE_GROUP`, `AZURE_LOCATION`, `AZURE_KEYVAULT_NAME`
+- Production-only optional variable: `ALERT_EMAIL`
 
-- **Feature branches / PRs** → Ephemeral test environments (auto-created, auto-deleted)
-- **`master` branch** → Production environment (Hyperliquid mainnet, requires approval)
+Add a required reviewer to `production`. Do not add a deployment approval to `development`.
 
-All infrastructure is provisioned automatically using Azure Bicep templates.
+Create `develop` from `master` and make it the default branch. Protect both branches:
 
-## Environments
+- Require the `.NET / build` check and at least one approving review.
+- Prevent direct pushes and force pushes.
+- Target normal and Dependabot pull requests at `develop`.
+- Use PRs from `develop` to `master` as production releases.
+- Merge release PRs with a merge commit; the production workflow rejects direct, squash, and rebase commits on `master`.
 
-| Environment  | Branch            | Azure Function App      | Hyperliquid Network | Auto-Deploy            | Auto-Cleanup   |
-| ------------ | ----------------- | ----------------------- | ------------------- | ---------------------- | -------------- |
-| PR / Feature | `feature/*` or PR | `yolo-funk-pr-{number}` | testnet             | ✅                     | ✅ on PR close |
-| Production   | `master`          | `yolo-funk-prod`        | mainnet             | ✅ (approval required) | ❌             |
+The deployment identity for each environment needs Contributor on only its resource group and User Access Administrator on that resource group (or its Key Vault). The latter allows the workflow to grant `Key Vault Secrets User` to that environment's Function App identity.
 
-## Prerequisites
+## Normal deployment flow
 
-- Azure subscription
-- Azure CLI installed locally
-- GitHub repository with Actions enabled
-- .NET 10.0 SDK
+1. Open a PR against `develop`. CI builds and runs tests excluding the `Integration` category; no Azure deployment occurs.
+2. Merge the PR. The exact resulting `develop` SHA deploys automatically to the development resource group and `yolo-funk-dev`.
+3. Observe testnet execution, Key Vault resolution, timers, storage, and telemetry.
+4. Open a release PR from `develop` to `master`.
+5. Merge the release PR. The production job waits at the protected `production` environment before any checkout, infrastructure change, or code deployment occurs.
+6. Approve the deployment. The workflow checks out and verifies the exact merge SHA, then deploys it to `yolo-funk-prod`.
 
-## Initial Setup
+Manual workflow dispatch is retained for redeployment. Select the workflow from `develop` when deploying `dev`, or from `master` when deploying `prod`; mismatched branch/environment combinations fail before Azure login. Production dispatches still require approval.
 
-### 1. Create Azure Service Principal
+## Azure layout
 
-Create a service principal for GitHub Actions to authenticate with Azure:
+Development and production use separate resource groups in the same subscription. Each resource group contains its own Function App, Consumption plan, storage account, managed identity, Key Vault, Log Analytics workspace, and Application Insights instance.
 
-```bash
-# Login to Azure
-az login
+The Bicep templates create infrastructure, including an empty RBAC-enabled Key Vault. Secret values must be populated separately before the first application deployment; see [Azure Key Vault Secrets Setup](AZURE-KEY-VAULT-SECRETS-SETUP.md).
 
-# Set your subscription
-az account set --subscription "Your Subscription Name"
+Globally scoped names must be unique. In particular, choose distinct `AZURE_KEYVAULT_NAME` values. The Function App names are fixed as `yolo-funk-dev` and `yolo-funk-prod`, while storage names are deterministically unique per resource group.
 
-# Create service principal with contributor role
-az ad sp create-for-rbac \
-  --name "github-yolo-funk" \
-  --role contributor \
-  --scopes /subscriptions/{subscription-id} \
-  --sdk-auth
+## Migration order
 
-# Output will be JSON - copy this entire output
-```
+1. Create and configure the `development` GitHub environment and its dedicated Azure identity, resource group name, location, and globally unique Key Vault name.
+2. Provision the development Key Vault, populate testnet-only secrets, and deploy `develop`.
+3. Confirm the development managed identity has access only to its own vault and validate testnet behavior and telemetry.
+4. Create the `production` GitHub environment. Point it at the existing production resource group initially so the current Function App is updated in place, not recreated.
+5. Create/populate the production-only vault with the environment-neutral secret names. Do not remove the legacy secrets until the new references resolve successfully.
+6. Merge a release PR and approve production. Verify the deployed SHA and live health before retiring the legacy shared-vault configuration.
 
-### 2. Configure GitHub Secrets
+## Rollback
 
-Add the following secrets to your GitHub repository (`Settings` → `Secrets and variables` → `Actions`):
+Production always deploys a commit on `master`. To roll back, revert the problematic release commit (or create a PR restoring the known-good state), merge it into `master`, and approve the resulting production deployment. This preserves an auditable history and prevents arbitrary unreviewed commits from reaching mainnet.
 
-| Secret Name         | Value                       | Description                                      |
-| ------------------- | --------------------------- | ------------------------------------------------ |
-| `AZURE_CREDENTIALS` | JSON from service principal | Full JSON output from `az ad sp create-for-rbac` |
-
-### 3. Configure GitHub Variables (optional)
-
-Add these variables if using Azure Key Vault:
-
-| Variable Name         | Value              | Description               |
-| --------------------- | ------------------ | ------------------------- |
-| `AZURE_KEYVAULT_NAME` | e.g., `yolo-vault` | Your Azure Key Vault name |
-
-### 4. Create Azure Key Vault (optional but recommended)
-
-```bash
-# Create Key Vault
-az keyvault create \
-  --name yolo-vault \
-  --resource-group rg-yolo-funk \
-  --location australiaeast
-
-# Add API secrets as applicable
-az keyvault secret set \
-  --vault-name yolo-vault \
-  --name "robotwealth-api-key" \
-  --value "YourApiKey"
-
-az keyvault secret set \
-  --vault-name yolo-vault \
-  --name "unravel-api-key" \
-  --value "YourApiKey"
-
-# Add secrets for development environment
-az keyvault secret set \
-  --vault-name yolo-vault \
-  --name "hyperliquid-dev-agent-address" \
-  --value "0xYourTestnetAgentAddress"
-
-az keyvault secret set \
-  --vault-name yolo-vault \
-  --name "hyperliquid-dev-agent-privatekey" \
-  --value "YourTestnetAgentPrivateKey"
-
-# Add secrets for production environment
-az keyvault secret set \
-  --vault-name yolo-vault \
-  --name "hyperliquid-prod-agent-address" \
-  --value "0xYourMainnetAgentAddress"
-
-az keyvault secret set \
-  --vault-name yolo-vault \
-  --name "hyperliquid-prod-agent-privatekey" \
-  --value "YourMainnetAgentPrivateKey"
-
-az keyvault secret set \
-  --vault-name yolo-vault \
-  --name "hyperliquid-prod-vaultaddress" \
-  --value "OxYourMainnetHyperliquidSubaccount"
-```
-
-### 5. Create GitHub Environments (for manual approvals)
-
-1. Go to `Settings` → `Environments` → `New environment`
-2. Create environment named `production`
-3. Enable "Required reviewers" and add yourself
-4. (Optional) Create `development` environment without restrictions
-
-## Configuration
-
-### Application Settings
-
-After first deployment, configure each Function App with application settings. Settings can be added via:
-
-1. **Azure Portal**: Function App → Configuration → Application settings
-2. **Azure CLI**: See examples below
-
-#### Development/PR Environment Settings
-
-Probably no overrides required - other than schedule MUST be set for each strategy or else the timed job will fail, if testing thereof is desired:
-
-```bash
-FUNCTION_APP="yolo-funk-pr-83"
-
-az functionapp config appsettings set \
-  --name $FUNCTION_APP \
-  --resource-group rg-yolo-funk \
-  --settings \
-    "Strategies__MomentumDaily__Schedule=*/5 * * * *"
-```
-
-#### Production Environment Settings
-
-Can be overridden as desired - schedule MUST be set for each strategy or else the timed job will fail:
-
-```bash
-FUNCTION_APP="yolo-funk-prod"
-
-az functionapp config appsettings set \
-  --name $FUNCTION_APP \
-  --resource-group rg-yolo-funk \
-  --settings \
-    "Strategies__MomentumDaily__Yolo__MaxLeverage=3.0" \
-    "Strategies__MomentumDaily__Yolo__NotionalCash=20000" \
-    "Strategies__MomentumDaily__Schedule=0 30 0 * * *"
-```
-
-### Local Development
-
-Create `src/YoloFunk/local.settings.json` (git-ignored):
-
-```json
-{
-  "IsEncrypted": false,
-  "Values": {
-    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
-    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
-    "Strategies__MomentumDaily__Yolo__MaxLeverage": "1.0",
-    "Strategies__MomentumDaily__Yolo__NotionalCash": "1000",
-    "Strategies__MomentumDaily__Hyperliquid__Dev__Agent__Address": "0xYourTestnetAddress",
-    "Strategies__MomentumDaily__Hyperliquid__Dev__Agent__PrivateKey": "YourTestnetPrivateKey",
-    "Strategies__MomentumDaily__RobotWealth__ApiKey": "YourApiKey",
-    "Strategies__MomentumDaily__Unravel__ApiKey": "YourApiKey",
-    "Strategies__MomentumDaily__Schedule": "0 */5 * * * *"
-  }
-}
-```
-
-## Deployment Process
-
-### Automatic Deployments
-
-#### Feature Branch / Pull Request
-
-1. Create feature branch: `git checkout -b feature/my-new-feature`
-2. Make changes and push: `git push -u origin feature/my-new-feature`
-3. Create pull request on GitHub
-4. **Automatic**: Infrastructure provisioned and code deployed to `yolo-funk-pr-{number}`
-5. PR receives comment with deployment URL
-6. Test your changes in isolated environment
-7. When PR is closed/merged to `master`: **Automatic cleanup** deletes all resources
-
-#### Production Environment
-
-1. Merge to `master` branch
-2. **Automatic**: Starts deployment workflow
-3. **Manual approval required** (via GitHub Environment protection)
-4. After approval: Deploys to `yolo-funk-prod` (mainnet)
-
-### Manual Deployments
-
-Trigger deployment manually via GitHub Actions:
-
-1. Go to `Actions` → `Deploy to Azure Functions` → `Run workflow`
-2. Select environment: `dev` or `prod`
-3. Click `Run workflow`
-
-### Manual Cleanup
-
-To cleanup a specific environment:
-
-1. Go to `Actions` → `Cleanup Azure Functions` → `Run workflow`
-2. Enter environment name (e.g., `pr-123`, `feat-my-feature`)
-3. Click `Run workflow`
-
-Note: Production (`prod`) cannot be cleaned up via automation for safety.
-
-## Monitoring
-
-### View Logs
-
-#### Azure Portal
-
-1. Navigate to Function App
-2. Go to `Log stream` or `Monitoring` → `Logs`
-3. Query Application Insights
-
-#### Azure CLI
-
-```bash
-# Get recent logs
-az monitor app-insights query \
-  --app yolo-funk-insights \
-  --resource-group rg-yolo-funk \
-  --analytics-query "traces | where timestamp > ago(1h) | order by timestamp desc | take 100"
-
-# Get errors
-az monitor app-insights query \
-  --app yolo-funk-insights \
-  --resource-group rg-yolo-funk \
-  --analytics-query "exceptions | where timestamp > ago(24h) | order by timestamp desc"
-```
-
-### Metrics
-
-View metrics in Azure Portal → Application Insights → `yolo-funk-insights`:
-
-- Request rates
-- Failure rates
-- Response times
-- Custom events from your trading strategies
-
-### Costs
-
-Monitor costs via Azure Portal → Cost Management:
-
-- Consumption Plan: Pay per execution (~$0.20 per million executions)
-- Storage: ~$0.02 per GB per month
-- Application Insights: First 5GB/month free
-
-Ephemeral PR environments are automatically cleaned up to minimize costs.
-
-## Troubleshooting
-
-### Deployment Fails
-
-1. Check GitHub Actions logs for detailed error messages
-2. Verify Azure credentials are valid: `az login` and test commands
-3. Ensure Resource Group exists: `az group show --name rg-yolo-funk`
-
-### Function App Not Starting
-
-1. Check Application Insights logs for errors
-2. Verify configuration settings (especially Key Vault references)
-3. Check that managed identity has Key Vault access:
-
-   ```bash
-   az functionapp identity show --name yolo-funk-dev --resource-group rg-yolo-funk
-   az keyvault show --name yolo-vault --query properties.accessPolicies
-   ```
-
-### Key Vault Access Denied
-
-Grant Function App managed identity access:
-
-```bash
-# Get Function App principal ID
-PRINCIPAL_ID=$(az functionapp identity show \
-  --name yolo-funk-dev \
-  --resource-group rg-yolo-funk \
-  --query principalId \
-  --output tsv)
-
-# Grant access
-az keyvault set-policy \
-  --name yolo-vault \
-  --object-id $PRINCIPAL_ID \
-  --secret-permissions get list
-```
-
-## Additional Resources
-
-- [Azure Functions Documentation](https://docs.microsoft.com/azure/azure-functions/)
-- [Azure Bicep Documentation](https://docs.microsoft.com/azure/azure-resource-manager/bicep/)
-- [GitHub Actions Documentation](https://docs.github.com/actions)
+Leaving or rejecting a production approval does not modify Azure; the existing production deployment continues running.

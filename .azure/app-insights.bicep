@@ -1,17 +1,28 @@
 @description('Location for Application Insights')
 param location string = resourceGroup().location
 
+@description('Environment name (dev or prod)')
+@allowed([
+  'dev'
+  'prod'
+])
+param environmentName string
+
 @description('Tags to apply to resources')
 param tags object = {}
 
 var appInsightsName = 'yolo-funk-insights'
 var logAnalyticsName = 'yolo-funk-logs'
+var resourceTags = union(tags, {
+  Environment: environmentName
+  ManagedBy: 'GitHub'
+})
 
 // Log Analytics Workspace (required for Application Insights)
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   name: logAnalyticsName
   location: location
-  tags: tags
+  tags: resourceTags
   properties: {
     sku: {
       name: 'PerGB2018'
@@ -20,11 +31,10 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   }
 }
 
-// Application Insights (shared across all environments)
 resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
   name: appInsightsName
   location: location
-  tags: tags
+  tags: resourceTags
   kind: 'web'
   properties: {
     Application_Type: 'web'
