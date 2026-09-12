@@ -26,20 +26,20 @@ public class DataFrameExtensionsTest
     }
 
     [Fact]
-    public void GivenQuantilesOneWithMissingValues_WhenNormalized_ShouldPreserveNaN()
+    public void GivenQuantilesOneWithMissingValues_WhenNormalized_ShouldReturnNaN()
     {
         var df = new DataFrame(new DoubleDataFrameColumn("Value", [1.0, double.NaN, 3.0]));
 
         var result = df.Normalize(CrossSectionalBins, 1);
         var values = ((DoubleDataFrameColumn)result["Value"]).ToArray();
 
-        values[0].ShouldBe(0.0);
+        double.IsNaN(values[0].GetValueOrDefault()).ShouldBeTrue();
         double.IsNaN(values[1].GetValueOrDefault()).ShouldBeTrue();
-        values[2].ShouldBe(0.0);
+        double.IsNaN(values[2].GetValueOrDefault()).ShouldBeTrue();
     }
 
     [Fact]
-    public void GivenAllZeroes_WhenCrossSectionalBinsNormalized_ShouldReturnAllZeroes()
+    public void GivenAllZeroes_WhenCrossSectionalBinsNormalized_ShouldReturnNaN()
     {
         var df = new DataFrame(new DoubleDataFrameColumn("Value", [0.0, 0.0, 0.0, 0.0]));
 
@@ -47,14 +47,11 @@ public class DataFrameExtensionsTest
         var values = ((DoubleDataFrameColumn)result["Value"]).ToArray();
 
         values.Length.ShouldBe(4);
-        values[0].ShouldBe(0.0);
-        values[1].ShouldBe(0.0);
-        values[2].ShouldBe(0.0);
-        values[3].ShouldBe(0.0);
+        values.All(value => double.IsNaN(value.GetValueOrDefault())).ShouldBeTrue();
     }
 
     [Fact]
-    public void GivenAllEqualWithMissingValues_WhenCrossSectionalBinsNormalized_ShouldReturnZeroesAndPreserveNaN()
+    public void GivenAllEqualWithMissingValues_WhenCrossSectionalBinsNormalized_ShouldReturnNaN()
     {
         var df = new DataFrame(new DoubleDataFrameColumn("Value", [5.0, double.NaN, 5.0, 5.0]));
 
@@ -62,10 +59,7 @@ public class DataFrameExtensionsTest
         var values = ((DoubleDataFrameColumn)result["Value"]).ToArray();
 
         values.Length.ShouldBe(4);
-        values[0].ShouldBe(0.0);
-        double.IsNaN(values[1].GetValueOrDefault()).ShouldBeTrue();
-        values[2].ShouldBe(0.0);
-        values[3].ShouldBe(0.0);
+        values.All(value => double.IsNaN(value.GetValueOrDefault())).ShouldBeTrue();
     }
 
     [Fact]
@@ -79,10 +73,39 @@ public class DataFrameExtensionsTest
         q2.Length.ShouldBe(q10.Length);
         for (var i = 0; i < q2.Length; i++)
         {
-            q2[i].ShouldBe(0.0);
-            q10[i].ShouldBe(0.0);
-            q2[i].ShouldBe(q10[i]);
+            double.IsNaN(q2[i].GetValueOrDefault()).ShouldBeTrue();
+            double.IsNaN(q10[i].GetValueOrDefault()).ShouldBeTrue();
         }
+    }
+
+    [Fact]
+    public void GivenTiedValues_WhenCrossSectionalBinsNormalized_ShouldMatchPandasQcut()
+    {
+        var df = new DataFrame(new DoubleDataFrameColumn("Value", [0.0, 0.0, 0.0, 1.0, 1.0, 2.0, 2.0, 2.0]));
+
+        var result = df.Normalize(CrossSectionalBins, 4);
+        var values = ((DoubleDataFrameColumn)result["Value"]).ToArray();
+
+        values.ShouldBe([
+            -0.125, -0.125, -0.125, -0.125, -0.125,
+             0.125,  0.125,  0.125
+        ]);
+    }
+
+    [Fact]
+    public void GivenTiedValuesAndMissingValue_WhenCrossSectionalBinsNormalized_ShouldMatchPandasQcut()
+    {
+        var df = new DataFrame(new DoubleDataFrameColumn("Value", [1.0, double.NaN, 1.0, 2.0, 2.0, 3.0]));
+
+        var result = df.Normalize(CrossSectionalBins, 4);
+        var values = ((DoubleDataFrameColumn)result["Value"]).ToArray();
+
+        values[0].ShouldBe(-0.2);
+        double.IsNaN(values[1].GetValueOrDefault()).ShouldBeTrue();
+        values[2].ShouldBe(-0.2);
+        values[3].ShouldBe(-0.2);
+        values[4].ShouldBe(-0.2);
+        values[5].ShouldBe(0.2);
     }
 
     [Fact]
