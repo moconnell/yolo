@@ -1,4 +1,8 @@
-@description('Environment name (dev, prod, or pr-{number})')
+@description('Environment name (dev or prod)')
+@allowed([
+  'dev'
+  'prod'
+])
 param environmentName string
 
 @description('Location for all resources')
@@ -11,8 +15,8 @@ param location string = resourceGroup().location
 ])
 param hyperliquidNetwork string = 'testnet'
 
-@description('Key Vault name for secrets (optional)')
-param keyVaultName string = ''
+@description('Name of the Key Vault dedicated to this environment')
+param keyVaultName string
 
 @description('Tags to apply to all resources')
 param tags object = {}
@@ -20,17 +24,11 @@ param tags object = {}
 var functionAppName = 'yolo-funk-${environmentName}'
 var storageAccountName = 'yolofunk${uniqueString(resourceGroup().id, environmentName)}'
 var appInsightsName = 'yolo-funk-insights'
-var contentShareName = contains([
-  'dev'
-  'prod'
-], environmentName) ? toLower(functionAppName) : 'yolofunk${uniqueString(resourceGroup().id, environmentName)}'
-
-// Determine secret suffix based on network (testnet or mainnet)
-var secretEnv = hyperliquidNetwork == 'mainnet' ? 'prod' : 'dev'
+var contentShareName = toLower(functionAppName)
 var useTestnet = hyperliquidNetwork == 'mainnet' ? 'false' : 'true'
 
 // Key Vault reference helper
-var keyVaultUri = !empty(keyVaultName) ? 'https://${keyVaultName}${environment().suffixes.keyvaultDns}' : ''
+var keyVaultUri = 'https://${keyVaultName}${environment().suffixes.keyvaultDns}'
 
 // Merge environment tags with provided tags
 var resourceTags = union(tags, {
@@ -54,7 +52,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   }
 }
 
-// Application Insights (shared across environments for cost savings)
+// Each environment has an identically named instance in its own resource group.
 resource appInsights 'Microsoft.Insights/components@2020-02-02' existing = {
   name: appInsightsName
 }
@@ -122,21 +120,15 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
         }
         {
           name: 'Strategies__YoloDaily__Hyperliquid__Address'
-          value: !empty(keyVaultName)
-            ? '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/hyperliquid-${secretEnv}-agent-address/)'
-            : ''
+          value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/hyperliquid-agent-address/)'
         }
         {
           name: 'Strategies__YoloDaily__Hyperliquid__PrivateKey'
-          value: !empty(keyVaultName)
-            ? '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/hyperliquid-${secretEnv}-agent-privatekey/)'
-            : ''
+          value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/hyperliquid-agent-privatekey/)'
         }
         {
           name: 'Strategies__YoloDaily__Hyperliquid__VaultAddress'
-          value: !empty(keyVaultName)
-            ? '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/hyperliquid-${secretEnv}-vault-yolodaily/)'
-            : ''
+          value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/hyperliquid-vault-yolodaily/)'
         }
         {
           name: 'Strategies__YoloDaily__Hyperliquid__UseTestnet'
@@ -144,21 +136,15 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
         }
         {
           name: 'Strategies__UnravelDaily__Hyperliquid__Address'
-          value: !empty(keyVaultName)
-            ? '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/hyperliquid-${secretEnv}-agent-address/)'
-            : ''
+          value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/hyperliquid-agent-address/)'
         }
         {
           name: 'Strategies__UnravelDaily__Hyperliquid__PrivateKey'
-          value: !empty(keyVaultName)
-            ? '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/hyperliquid-${secretEnv}-agent-privatekey/)'
-            : ''
+          value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/hyperliquid-agent-privatekey/)'
         }
         {
           name: 'Strategies__UnravelDaily__Hyperliquid__VaultAddress'
-          value: !empty(keyVaultName)
-            ? '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/hyperliquid-${secretEnv}-vault-unraveldaily/)'
-            : ''
+          value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/hyperliquid-vault-unraveldaily/)'
         }
         {
           name: 'Strategies__UnravelDaily__Hyperliquid__UseTestnet'
@@ -166,13 +152,11 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
         }
         {
           name: 'Strategies__YoloDaily__RobotWealth__ApiKey'
-          value: !empty(keyVaultName)
-            ? '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/robotwealth-api-key/)'
-            : ''
+          value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/robotwealth-api-key/)'
         }
         {
           name: 'Strategies__UnravelDaily__Unravel__ApiKey'
-          value: !empty(keyVaultName) ? '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/unravel-api-key/)' : ''
+          value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}/secrets/unravel-api-key/)'
         }
         {
           name: 'Strategies__YoloDaily__Schedule'
