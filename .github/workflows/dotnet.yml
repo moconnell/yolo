@@ -13,6 +13,7 @@ permissions:
 
 jobs:
   build:
+    environment: ${{ github.event_name == 'push' && github.ref == 'refs/heads/develop' && 'development' || '' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -25,13 +26,24 @@ jobs:
         run: dotnet restore
       - name: Build
         run: dotnet build --no-restore
-      - name: Test
-        run: dotnet test --no-build --verbosity normal --filter "Category!=Integration" --collect:"XPlat Code Coverage" --results-directory ./coverage
+      - name: Test (pull requests and production)
+        if: github.event_name != 'push' || github.ref != 'refs/heads/develop'
+        run: dotnet test --no-build --verbosity normal --filter "Category!=Integration"
+      - name: Test (development, including integration tests)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        env:
+          HYPERLIQUID__ADDRESS: ${{ secrets.HYPERLIQUID__ADDRESS }}
+          HYPERLIQUID__PRIVATEKEY: ${{ secrets.HYPERLIQUID__PRIVATEKEY }}
+          ROBOTWEALTH__APIKEY: ${{ secrets.ROBOTWEALTH__APIKEY }}
+          UNRAVEL__APIKEY: ${{ secrets.UNRAVEL__APIKEY }}
+        run: dotnet test --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage
       - name: Merge coverage reports
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
         run: |
           dotnet tool install -g dotnet-reportgenerator-globaltool
           reportgenerator -reports:./coverage/*/coverage.cobertura.xml -targetdir:./coverage/merged -reporttypes:Cobertura -classfilters:"+*" -filefilters:"+**/src/**;-**/test/**;-**/obj/**;-**/Program.cs"
       - name: Publish coverage report to coveralls.io
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
         uses: coverallsapp/github-action@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
