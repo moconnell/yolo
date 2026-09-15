@@ -94,59 +94,72 @@ public static class DataFrameExtensions
         if (items.Count == 0)
             return [.. Enumerable.Repeat(double.NaN, (int)col.Length)];
 
-        var minValue = items.Min(x => x.Value);
-        var maxValue = items.Max(x => x.Value);
-        if (Math.Abs(maxValue - minValue) < 1e-10)
-        {
-            return EmptyArray(col, items, items.Count);
-        }
+        var sortedValues = items.Select(x => x.Value).Order().ToArray();
+        var edges = Enumerable.Range(0, quantiles + 1)
+            .Select(i => Quantile(sortedValues, i / (double)quantiles))
+            .Distinct()
+            .ToArray();
 
-        // qcut behaviour
-        items.Sort((a, b) => a.Value.CompareTo(b.Value));
+        // pandas.qcut(..., duplicates: "drop") has no usable interval when every
+        // quantile edge is identical. Preserve missing values and mark all valid
+        // observations as NaN so an uninformative factor is excluded downstream.
+        if (edges.Length < 2)
+            return [.. Enumerable.Repeat(double.NaN, (int)col.Length)];
 
-        int n = items.Count;
-        var bins = new int[n];
-
-        for (int k = 0; k < n; k++)
-        {
-            var b = (int)Math.Floor((k + 1) / (double)n * quantiles) - 1;
-            if (b < 0) b = 0;
-            if (b > quantiles - 1) b = quantiles - 1;
-            bins[k] = b;
-        }
-
-        int maxBin = bins.Max();
+        var innerEdges = edges[1..^1];
+        var maxBin = edges.Length - 2;
         if (maxBin <= 0)
-        {
-            return EmptyArray(col, items, n);
-        }
+            return [.. Enumerable.Repeat(double.NaN, (int)col.Length)];
 
-        var weights = new double[n];
-        for (int k = 0; k < n; k++)
-            weights[k] = 2.0 * (bins[k] / (double)maxBin) - 1.0;
+        var weights = new double[items.Count];
+        for (var k = 0; k < items.Count; k++)
+        {
+            // qcut intervals are right-closed: a value equal to a boundary stays
+            // in the lower bin. Equal values therefore always receive equal bins.
+            var bin = LowerBound(innerEdges, items[k].Value);
+            weights[k] = 2.0 * (bin / (double)maxBin) - 1.0;
+        }
 
         // L1 normalisation
         var denom = weights.Sum(w => Math.Abs(w));
         if (denom <= 0)
-        {
-            return EmptyArray(col, items, n);
-        }
+            return [.. Enumerable.Repeat(double.NaN, (int)col.Length)];
 
-        for (int k = 0; k < n; k++)
+        for (int k = 0; k < items.Count; k++)
             weights[k] /= denom;
 
         double[] result = [.. Enumerable.Repeat(double.NaN, (int)col.Length)];
-        for (int k = 0; k < n; k++)
+        for (int k = 0; k < items.Count; k++)
             result[items[k].Index] = weights[k];
 
         return result;
 
-        static double[] EmptyArray(DoubleDataFrameColumn col, List<(double Value, int Index)> items, int n)
+        static double Quantile(IReadOnlyList<double> sorted, double probability)
         {
-            double[] result = [.. Enumerable.Repeat(double.NaN, (int)col.Length)];
-            for (int k = 0; k < n; k++)
-                result[items[k].Index] = 0.0;
-            return result;
+            var position = (sorted.Count - 1) * probability;
+            var lower = (int)Math.Floor(position);
+            var upper = (int)Math.Ceiling(position);
+            if (lower == upper)
+                return sorted[lower];
+
+            var fraction = position - lower;
+            return sorted[lower] + (sorted[upper] - sorted[lower]) * fraction;
+        }
+
+        static int LowerBound(IReadOnlyList<double> values, double target)
+        {
+            var low = 0;
+            var high = values.Count;
+            while (low < high)
+            {
+                var middle = low + (high - low) / 2;
+                if (values[middle] < target)
+                    low = middle + 1;
+                else
+                    high = middle;
+            }
+
+            return low;
         }
     }
 
