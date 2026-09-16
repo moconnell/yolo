@@ -2,6 +2,7 @@ name: Deploy to Azure Functions
 
 permissions:
   contents: read
+  pull-requests: read
 
 on:
   push:
@@ -101,15 +102,15 @@ jobs:
       - name: Verify production promotion source
         if: env.DEPLOYMENT_ENVIRONMENT == 'prod'
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if ! SECOND_PARENT=$(git rev-parse "$DEPLOYMENT_SHA^2" 2>/dev/null); then
-            echo "Production commits must be merge commits from a develop release PR."
-            exit 1
-          fi
-
-          git fetch origin develop
-          if ! git merge-base --is-ancestor "$SECOND_PARENT" origin/develop; then
-            echo "The production merge commit's source is not part of develop."
+          if ! gh api \
+            --header "Accept: application/vnd.github+json" \
+            "repos/$GITHUB_REPOSITORY/commits/$DEPLOYMENT_SHA/pulls" \
+            --jq '.[] | select(.state == "closed" and .merged_at != null and .base.ref == "master" and .head.ref == "develop") | .merge_commit_sha' \
+            | grep --fixed-strings --line-regexp --quiet "$DEPLOYMENT_SHA"; then
+            echo "Production commits must come from a merged develop-to-master release PR."
             exit 1
           fi
 
