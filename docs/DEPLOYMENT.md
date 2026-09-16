@@ -23,7 +23,7 @@ Create `develop` from `master` and make it the default branch. Protect both bran
 - Prevent direct pushes and force pushes.
 - Target normal and Dependabot pull requests at `develop`.
 - Use PRs from `develop` to `master` as production releases.
-- Merge release PRs with a merge commit; the production workflow rejects direct, squash, and rebase commits on `master`.
+- The production workflow verifies that the deployed commit came from a merged `develop`-to-`master` release PR; merge and squash merges are supported.
 
 The deployment identity for each environment needs Contributor on only its resource group and User Access Administrator on that resource group (or its Key Vault). The latter allows the workflow to grant `Key Vault Secrets User` to that environment's Function App identity.
 
