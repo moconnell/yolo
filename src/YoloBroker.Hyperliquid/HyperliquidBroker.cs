@@ -470,9 +470,9 @@ public sealed class HyperliquidBroker : IYoloBroker
             "Could not get spot balances");
 
         var futuresPositions = GetPositionsFromPositions(futuresAccount.Positions);
-        var spotPositions = GetPositionsFromBalances(
-            spotBalances
-                .Where(x => x.Asset != "USDC" && x.Total != 0));
+        var spotPositions = spotBalances != null
+            ? GetPositionsFromBalances(spotBalances.Balances.Where(x => x.Asset != "USDC" && x.Total != 0))
+            : [];
 
         var result = new Dictionary<string, IReadOnlyList<Position>>(futuresPositions);
         foreach (var (key, value) in spotPositions)
