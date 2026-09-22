@@ -28,7 +28,7 @@ public class BrokerVolatilityFactorService(IYoloBroker broker, bool throwOnMissi
         {
             try
             {
-                return await broker.GetDailyClosePricesAsync(t, Periods, ct: cancellationToken);
+                return await broker.GetDailyClosePricesAsync(t, Periods + 1, ct: cancellationToken);
             }
             catch (Exception) when (!throwOnMissingData)
             {
