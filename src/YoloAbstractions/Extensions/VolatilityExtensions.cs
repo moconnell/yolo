@@ -1,5 +1,11 @@
 namespace YoloAbstractions.Extensions;
 
+public enum VolatilityMethod
+{
+    Simple,
+    Logarithmic
+}
+
 public static class VolatilityExtensions
 {
     /// <summary>
@@ -9,9 +15,9 @@ public static class VolatilityExtensions
     /// <param name="periodsPerYear">
     /// Number of periods per year (252 for equities, 365 for crypto daily data).
     /// </param>
-    /// <param name="useLogReturns">Whether to use log returns (true) or simple returns (false).</param>
+    /// <param name="volatilityMethod">Whether to use Logarithmic returns or Simple returns.</param>
     /// <param name="throwOnMissingData">Whether to throw an exception if there is missing data.</param>
-    public static double AnnualizedVolatility(this IEnumerable<decimal> closes, int periodsPerYear = 365, bool useLogReturns = false, bool throwOnMissingData = true)
+    public static double AnnualizedVolatility(this IEnumerable<decimal> closes, int periodsPerYear = 365, VolatilityMethod volatilityMethod = VolatilityMethod.Simple, bool throwOnMissingData = true)
     {
         var prices = closes.ToList();
         if (prices.Count < 2)
@@ -32,7 +38,7 @@ public static class VolatilityExtensions
         for (var i = 1; i < prices.Count; i++)
         {
 
-            var r = useLogReturns ? Math.Log((double)(prices[i] / prices[i - 1])) : (double)(prices[i] / prices[i - 1]) - 1;
+            var r = volatilityMethod == VolatilityMethod.Logarithmic ? Math.Log((double)(prices[i] / prices[i - 1])) : (double)(prices[i] / prices[i - 1]) - 1;
             returns.Add(r);
         }
 
