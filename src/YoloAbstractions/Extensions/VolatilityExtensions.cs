@@ -9,7 +9,9 @@ public static class VolatilityExtensions
     /// <param name="periodsPerYear">
     /// Number of periods per year (252 for equities, 365 for crypto daily data).
     /// </param>
-    public static double AnnualizedVolatility(this IEnumerable<decimal> closes, int periodsPerYear = 365, bool throwOnMissingData = true)
+    /// <param name="useLogReturns">Whether to use log returns (true) or simple returns (false).</param>
+    /// <param name="throwOnMissingData">Whether to throw an exception if there is missing data.</param>
+    public static double AnnualizedVolatility(this IEnumerable<decimal> closes, int periodsPerYear = 365, bool useLogReturns = false, bool throwOnMissingData = true)
     {
         var prices = closes.ToList();
         if (prices.Count < 2)
@@ -26,17 +28,17 @@ public static class VolatilityExtensions
             throw new ArgumentOutOfRangeException(nameof(periodsPerYear), periodsPerYear, "Periods per year must be less than 366.");
 
         // Compute log returns
-        var logReturns = new List<double>(prices.Count - 1);
+        var returns = new List<double>(prices.Count - 1);
         for (var i = 1; i < prices.Count; i++)
         {
 
-            var r = Math.Log((double)(prices[i] / prices[i - 1]));
-            logReturns.Add(r);
+            var r = useLogReturns ? Math.Log((double)(prices[i] / prices[i - 1])) : (double)(prices[i] / prices[i - 1]) - 1;
+            returns.Add(r);
         }
 
         // Standard deviation of log returns
-        var mean = logReturns.Average();
-        var variance = logReturns.Average(r => Math.Pow(r - mean, 2));
+        var mean = returns.Average();
+        var variance = returns.Average(r => Math.Pow(r - mean, 2));
         var stdev = Math.Sqrt(variance);
 
         // Annualize
