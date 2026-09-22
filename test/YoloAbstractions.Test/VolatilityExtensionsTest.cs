@@ -20,6 +20,21 @@ public class VolatilityExtensionsTest
         volatility.ShouldBe(expected, tolerance: 1e-12);
     }
 
+    [Fact]
+    public void AnnualizedVolatility_WithUnsupportedMethod_ThrowsArgumentOutOfRangeException()
+    {
+        // Arrange
+        var closes = new List<decimal> { 100m, 110m };
+        var unsupportedMethod = (VolatilityMethod)int.MaxValue;
+
+        // Act
+        var exception = Should.Throw<ArgumentOutOfRangeException>(() =>
+            closes.AnnualizedVolatility(volatilityMethod: unsupportedMethod));
+
+        // Assert
+        exception.ParamName.ShouldBe("volatilityMethod");
+    }
+
     [Theory]
     [InlineData(Simple)]
     [InlineData(Logarithmic)]

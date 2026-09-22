@@ -17,9 +17,8 @@ public static class VolatilityExtensions
     /// </param>
     /// <param name="volatilityMethod">Whether to use Logarithmic returns or Simple returns.</param>
     /// <param name="throwOnMissingData">Whether to throw an exception if there is missing data.</param>
-    public static double AnnualizedVolatility(this IEnumerable<decimal> closes, int periodsPerYear = 365, VolatilityMethod volatilityMethod = VolatilityMethod.Simple, bool throwOnMissingData = true)
+    public static double AnnualizedVolatility(this IReadOnlyList<decimal> prices, int periodsPerYear = 365, VolatilityMethod volatilityMethod = VolatilityMethod.Simple, bool throwOnMissingData = true)
     {
-        var prices = closes.ToList();
         if (prices.Count < 2)
         {
             if (throwOnMissingData)
@@ -33,12 +32,18 @@ public static class VolatilityExtensions
         if (periodsPerYear > 365)
             throw new ArgumentOutOfRangeException(nameof(periodsPerYear), periodsPerYear, "Periods per year must be less than 366.");
 
-        // Compute log returns
+        // Compute returns
         var returns = new List<double>(prices.Count - 1);
         for (var i = 1; i < prices.Count; i++)
         {
 
-            var r = volatilityMethod == VolatilityMethod.Logarithmic ? Math.Log((double)(prices[i] / prices[i - 1])) : (double)(prices[i] / prices[i - 1]) - 1;
+            var priceRatio = (double)(prices[i] / prices[i - 1]);
+            var r = volatilityMethod switch
+            {
+                VolatilityMethod.Logarithmic => Math.Log(priceRatio),
+                VolatilityMethod.Simple => priceRatio - 1,
+                _ => throw new ArgumentOutOfRangeException(nameof(volatilityMethod), volatilityMethod, "Unsupported volatility method.")
+            };
             returns.Add(r);
         }
 
