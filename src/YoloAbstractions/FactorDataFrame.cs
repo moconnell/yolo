@@ -125,6 +125,13 @@ public sealed record FactorDataFrame
     }
 
     public FactorDataFrame Normalize(NormalizationMethod method = NormalizationMethod.None, int? quantiles = null, params FactorType[] preserveFactors)
+        => Normalize(method, quantiles, precision: 12, preserveFactors);
+
+    public FactorDataFrame Normalize(
+        NormalizationMethod method,
+        int? quantiles,
+        int precision,
+        params FactorType[] preserveFactors)
     {
         if (method == NormalizationMethod.None)
             return this;
@@ -153,7 +160,7 @@ public sealed record FactorDataFrame
 
             var normalizedCol = method switch
             {
-                NormalizationMethod.CrossSectionalBins => col.NormalizeBins(quantiles!.Value),
+                NormalizationMethod.CrossSectionalBins => col.NormalizeBins(quantiles!.Value, precision),
                 NormalizationMethod.CrossSectionalZScore => col.NormalizeZScore(),
                 NormalizationMethod.MinMax => col.NormalizeMinMax(),
                 NormalizationMethod.Rank => col.NormalizeRank(),
@@ -177,7 +184,8 @@ public sealed record FactorDataFrame
         bool volatilityScaling = true,
         bool normalizePerAsset = true,
         NormalizationMethod normalizationMethod = NormalizationMethod.None,
-        int? quantilesForNormalization = null)
+        int? quantilesForNormalization = null,
+        int precision = 12)
     {
         ArgumentNullException.ThrowIfNull(weights);
 
@@ -197,7 +205,7 @@ public sealed record FactorDataFrame
         var tickerWeightsVector = GetWeights();
 
         var weightsCol = new DoubleDataFrameColumn(Weight, tickerWeightsVector)
-                .Normalize(normalizationMethod, quantilesForNormalization);
+                .Normalize(normalizationMethod, quantilesForNormalization, precision);
 
         if (volatilityScaling &&
             _dataFrame.Columns.FirstOrDefault(c => c.Name == nameof(Volatility)) is DoubleDataFrameColumn volCol)
