@@ -621,6 +621,49 @@ public class FactorDataFrameTest(ITestOutputHelper output)
     }
 
     [Fact]
+    public void GivenSeptember23NormalizedFactors_WhenApplyWeights_ShouldMatchPandasPortfolioBins()
+    {
+        // Values are the 2026-09-23 normalized factors exported by the Unravel backtest.
+        string[] tickers = ["AAVE", "ADA", "AVAX", "BNB", "BTC", "DOGE", "ETH", "GRAM", "HBAR", "HYPE", "LINK", "LTC", "SHIB", "SOL", "SUI", "TAO", "TRX", "XLM", "XMR", "XRP"];
+        var factorDataFrame = FactorDataFrame.NewFrom(
+            tickers,
+            new DateTime(2026, 9, 23),
+            (Carry, [-0.015, 0.005, -0.045, 0.025, 0.075, -0.005, 0.065, -0.075, 0.035, 0.015, -0.055, 0.045, 0.085, 0.055, -0.035, -0.085, 0.095, -0.065, -0.095, -0.025]),
+            (InstantaneousMomentum, [-0.045, 0.035, 0.075, -0.015, 0.025, -0.035, 0.005, -0.085, 0.065, 0.015, -0.075, 0.085, -0.095, 0.045, 0.095, 0.055, -0.055, -0.065, -0.025, -0.005]),
+            (MeanReversion, [0.015, 0.045, -0.025, -0.085, -0.015, 0.035, -0.075, 0.085, 0.065, -0.095, -0.035, 0.005, 0.075, -0.065, 0.095, -0.005, -0.045, 0.055, -0.055, 0.025]),
+            (OpenInterestDivergence, [-0.085, 0.005, -0.035, 0.085, 0.045, -0.015, -0.045, 0.035, 0.025, -0.065, -0.005, -0.055, 0.065, -0.025, -0.095, -0.075, 0.095, 0.055, 0.075, 0.015]),
+            (Polaris, [-0.015, -0.085, 0.035, 0.015, 0.075, -0.065, 0.065, -0.095, -0.055, 0.095, 0.005, 0.045, -0.075, 0.055, -0.045, 0.025, -0.025, -0.035, 0.085, -0.005]),
+            (RelativeIlliquidity, [-0.085, -0.005, -0.075, 0.085, 0.055, -0.065, -0.015, 0.065, 0.035, -0.035, 0.005, -0.045, 0.045, -0.025, -0.095, -0.055, 0.095, 0.025, 0.075, 0.015]),
+            (RetailFlow, [0.025, -0.005, -0.045, 0.055, 0.045, 0.065, -0.055, -0.085, -0.075, -0.035, 0.095, 0.005, -0.015, 0.085, -0.065, -0.025, 0.015, -0.095, 0.035, 0.075]),
+            (SupplyVelocity, [0.035, -0.005, -0.025, 0.085, 0.045, 0.055, 0.025, -0.095, -0.015, 0.095, -0.055, 0.015, 0.075, -0.045, -0.075, -0.085, 0.065, -0.065, 0.005, -0.035]),
+            (TrendLongonlyAdaptive, [0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, -0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05]));
+        var weights = factorDataFrame.FactorTypes.ToDictionary(factor => factor, _ => 1.0);
+        double[] expected = [
+            -0.0555555555555555, -0.005050505050505, -0.0454545454545454,
+             0.0858585858585858, 0.0959595959595959, -0.0252525252525252,
+            -0.0252525252525252, -0.0959595959595959, 0.0252525252525252,
+            -0.005050505050505, -0.0353535353535353, 0.0454545454545454,
+             0.0656565656565656, 0.0252525252525252, -0.0757575757575757,
+            -0.0858585858585858, 0.0757575757575757, -0.0656565656565656,
+             0.0454545454545454, 0.0151515151515151
+        ];
+
+        var result = factorDataFrame.ApplyWeights(
+            weights,
+            volatilityScaling: false,
+            normalizationMethod: NormalizationMethod.CrossSectionalBins,
+            quantilesForNormalization: 20);
+        var actual = ((DoubleDataFrameColumn)result["Weight"]).ToArray();
+
+        actual.Length.ShouldBe(expected.Length);
+        for (var i = 0; i < expected.Length; i++)
+            actual[i].GetValueOrDefault().ShouldBe(
+                expected[i],
+                tolerance: 1e-12,
+                customMessage: $"Ticker: {tickers[i]}");
+    }
+
+    [Fact]
     public void GivenFactorDataFrameWithZeroNormalizer_WhenApplyWeights_ShouldReturnZero()
     {
         // arrange

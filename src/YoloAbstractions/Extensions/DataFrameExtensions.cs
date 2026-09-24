@@ -11,7 +11,8 @@ public static class DataFrameExtensions
     public static DataFrame Normalize(
         this DataFrame df,
         NormalizationMethod method = None,
-        int? quantiles = null)
+        int? quantiles = null,
+        int precision = 12)
     {
         if (method == None)
             return df;
@@ -23,13 +24,17 @@ public static class DataFrameExtensions
             if (col is not DoubleDataFrameColumn numeric)
                 continue;
 
-            result.Columns[col.Name] = numeric.Normalize(method, quantiles);
+            result.Columns[col.Name] = numeric.Normalize(method, quantiles, precision);
         }
 
         return result;
     }
 
-    public static DoubleDataFrameColumn Normalize(this DoubleDataFrameColumn col, NormalizationMethod method, int? quantiles = null)
+    public static DoubleDataFrameColumn Normalize(
+        this DoubleDataFrameColumn col,
+        NormalizationMethod method,
+        int? quantiles = null,
+        int precision = 12)
     {
         if (method == None)
             return col;
@@ -41,7 +46,7 @@ public static class DataFrameExtensions
 
         var normalizedValues = method switch
         {
-            CrossSectionalBins => col.NormalizeBins(quantiles!.Value),
+            CrossSectionalBins => col.NormalizeBins(quantiles!.Value, precision),
             CrossSectionalZScore => col.NormalizeZScore(),
             MinMax => col.NormalizeMinMax(),
             Rank => col.NormalizeRank(),
@@ -80,15 +85,19 @@ public static class DataFrameExtensions
     // -------------------------------
     internal static double[] NormalizeBins(
         this DoubleDataFrameColumn col,
-        int quantiles)
+        int quantiles,
+        int precision = 12)
     {
+        if (precision is < 0 or > 15)
+            throw new ArgumentOutOfRangeException(nameof(precision), precision, "Precision must be between 0 and 15.");
+
         var items = new List<(double Value, int Index)>();
 
         for (int i = 0; i < col.Length; i++)
         {
             var v = col[i];
             if (v.HasValue && !double.IsNaN(v.Value))
-                items.Add((v.Value, i));
+                items.Add((Math.Round(v.Value, precision), i));
         }
 
         if (items.Count == 0)
