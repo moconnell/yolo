@@ -8,9 +8,9 @@ public static class NethereumSigningExtensions
     {
         ArgumentException.ThrowIfNullOrEmpty(message, nameof(message));
         ArgumentException.ThrowIfNullOrEmpty(privateKey, nameof(privateKey));
-        if (!message[2..].All(char.IsAsciiHexDigit))
+        if (message.Length != 64 || !message.All(char.IsAsciiHexDigit))
         {
-            throw new ArgumentException("Message must be a valid hex string", nameof(message));
+            throw new ArgumentException("Message must be a valid hex string containing exactly 32 bytes", nameof(message));
         }
         if (privateKey.Length != 66 || !privateKey[2..].All(char.IsAsciiHexDigit))
         {

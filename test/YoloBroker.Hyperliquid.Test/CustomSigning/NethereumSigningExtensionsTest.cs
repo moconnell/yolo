@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using YoloBroker.Hyperliquid.CustomSigning;
 using Shouldly;
 
@@ -12,7 +13,7 @@ public class NethereumSigningExtensionsTest
     {
         // Arrange
         var privateKey = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-        var message = System.Convert.ToHexString(UTF8.GetBytes("Hello, Hyperliquid!"));
+        var message = HashMessage("Hello, Hyperliquid!");
 
         // Act
         var signature = message.SignMessage(privateKey);
@@ -57,7 +58,7 @@ public class NethereumSigningExtensionsTest
     public void SignMessage_WhenPrivateKeyIsNull_ShouldThrowArgumentException()
     {
         // Arrange
-        var message = System.Convert.ToHexString(UTF8.GetBytes("Hello"));
+        var message = HashMessage("Hello");
         string? privateKey = null;
 
         // Act & Assert
@@ -69,7 +70,7 @@ public class NethereumSigningExtensionsTest
     public void SignMessage_WhenPrivateKeyIsEmpty_ShouldThrowArgumentException()
     {
         // Arrange
-        var message = System.Convert.ToHexString(UTF8.GetBytes("Hello"));
+        var message = HashMessage("Hello");
         var privateKey = string.Empty;
 
         // Act & Assert
@@ -103,11 +104,26 @@ public class NethereumSigningExtensionsTest
         ex.Message.ShouldContain("Message must be a valid hex string");
     }
 
+    [Theory]
+    [InlineData(62)]
+    [InlineData(66)]
+    public void SignMessage_WhenMessageIsNot32Bytes_ShouldThrowArgumentException(int hexLength)
+    {
+        // Arrange
+        var message = new string('a', hexLength);
+        var privateKey = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+        // Act & Assert
+        var ex = Should.Throw<ArgumentException>(() => message.SignMessage(privateKey));
+        ex.ParamName.ShouldBe("message");
+        ex.Message.ShouldContain("exactly 32 bytes");
+    }
+
     [Fact]
     public void SignMessage_WhenPrivateKeyIsTooShort_ShouldThrowArgumentException()
     {
         // Arrange
-        var message = System.Convert.ToHexString(UTF8.GetBytes("Hello"));
+        var message = HashMessage("Hello");
         var privateKey = "0x0123456789abcdef"; // Too short
 
         // Act & Assert
@@ -120,7 +136,7 @@ public class NethereumSigningExtensionsTest
     public void SignMessage_WhenPrivateKeyIsTooLong_ShouldThrowArgumentException()
     {
         // Arrange
-        var message = System.Convert.ToHexString(UTF8.GetBytes("Hello"));
+        var message = HashMessage("Hello");
         var privateKey = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef00"; // Too long
 
         // Act & Assert
@@ -133,7 +149,7 @@ public class NethereumSigningExtensionsTest
     public void SignMessage_WhenPrivateKeyIsNotValidHex_ShouldThrowArgumentException()
     {
         // Arrange
-        var message = System.Convert.ToHexString(UTF8.GetBytes("Hello"));
+        var message = HashMessage("Hello");
         var privateKey = "0xGGHHIIJJ0123456789abcdef0123456789abcdef0123456789abcdef01234567"; // Invalid hex
 
         // Act & Assert
@@ -146,7 +162,7 @@ public class NethereumSigningExtensionsTest
     public void SignMessage_WhenPrivateKeyHasCorrectLengthButInvalidHex_ShouldThrowArgumentException()
     {
         // Arrange
-        var message = System.Convert.ToHexString(UTF8.GetBytes("Hello"));
+        var message = HashMessage("Hello");
         var privateKey = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdez"; // 'z' is not hex
 
         // Act & Assert
@@ -160,7 +176,7 @@ public class NethereumSigningExtensionsTest
     {
         // Arrange
         var privateKey = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-        var message = "48656C6C6F"; // "Hello" in uppercase hex (without 0x prefix)
+        var message = HashMessage("Hello");
 
         // Act
         var signature = message.SignMessage(privateKey);
@@ -177,7 +193,7 @@ public class NethereumSigningExtensionsTest
     {
         // Arrange
         var privateKey = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-        var message = "48656c6c6f"; // "Hello" in lowercase hex (without 0x prefix)
+        var message = HashMessage("Hello").ToLowerInvariant();
 
         // Act
         var signature = message.SignMessage(privateKey);
@@ -194,7 +210,8 @@ public class NethereumSigningExtensionsTest
     {
         // Arrange
         var privateKey = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-        var message = "48656C6c6F"; // "Hello" in mixed case hex (without 0x prefix)
+        var message = string.Concat(HashMessage("Hello")
+            .Select((c, i) => i % 2 == 0 ? char.ToUpperInvariant(c) : char.ToLowerInvariant(c)));
 
         // Act
         var signature = message.SignMessage(privateKey);
@@ -211,7 +228,7 @@ public class NethereumSigningExtensionsTest
     {
         // Arrange
         var privateKey = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-        var message = System.Convert.ToHexString(UTF8.GetBytes("Test"));
+        var message = HashMessage("Test");
 
         // Act
         var signature = message.SignMessage(privateKey);
@@ -229,8 +246,8 @@ public class NethereumSigningExtensionsTest
     {
         // Arrange
         var privateKey = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-        var message1 = System.Convert.ToHexString(UTF8.GetBytes("Message1"));
-        var message2 = System.Convert.ToHexString(UTF8.GetBytes("Message2"));
+        var message1 = HashMessage("Message1");
+        var message2 = HashMessage("Message2");
 
         // Act
         var signature1 = message1.SignMessage(privateKey);
@@ -246,7 +263,7 @@ public class NethereumSigningExtensionsTest
     {
         // Arrange
         var privateKey = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-        var message = System.Convert.ToHexString(UTF8.GetBytes("Consistent Message"));
+        var message = HashMessage("Consistent Message");
 
         // Act
         var signature1 = message.SignMessage(privateKey);
@@ -257,4 +274,7 @@ public class NethereumSigningExtensionsTest
         signature1["s"].ShouldBe(signature2["s"]);
         signature1["v"].ShouldBe(signature2["v"]);
     }
+
+    private static string HashMessage(string message) =>
+        System.Convert.ToHexString(SHA256.HashData(UTF8.GetBytes(message)));
 }
