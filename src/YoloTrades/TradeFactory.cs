@@ -94,7 +94,7 @@ public class TradeFactory : ITradeFactory
                     if (trade.IsTradable(minOrderValueForCheck))
                         yield return trade;
                     else
-                        _logger.DeltaTooSmall(item.Token, remainingDelta);
+                        _logger.DeltaTooSmall(item.Token, remainingDelta, trade.Value, minOrderValueForCheck);
                     remainingDelta = remainingDeltaPostTrade;
                 }
             }
@@ -216,8 +216,9 @@ public class TradeFactory : ITradeFactory
             decimal? CalcLimitPrice()
             {
                 var factor = isBuy ? SpreadSplit : 1 - SpreadSplit;
-                var spread = market.Ask!.Value - market.Bid!.Value;
-                var rawLimitPrice = market.Bid!.Value + spread * factor;
+                var rawLimitPrice = market.Spread is { } spread && market.Bid is { } bid
+                    ? bid + spread * factor
+                    : price.Value;
                 var limitPriceSteps = rawLimitPrice / market.PriceStep;
                 var limitPrice = limitPriceSteps is null
                     ? null
