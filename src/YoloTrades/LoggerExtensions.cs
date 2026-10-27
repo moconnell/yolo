@@ -19,7 +19,7 @@ public static partial class LoggerExtensions
     [LoggerMessage(
         EventId = TradeEventIds.Factors,
         Level = LogLevel.Debug,
-        Message = "({Token}): processing {Weight}")]    
+        Message = "({Token}): processing {Weight}")]
     public static partial void Weight(this ILogger logger, string token, decimal weight);
 
     [LoggerMessage(
@@ -92,9 +92,11 @@ public static partial class LoggerExtensions
         EventId = TradeEventIds.DeltaTooSmall,
         Level = LogLevel.Information,
         Message =
-            "({Token}): no action - delta too small to trade (delta: {Delta:0.0000})")]
+            "({Token}): no action - delta too small to trade (delta: {Delta:0.0000}, value: {Value:0.00}, min order value: {MinOrderValue:0.00})")]
     public static partial void DeltaTooSmall(
         this ILogger logger,
         string token,
-        decimal delta);
+        decimal delta,
+        decimal? value,
+        decimal? minOrderValue);
 }

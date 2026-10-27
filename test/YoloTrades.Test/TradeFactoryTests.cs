@@ -862,6 +862,58 @@ public class TradeFactoryTests
         trades.ShouldBeEmpty();
     }
 
+    [Theory]
+    [InlineData(true, 32.650)]
+    [InlineData(false, 32.649)]
+    public void GivenOneSidedQuote_WhenExecutableSideIsAvailable_ShouldUseThatPrice(
+        bool isBuy,
+        decimal expectedLimitPrice)
+    {
+        var logger = _loggerFactory.CreateLogger<TradeFactory>();
+        var config = new YoloConfig
+        {
+            AssetPermissions = AssetPermissions.PerpetualFutures,
+            BaseAsset = "USDC",
+            NominalCash = 10000,
+            TradeBuffer = 0
+        };
+
+        var tradeFactory = new TradeFactory(config, logger);
+        var weights = isBuy
+            ? new Dictionary<string, decimal> { ["HYPE"] = 0.10m }
+            : new Dictionary<string, decimal>();
+        var positions = isBuy
+            ? new Dictionary<string, IReadOnlyList<Position>>()
+            : new Dictionary<string, IReadOnlyList<Position>>
+            {
+                ["HYPE"] = [new Position("HYPE", "HYPE", AssetType.Future, 1.0m)]
+            };
+        var markets = new Dictionary<string, IReadOnlyList<MarketInfo>>
+        {
+            ["HYPE"] =
+            [
+                new MarketInfo(
+                    "HYPE",
+                    "HYPE",
+                    "USDC",
+                    AssetType.Future,
+                    DateTime.UtcNow,
+                    PriceStep: 0.001m,
+                    QuantityStep: 0.01m,
+                    MinProvideSize: 0.01m,
+                    Ask: isBuy ? expectedLimitPrice : null,
+                    Bid: isBuy ? null : expectedLimitPrice,
+                    Last: expectedLimitPrice)
+            ]
+        };
+
+        var trade = tradeFactory.CalculateTrades(weights, positions, markets).ShouldHaveSingleItem();
+
+        trade.LimitPrice.ShouldBe(expectedLimitPrice);
+        trade.OrderType.ShouldBe(OrderType.Limit);
+        trade.PostPrice.ShouldBe(true);
+    }
+
     private static
         (Dictionary<string, decimal> weights,
         Dictionary<string, IReadOnlyList<Position>> positions,
