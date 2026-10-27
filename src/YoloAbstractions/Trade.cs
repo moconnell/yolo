@@ -27,10 +27,13 @@ public record Trade(
             return false;
 
         // Ensure the order value meets the minimum requirement
-        return !minOrderValue.HasValue || !LimitPrice.HasValue || Value >= minOrderValue;
+        return !minOrderValue.HasValue || !LimitPrice.HasValue || GetValue() >= minOrderValue;
     }
 
-    public decimal? Value => LimitPrice.HasValue ? AbsoluteAmount * LimitPrice.Value : null;
+    public decimal? GetValue()
+    {
+        return LimitPrice.HasValue ? AbsoluteAmount * LimitPrice.Value : null;
+    }
 
     public decimal AbsoluteAmount => Math.Abs(Amount);
 

@@ -94,7 +94,7 @@ public class TradeFactory : ITradeFactory
                     if (trade.IsTradable(minOrderValueForCheck))
                         yield return trade;
                     else
-                        _logger.DeltaTooSmall(item.Token, remainingDelta, trade.Value, minOrderValueForCheck);
+                        _logger.DeltaTooSmall(item.Token, remainingDelta, trade.GetValue(), minOrderValueForCheck);
                     remainingDelta = remainingDeltaPostTrade;
                 }
             }
