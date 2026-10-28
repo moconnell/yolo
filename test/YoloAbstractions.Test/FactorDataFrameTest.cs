@@ -218,7 +218,7 @@ public class FactorDataFrameTest(ITestOutputHelper output)
     [InlineData(null, false, 0.254, 0.292, 0.056)]
     [InlineData(0.25, false, 0.25, 0.25, 0.056)]
     [InlineData(null, true, 0.79375d, 0.3792207792207792d, 0.060869565217391314d)]
-    [InlineData(0.5, true, 0.5, 0.3792207792207792d, 0.060869565217391314d)]
+    [InlineData(0.5, true, 0.6433166199970826d, 0.30734995895555467d, 0.04933342104736271d)]
     public void GivenFactorDataFrameAndWeightsDict_WhenTickersEqual_ShouldMultiply(
         double? maxWeightAbs,
         bool volScaling,
@@ -718,6 +718,40 @@ public class FactorDataFrameTest(ITestOutputHelper output)
         resultWeights[0].GetValueOrDefault().ShouldBe(0.15 / 0.35, 0.0000001);
         // ETH: 0.10 / 0.5
         resultWeights[1].GetValueOrDefault().ShouldBe(0.20 / 0.35, 0.0000001);
+    }
+
+    [Fact]
+    public void GivenVolatilityScalingAndClipping_WhenVolatilitiesShareCommonScale_ShouldMatchBacktest()
+    {
+        // arrange
+        string[] tickers = ["BTC", "ETH", "SOL"];
+        double[] carryValues = [0.1, 0.1, -0.2];
+        var weights = new Dictionary<FactorType, double> { [Carry] = 1.0 };
+
+        double[] CalculateWeights(double[] volatilityValues)
+        {
+            var factorDataFrame = new FactorDataFrame(
+                new DataFrame(
+                    new DateTimeDataFrameColumn("Date", Enumerable.Repeat(DateTime.Today, tickers.Length)),
+                    new StringDataFrameColumn("Ticker", tickers),
+                    new DoubleDataFrameColumn(nameof(Carry), carryValues),
+                    new DoubleDataFrameColumn(nameof(Volatility), volatilityValues)
+                ),
+                Carry,
+                Volatility);
+
+            var result = factorDataFrame.ApplyWeights(weights, maxWeightAbs: 0.1, volatilityScaling: true);
+            return [.. ((DoubleDataFrameColumn)result["Weight"]).Cast<double>()];
+        }
+
+        // act
+        var dailyVolatilityWeights = CalculateWeights([0.1, 0.2, 0.4]);
+        var annualizedVolatilityWeights = CalculateWeights([1.0, 2.0, 4.0]);
+
+        // assert
+        double[] expected = [7d / 19d, 6d / 19d, -6d / 19d];
+        dailyVolatilityWeights.ShouldBe(expected, 0.0000001);
+        annualizedVolatilityWeights.ShouldBe(expected, 0.0000001);
     }
 
     [Fact]

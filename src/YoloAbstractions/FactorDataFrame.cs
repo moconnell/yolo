@@ -211,7 +211,9 @@ public sealed record FactorDataFrame
             _dataFrame.Columns.FirstOrDefault(c => c.Name == nameof(Volatility)) is DoubleDataFrameColumn volCol)
         {
             var vol = Vector<double>.Build.DenseOfArray([.. volCol.Select(x => x is > 0d ? x.Value : 1d)]);
-            weightsCol = weightsCol.PointwiseDivide(vol);
+            var inverseVolatility = vol.Map(x => 1d / x);
+            var meanInverseVolatility = inverseVolatility.Sum() / inverseVolatility.Count;
+            weightsCol = weightsCol.PointwiseDivide(vol * meanInverseVolatility);
         }
 
         if (maxWeightAbs.HasValue)
