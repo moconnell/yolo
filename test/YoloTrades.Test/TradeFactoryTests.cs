@@ -1,6 +1,4 @@
-using System.Globalization;
 using CsvHelper;
-using CsvHelper.Configuration;
 using MathNet.Numerics;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -928,13 +926,7 @@ public class TradeFactoryTests
             decimal carryMultiplier,
             decimal maxWeightingAbs)
     {
-        var config = new CsvConfiguration(CultureInfo.InvariantCulture)
-        {
-            HasHeaderRecord = true
-        };
-
-        using var reader = new StreamReader(path);
-        using var csv = new CsvReader(reader, config);
+        using var csv = CsvReader.FromFile(path, new CsvReaderOptions { Separator = ',' });
 
         var records = csv
             .GetRecords<YoloCsvRow>()
