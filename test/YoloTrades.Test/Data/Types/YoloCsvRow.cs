@@ -1,65 +1,65 @@
-using CsvHelper.Configuration.Attributes;
+using CsvHelper;
 
 namespace YoloTrades.Test.Data.Types;
 
-public class YoloCsvRow
+[CsvRecord]
+public partial class YoloCsvRow
 {
-    [Name("Ticker")]
+    [CsvColumn("Ticker")]
     public required string Ticker { get; set; }
 
-    [Name("Price, $")]
+    [CsvColumn("Price, $")]
     public decimal Price { get; set; }
 
-    [Name("Momentum")]
+    [CsvColumn("Momentum")]
     public decimal Momentum { get; set; }
 
-    [Name("Trend")]
+    [CsvColumn("Trend")]
     public decimal Trend { get; set; }
 
-    [Name("Carry")]
+    [CsvColumn("Carry")]
     public decimal Carry { get; set; }
 
-    [Name("Vol")]
+    [CsvColumn("Vol")]
     public decimal Volatility { get; set; }
 
-    [Name("Unconstrained Target Weight")]
+    [CsvColumn("Unconstrained Target Weight")]
     public decimal UnconstrainedTTargetWeight { get; set; }
 
-    [Name("Vol Scaled Target Weight")]
+    [CsvColumn("Vol Scaled Target Weight")]
     public decimal VolScaledTargetWeight { get; set; }
 
-    [Name("Current Position")]
+    [CsvColumn("Current Position")]
     public decimal CurrentPosition { get; set; }
 
-    [Name("Current Position Value, $")]
+    [CsvColumn("Current Position Value, $")]
     public decimal CurrentPositionValue { get; set; }
 
-    [Name("Current Weight")]
+    [CsvColumn("Current Weight")]
     public decimal CurrentWeight { get; set; }
 
-    [Name("Trades (Qty)")]
+    [CsvColumn("Trades (Qty)")]
     public decimal TradeQuantity { get; set; }
 
-    [Name("Trade Value, $")]
+    [CsvColumn("Trade Value, $")]
     public decimal TradeValue { get; set; }
 
-    [Name("Post-Trade Positions")]
+    [CsvColumn("Post-Trade Positions")]
     public decimal PostTradePosition { get; set; }
 
-    [Name("Post-Trade Position Value, $")]
+    [CsvColumn("Post-Trade Position Value, $")]
     public decimal PostTradePositionValue { get; set; }
 
-    [Name("Post-Trade Weights")]
+    [CsvColumn("Post-Trade Weights")]
     public decimal PostTradeWeight { get; set; }
 
-    [Name("Diff to Constrained Target Weight Before Trade")]
+    [CsvColumn("Diff to Constrained Target Weight Before Trade")]
     public required string DiffToConstrainedTargetWeightPreTrade { get; set; }
 
-    [Name("Diff to Constrained Target Weight After Trade")]
+    [CsvColumn("Diff to Constrained Target Weight After Trade")]
     public required string DiffToConstrainedTargetWeightPostTrade { get; set; }
 
-    [Name("OK?")]
-    [BooleanTrueValues("YES")]
-    [BooleanFalseValues("NO")]
+    [CsvColumn("OK?")]
+    [CsvBooleanValues("YES", "NO")]
     public bool Ok { get; set; }
 }
