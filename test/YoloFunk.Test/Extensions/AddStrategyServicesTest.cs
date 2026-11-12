@@ -12,14 +12,17 @@ namespace YoloFunk.Test.Extensions;
 
 public class AddStrategyServicesTest
 {
+    private const string TestWalletAddress = "0x1111111111111111111111111111111111111111";
+    private const string TestPrivateKey = "0x0000000000000000000000000000000000000000000000000000000000000001";
+
     [Fact]
     public void AddStrategy_WhenYoloConfigMissing_ShouldThrow()
     {
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Strategies:Test:Hyperliquid:Address"] = "0xabc",
-                ["Strategies:Test:Hyperliquid:PrivateKey"] = "key",
+                ["Strategies:Test:Hyperliquid:Address"] = TestWalletAddress,
+                ["Strategies:Test:Hyperliquid:PrivateKey"] = TestPrivateKey,
                 ["Strategies:Test:Hyperliquid:UseTestnet"] = "true"
             })
             .Build();
@@ -37,8 +40,8 @@ public class AddStrategyServicesTest
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Strategies:Test:Yolo:BaseAsset"] = "USDC",
-                ["Strategies:Test:Hyperliquid:Address"] = "0xabc",
-                ["Strategies:Test:Hyperliquid:PrivateKey"] = "key",
+                ["Strategies:Test:Hyperliquid:Address"] = TestWalletAddress,
+                ["Strategies:Test:Hyperliquid:PrivateKey"] = TestPrivateKey,
                 ["Strategies:Test:Hyperliquid:UseTestnet"] = "true"
             })
             .Build();
@@ -78,8 +81,8 @@ public class AddStrategyServicesTest
             {
                 ["Strategies:Test:Yolo:BaseAsset"] = "USDC",
                 ["Strategies:Test:Yolo:TradeBuffer"] = "0.01",
-                ["Strategies:Test:Hyperliquid:Address"] = "0x1111111111111111111111111111111111111111",
-                ["Strategies:Test:Hyperliquid:PrivateKey"] = "key",
+                ["Strategies:Test:Hyperliquid:Address"] = TestWalletAddress,
+                ["Strategies:Test:Hyperliquid:PrivateKey"] = TestPrivateKey,
                 ["Strategies:Test:Hyperliquid:UseTestnet"] = "true",
                 ["Strategies:Test:RobotWealth:ApiBaseUrl"] = "https://example.com",
                 ["Strategies:Test:RobotWealth:ApiKey"] = "rw-key",
@@ -111,8 +114,8 @@ public class AddStrategyServicesTest
             {
                 ["AzureWebJobsStorage"] = "UseDevelopmentStorage=true",
                 ["Strategies:Test:Yolo:BaseAsset"] = "USDC",
-                ["Strategies:Test:Hyperliquid:Address"] = "0x1111111111111111111111111111111111111111",
-                ["Strategies:Test:Hyperliquid:PrivateKey"] = "key",
+                ["Strategies:Test:Hyperliquid:Address"] = TestWalletAddress,
+                ["Strategies:Test:Hyperliquid:PrivateKey"] = TestPrivateKey,
                 ["Strategies:Test:Hyperliquid:UseTestnet"] = "true",
                 ["Strategies:Test:TradeIngestion:WindowDays"] = "1",
                 ["Strategies:Test:TradeIngestion:OverlapDays"] = "2"
