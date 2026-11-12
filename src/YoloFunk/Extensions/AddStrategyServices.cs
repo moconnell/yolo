@@ -1,3 +1,4 @@
+using CryptoExchange.Net.Web3;
 using Azure.Data.Tables;
 using HyperLiquid.Net;
 using HyperLiquid.Net.Clients;
@@ -93,7 +94,9 @@ public static class AddStrategyServices
 
             var socketClient = new HyperLiquidSocketClient(options =>
             {
-                options.ApiCredentials = new HyperLiquidCredentials(hyperliquidConfig.Address, hyperliquidConfig.PrivateKey);
+                options.ApiCredentials = new HyperLiquidCredentials().With(
+                    EthKey.FromPublicAddress(hyperliquidConfig.Address),
+                    EthKey.FromPrivateKey(hyperliquidConfig.PrivateKey));
                 options.BuilderFeePercentage = hyperliquidConfig.BuilderFeePercentage;
 
                 if (hyperliquidConfig.UseTestnet)
@@ -226,7 +229,9 @@ public static class AddStrategyServices
     {
         return new HyperLiquidRestClient(options =>
         {
-            options.ApiCredentials = new HyperLiquidCredentials(hyperliquidConfig.Address, hyperliquidConfig.PrivateKey);
+            options.ApiCredentials = new HyperLiquidCredentials().With(
+                EthKey.FromPublicAddress(hyperliquidConfig.Address),
+                EthKey.FromPrivateKey(hyperliquidConfig.PrivateKey));
             options.BuilderFeePercentage = hyperliquidConfig.BuilderFeePercentage;
 
             if (hyperliquidConfig.UseTestnet)

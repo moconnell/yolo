@@ -1,3 +1,4 @@
+using CryptoExchange.Net.Web3;
 using HyperLiquid.Net;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,7 +22,9 @@ public static class BrokerServiceCollectionExtensions
             var hyperliquidConfig = config.GetHyperliquidConfig()!;
             services.AddHyperLiquid(options =>
             {
-                options.ApiCredentials = new HyperLiquidCredentials(hyperliquidConfig.Address, hyperliquidConfig.PrivateKey);
+                options.ApiCredentials = new HyperLiquidCredentials().With(
+                    EthKey.FromPublicAddress(hyperliquidConfig.Address),
+                    EthKey.FromPrivateKey(hyperliquidConfig.PrivateKey));
                 options.Rest.BuilderFeePercentage = hyperliquidConfig.BuilderFeePercentage;
                 options.Socket.BuilderFeePercentage = hyperliquidConfig.BuilderFeePercentage;
 
