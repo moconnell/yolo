@@ -978,6 +978,7 @@ public class HyperliquidBrokerTest
                 order.Id,
                 null,
                 null,
+                null,
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(HttpResult());
 
@@ -988,7 +989,7 @@ public class HyperliquidBrokerTest
 
         // assert
         mockSpotTrading.Verify(
-            x => x.CancelOrderAsync(order.Symbol, order.Id, null, null, It.IsAny<CancellationToken>()),
+            x => x.CancelOrderAsync(order.Symbol, order.Id, null, null, null, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -1021,6 +1022,7 @@ public class HyperliquidBrokerTest
                 order.Id,
                 null,
                 null,
+                null,
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(HttpResult());
 
@@ -1031,7 +1033,7 @@ public class HyperliquidBrokerTest
 
         // assert
         mockFuturesTrading.Verify(
-            x => x.CancelOrderAsync(order.Symbol, order.Id, null, null, It.IsAny<CancellationToken>()),
+            x => x.CancelOrderAsync(order.Symbol, order.Id, null, null, null, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
